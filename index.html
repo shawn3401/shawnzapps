@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ShawnZapps: apps by Shawn Anderson in Idaho Falls, Idaho. Some for home, some for real estate.">
+<title>ShawnZapps</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2312172B'/%3E%3Cpath d='M37 8 16 36h13l-3 20 22-29H34z' fill='%23FFD21F'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:#F5F4EF;--paper:#FFFFFF;--ink:#12172B;--ink-2:#454C63;--ink-3:#767D93;--line:#E1E0D8;
+  --hero:#12172B;--hero-ink:#F5F4EF;--hero-ink-2:#B4BAD0;
+  --zap:#FFD21F;--zap-ink:#12172B;
+  --home:#D9482B;--home-soft:#FBE9E3;
+  --work:#2456E6;--work-soft:#E4EBFD;
+  --live:#1E8E5A;
+  --shadow:0 1px 2px rgba(18,23,43,.06),0 8px 24px rgba(18,23,43,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C0F1C;--paper:#151A2E;--ink:#EEF0F7;--ink-2:#B4BAD0;--ink-3:#8088A2;--line:#262D47;
+  --hero:#151A2E;
+  --home:#FF7A5C;--home-soft:#3A1E1A;
+  --work:#7C9DFF;--work-soft:#1B2650;
+  --live:#4FD093;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}}
+:root[data-theme="dark"]{
+  --bg:#0C0F1C;--paper:#151A2E;--ink:#EEF0F7;--ink-2:#B4BAD0;--ink-3:#8088A2;--line:#262D47;
+  --hero:#151A2E;
+  --home:#FF7A5C;--home-soft:#3A1E1A;
+  --work:#7C9DFF;--work-soft:#1B2650;
+  --live:#4FD093;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+
+/* hero */
+.hero{background:var(--hero);color:var(--hero-ink);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-40px;width:420px;height:520px;opacity:.07;pointer-events:none;
+  background:var(--zap);clip-path:polygon(58% 0,8% 52%,42% 52%,30% 100%,92% 40%,56% 40%)}
+.top{display:flex;align-items:center;justify-content:space-between;padding-top:22px;padding-bottom:22px;position:relative;z-index:1}
+.mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em}
+.mark svg{width:30px;height:30px;flex:none}
+.mark b{color:var(--zap);font-weight:800}
+.jump{display:flex;gap:8px}
+.jump a{text-decoration:none;font-weight:600;font-size:15px;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:var(--hero-ink)}
+.jump a:hover,.jump a:focus-visible{background:var(--zap);border-color:var(--zap);color:var(--zap-ink)}
+.pitch{padding:56px 0 72px;position:relative;z-index:1;max-width:720px}
+.pitch h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:60px;line-height:1.02;letter-spacing:-.03em;margin:0 0 18px}
+.pitch h1 em{font-style:normal;color:var(--zap)}
+.pitch p{font-size:20px;color:var(--hero-ink-2);margin:0;max-width:600px}
+
+/* sections */
+section{padding:56px 0 8px;scroll-margin-top:8px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:0 0 4px}
+.home .eyebrow{color:var(--home)}
+.work .eyebrow{color:var(--work)}
+.head h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:34px;line-height:1.05;letter-spacing:-.02em;margin:0}
+.head>p{margin:0;color:var(--ink-2);max-width:380px;text-align:right}
+.grid li{min-width:0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;list-style:none;margin:0;padding:0}
+.app{display:flex;gap:16px;align-items:flex-start;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px;text-decoration:none;height:100%;box-shadow:var(--shadow);transition:transform .15s ease,border-color .15s ease}
+a.app:hover,a.app:focus-visible{transform:translateY(-2px);border-color:var(--tint)}
+a.app:focus-visible{outline:3px solid var(--tint);outline-offset:2px}
+.home .app{--tint:var(--home);--soft:var(--home-soft)}
+.work .app{--tint:var(--work);--soft:var(--work-soft)}
+.tile{flex:none;width:56px;height:56px;border-radius:14px;background:var(--soft);color:var(--tint);display:grid;place-items:center;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:22px;letter-spacing:-.02em}
+.body{min-width:0;flex:1}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.name{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:22px;letter-spacing:-.01em;line-height:1.2}
+.chip{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-3);white-space:nowrap}
+.chip.live{color:var(--live);border-color:currentColor}
+.chip.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+.app p{margin:6px 0 0;color:var(--ink-2)}
+.go{display:inline-block;margin-top:10px;font-weight:700;font-size:15px;color:var(--tint)}
+a.app:hover .go span{margin-left:4px}
+.go span{transition:margin .15s ease}
+.app.soon{box-shadow:none;background:transparent;border-style:dashed}
+.app.soon .tile{background:transparent;border:1px dashed var(--line);color:var(--ink-3)}
+.app.soon .name{color:var(--ink-2)}
+
+footer{margin-top:64px;border-top:1px solid var(--line);padding:22px 0 40px;color:var(--ink-3);font-size:15px}
+footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+@media (max-width:760px){
+  .pitch{padding:36px 0 48px}
+  .pitch h1{font-size:40px}
+  .pitch p{font-size:18px}
+  .grid{grid-template-columns:1fr}
+  .head{display:block}
+  .head>p{text-align:left;margin-top:8px;max-width:none}
+  .head h2{font-size:28px}
+  section{padding-top:40px}
+}
+@media (max-width:420px){
+  .wrap{padding:0 16px}
+  .jump a{padding:6px 11px;font-size:14px}
+  .mark{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.app,.go span{transition:none}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap top">
+    <a class="mark" href="/" aria-label="ShawnZapps home">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#FFD21F"/><path d="M37 8 16 36h13l-3 20 22-29H34z" fill="#12172B"/></svg>
+      <span>Shawn<b>Z</b>apps</span>
+    </a>
+    <nav class="jump" aria-label="Sections">
+      <a href="#personal">Personal</a>
+      <a href="#business">Business</a>
+    </nav>
+  </div>
+  <div class="wrap">
+    <div class="pitch">
+      <h1>Apps I built because I <em>needed them.</em></h1>
+      <p>I'm Shawn Anderson in Idaho Falls, Idaho. I sell real estate and I build software. Some of it runs my business and some of it settles where we eat. It all lives here.</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="personal" class="home">
+    <div class="head">
+      <div>
+        <p class="eyebrow">Personal</p>
+        <h2>For home and the weekend</h2>
+      </div>
+      <p>Things I made for my own family and friends.</p>
+    </div>
+    <ul class="grid">
+      <li>
+        <a class="app" href="https://shawnandersonapps.com/dough/">
+          <div class="tile" aria-hidden="true">Do</div>
+          <div class="body">
+            <div class="row"><span class="name">Dough</span><span class="chip live">Live</span></div>
+            <p>A dough calculator that remembers every batch, what you changed, and how it turned out, so the next one is better.</p>
+            <span class="go">Open Dough <span>→</span></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a class="app" href="https://shawnandersonapps.com/yourturn/">
+          <div class="tile" aria-hidden="true">YT</div>
+          <div class="body">
+            <div class="row"><span class="name">Your Turn</span><span class="chip live">Live</span></div>
+            <p>Settles where to eat. Answer a few quick questions, take turns picking or eliminate your way down to one.</p>
+            <span class="go">Open Your Turn <span>→</span></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a class="app" href="https://turftrack.ai">
+          <div class="tile" aria-hidden="true">TT</div>
+          <div class="body">
+            <div class="row"><span class="name">TurfTrack</span><span class="chip">iPhone</span></div>
+            <p>Lawn care tracker for iOS.</p>
+            <span class="go">turftrack.ai <span>→</span></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <div class="app soon">
+          <div class="tile" aria-hidden="true">CT</div>
+          <div class="body">
+            <div class="row"><span class="name">CareTrack</span><span class="chip">Coming soon</span></div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="app soon">
+          <div class="tile" aria-hidden="true">PR</div>
+          <div class="body">
+            <div class="row"><span class="name">PackRight</span><span class="chip">Coming soon</span></div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section id="business" class="work">
+    <div class="head">
+      <div>
+        <p class="eyebrow">Business</p>
+        <h2>For real estate</h2>
+      </div>
+      <p>Tools I built for my own listings and team.</p>
+    </div>
+    <ul class="grid">
+      <li>
+        <a class="app" href="https://areapro.com">
+          <div class="tile" aria-hidden="true">AP</div>
+          <div class="body">
+            <div class="row"><span class="name">AreaPro</span><span class="chip live">Live</span></div>
+            <p>Market data and tools for real estate agents.</p>
+            <span class="go">areapro.com <span>→</span></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a class="app" href="https://showingpulse.com">
+          <div class="tile" aria-hidden="true">SP</div>
+          <div class="body">
+            <div class="row"><span class="name">ShowingPulse</span><span class="chip live">Live</span></div>
+            <p>Showing feedback for listing agents and sellers.</p>
+            <span class="go">showingpulse.com <span>→</span></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <div class="app soon">
+          <div class="tile" aria-hidden="true">SA</div>
+          <div class="body">
+            <div class="row"><span class="name">Seller Assistant</span><span class="chip">Coming soon</span></div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Built in Idaho Falls by Shawn Anderson</span>
+    <span>shawnzapps.com</span>
+  </div>
+</footer>
+
+</body>
+</html>
