@@ -18,7 +18,7 @@ The three apps moved here from shawnandersonapps.com on Oct 13, 2026. The old pa
 - Never invent data or app descriptions. Ask for anything missing.
 - Writing style for anything shown on the site or sent to Shawn: no em dashes or en dashes used to set off phrases (use commas, parentheses, or a new sentence). Plain, warm, specific.
 - DNS is at GoDaddy: four A records for `@` to GitHub Pages and `www` CNAME to `shawn3401.github.io`. HTTPS is enforced.
-- Still tied to the old domain: the Google Cloud project "ShawnZapps" Branding page (home page, authorized domains, privacy policy link at shawnandersonapps.com/privacy/).
+- Google Cloud project "ShawnZapps" (Oct 13, 2026): the OAuth client "ShawnZapps web" lists both domains under Authorized JavaScript origins, and Branding lists both under Authorized domains. Shawn confirmed Google sign-in works on shawnzapps.com/dough/. Still pointing at the old domain on the Branding page: the application home page and the privacy policy link (shawnandersonapps.com/privacy/); changing them may trigger a Google re-review, so move the privacy page first.
 
 ## dough/ app (started Oct 3, 2026)
 
