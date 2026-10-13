@@ -144,6 +144,18 @@ dialog::backdrop{background:rgba(15,15,15,.55)}
 dialog h2{font-size:22px}
 .or{text-align:center;color:var(--ink-3);font-size:14px;margin:12px 0 0}
 .chk{display:flex;gap:7px;align-items:center;font-size:14px;color:var(--ink-2);margin-top:8px}
+.todo{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
+.todo:first-child{border-top:0}
+.tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--ink-3);background:none;flex:none;cursor:pointer;color:#fff;font-weight:700;font-size:15px;line-height:1;padding:0;margin-top:1px}
+.tick:hover{border-color:var(--good)}
+.todo.done .tick{background:var(--good);border-color:var(--good)}
+.todo.done .tt{text-decoration:line-through;color:var(--ink-3)}
+.todo .tb{flex:1;min-width:0}
+.todo .meta{color:var(--ink-3);font-size:13px;margin-top:2px}
+.todo .warnbox{font-size:14px}
+.doneList{margin-top:14px}
+.doneList summary{cursor:pointer;color:var(--ink-2);font-size:15px}
+
 /* the form shown as the real page, with the boxes live on top of it */
 .fpage{position:relative;container-type:inline-size;border:1px solid var(--line);margin-top:12px;background:#fff;line-height:1;overflow:hidden}
 .fpage img{display:block;width:100%}
@@ -205,7 +217,14 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
         <textarea id="noteText" placeholder="Type a thought or new info, or paste a transcript."></textarea>
         <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px"><input type="date" id="noteDate" style="width:auto" aria-label="Date"><button class="btn primary" id="noteSave">Save note</button></div>
         <div class="err" id="noteErr" hidden></div>
+        <div class="ok" id="noteOk" hidden></div>
         <div id="notes"></div>
+      </div>
+
+      <div id="todosTab" hidden>
+        <div style="display:flex;gap:8px"><input type="text" id="todoText" placeholder="Add a to-do" aria-label="Add a to-do"><button class="btn primary" id="todoAdd">Add</button></div>
+        <p class="note" id="todoStatus" style="margin:8px 0 4px"></p>
+        <div id="todos"></div>
       </div>
 
       <div id="filesTab" hidden>
@@ -285,7 +304,7 @@ fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } })
 
 const BUCKET = "listing-files", BLANK_PATH = "_shared/form-blank.pdf", MAX_FILE = 200 * 1024 * 1024;
 const STAGES = [["new", "New lead"], ["call", "First call done"], ["walk_set", "Walkthrough set"], ["walked", "Walked"], ["pricing", "Pricing"], ["signed", "Signed"], ["listed", "Listed"], ["hold", "On hold"], ["closed", "Closed out"]];
-const VIEWS = [["notes", "Notes"], ["files", "Files"], ["brief", "Brief"], ["form", "Property form"]];
+const VIEWS = [["notes", "Notes"], ["files", "Files"], ["todos", "To-dos"], ["brief", "Brief"], ["form", "Property form"]];
 const FTYPES = [["photo", "Photos"], ["audio", "Recordings"], ["video", "Video"], ["doc", "Documents"]];
 const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"]];   // inside Brief
 const LONG_FIELDS = ["improvements", "additional_notes"];
@@ -302,7 +321,7 @@ const todayISO = () => new Date().toLocaleDateString("en-CA");
 const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
-let session = null, leads = [], cur = null, items = [], thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
+let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
 let formMode = innerWidth >= 760 ? "page" : "list", pageImgs = null, pagesLoading = false, pagesFailed = false;   // the form as the real page (wide screens) or as a list of boxes (phones)
 const triedPdf = new Set();
 
@@ -315,6 +334,8 @@ async function load(){
   if (!a){ show("noAccess"); return; }
   const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
   leads = error ? [] : data;
+  const { data: open } = await sb.from("listing_todos").select("lead_id").eq("done", false);
+  const n = {}; (open || []).forEach(t => n[t.lead_id] = (n[t.lead_id] || 0) + 1); leads.forEach(l => l.todo = n[l.id] || 0);
   route();
 }
 function route(){
@@ -333,7 +354,7 @@ function renderList(){
       <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
       ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
       ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
-      <div class="when">Updated ${niceDate(l.updated_at)}</div>
+      <div class="when">${l.todo ? `<b style="color:var(--accent-deep)">${l.todo} to-do${l.todo === 1 ? "" : "s"} open</b> · ` : ""}Updated ${niceDate(l.updated_at)}</div>
     </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
 }
 $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b){ filter = b.dataset.f; renderList(); } });
@@ -344,13 +365,14 @@ window.addEventListener("hashchange", () => { if (skipHash){ skipHash = false; r
 
 // ---- one lead ----------------------------------------------------------------------
 async function openLead(id){
-  const [{ data: l }, { data: its }] = await Promise.all([
+  const [{ data: l }, { data: its }, { data: tds }] = await Promise.all([
     sb.from("listing_leads").select("*").eq("id", id).maybeSingle(),
     sb.from("listing_items").select("*").eq("lead_id", id).order("created_at"),
+    sb.from("listing_todos").select("*").eq("lead_id", id).order("created_at"),
   ]);
   if (!l){ location.hash = ""; return; }
-  cur = l; cur.form = normForm(cur.form); items = its || []; view = "notes"; tab = "overview"; fileFilter = "all";
-  $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
+  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; view = "notes"; tab = "overview"; fileFilter = "all";
+  $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteOk").hidden = $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
   show("lead"); renderLead(); window.scrollTo(0, 0);
   loadThumbs();
 }
@@ -363,10 +385,10 @@ function renderLead(){
 // An entry is a note (words, no file) or a file (one upload). Notes and Files are two views of the same list.
 const isNote = i => !i.files.length;
 function renderView(){
-  const nNotes = items.filter(isNote).length, n = { notes: nNotes, files: items.length - nNotes };
+  const nNotes = items.filter(isNote).length, n = { notes: nNotes, files: items.length - nNotes, todos: todos.filter(t => !t.done).length };
   $("#tabs").innerHTML = VIEWS.map(([k, name]) => `<button class="pill${view === k ? " on" : ""}" data-v="${k}">${name}${n[k] ? `<span class="n">${n[k]}</span>` : ""}</button>`).join("");
-  $("#notesTab").hidden = view !== "notes"; $("#filesTab").hidden = view !== "files"; $("#briefTab").hidden = view !== "brief" && view !== "form";
-  if (view === "notes") renderNotes(); else if (view === "files") renderFiles(); else renderBrief();
+  $("#notesTab").hidden = view !== "notes"; $("#filesTab").hidden = view !== "files"; $("#todosTab").hidden = view !== "todos"; $("#briefTab").hidden = view !== "brief" && view !== "form";
+  if (view === "notes") renderNotes(); else if (view === "files") renderFiles(); else if (view === "todos") renderTodos(); else renderBrief();
 }
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (b){ view = b.dataset.v; renderView(); } });
 async function saveLead(patch){
@@ -416,6 +438,60 @@ $("#noteSave").addEventListener("click", async () => {
   $("#noteSave").disabled = false;
   if (error){ err.textContent = "That didn't save: " + error.message; err.hidden = false; return; }
   items.push(data); $("#noteText").value = ""; renderView();
+  const ok = $("#noteOk"), lead = cur; ok.textContent = "Saved. Checking it for to-dos…"; ok.hidden = false;
+  const res = await findTodos(data);
+  if (cur !== lead) return;
+  const got = res.added || [];
+  ok.textContent = res.error ? "Saved. (Couldn't check it for to-dos: " + res.error + ")" : got.length ? "Saved, and added to your to-dos: " + got.map(t => t.text).join("; ") + "." : "Saved.";
+  setTimeout(() => { if (cur === lead) ok.hidden = true; }, got.length ? 9000 : 2500);
+});
+
+// ---- to-dos ---------------------------------------------------------------------------
+// The running list of what has to happen before the home goes live. He can type one, and every note,
+// transcript, and PDF he adds is read for more (the listing-todos function). Nothing is ticked off for him:
+// when new material shows a to-do is finished, it gets a "Looks done" prompt instead.
+function renderTodos(){
+  const open = todos.filter(t => !t.done), done = todos.filter(t => t.done).sort((a, b) => (b.done_at || "").localeCompare(a.done_at || ""));
+  const from = t => { if (t.source !== "ai") return "Added by you"; const it = items.find(i => i.id === t.item_id); return it ? (isNote(it) ? "From your note of " + niceDate(it.occurred_on) : "From " + esc(it.title)) : "From your notes and files"; };
+  const row = t => `<div class="todo${t.done ? " done" : ""}">
+      <button class="tick" data-tick="${t.id}" aria-label="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
+      <div class="tb"><div class="tt">${esc(t.text)}</div>
+        <div class="meta">${t.who && !/^me$/i.test(t.who) ? `<b>${esc(t.who)}</b> · ` : ""}${from(t)}${t.done && t.done_at ? " · done " + niceDate(t.done_at) : ""} · <button class="btn link" data-trm="${t.id}">Remove</button></div>
+        ${!t.done && t.done_hint ? `<div class="warnbox">Looks done: ${esc(t.done_hint)} <button class="btn small" data-tick="${t.id}">Mark done</button> <button class="btn small" data-nothint="${t.id}">Not yet</button></div>` : ""}
+      </div></div>`;
+  $("#todos").innerHTML = (open.length ? open.map(row).join("") : `<p class="sub" style="margin-top:10px">${done.length ? "Nothing open. Everything on the list is done." : "Nothing here yet. Type one above, or just write it in a note (\"need to measure the property\") and it lands here."}</p>`)
+    + (done.length ? `<details class="doneList"><summary>Done (${done.length})</summary>${done.map(row).join("")}</details>` : "");
+  $("#todoStatus").innerHTML = scanning ? "Checking for to-dos…" : `To-dos are picked up from the notes and files you add.${items.some(i => i.transcript) ? ` <button class="btn link" id="todoScan">Check everything again</button>` : ""}`;
+}
+async function findTodos(item){   // one new entry, or with no item, everything on the lead
+  const lead = cur; scanning++; if (view === "todos") renderTodos();
+  let res;
+  try { res = await fn("listing-todos", { lead_id: lead.id, item_id: item?.id }); } catch (err){ res = { error: err.message }; }
+  scanning--;
+  if (cur === lead){
+    for (const t of res.added || []) todos.push(t);
+    for (const h of res.hinted || []){ const t = todos.find(x => x.id === h.id); if (t) t.done_hint = h.done_hint; }
+    if (res.error && view === "todos"){ renderTodos(); $("#todoStatus").textContent = "Couldn't check for to-dos: " + res.error; } else renderView();
+  }
+  return res;
+}
+async function addTodo(){
+  const text = $("#todoText").value.trim(); if (!text) return;
+  const { data, error } = await sb.from("listing_todos").insert({ lead_id: cur.id, text, who: "Me" }).select().single();
+  if (error) return alert("That didn't save: " + error.message);
+  todos.push(data); $("#todoText").value = ""; renderView(); $("#todoText").focus();
+}
+$("#todoAdd").addEventListener("click", addTodo);
+$("#todoText").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); addTodo(); } });
+$("#todosTab").addEventListener("click", async e => {
+  const tick = e.target.closest("[data-tick]"), not = e.target.closest("[data-nothint]"), rm = e.target.closest("[data-trm]");
+  if (e.target.id === "todoScan") return void findTodos(null);
+  const t = todos.find(x => x.id === (tick?.dataset.tick || not?.dataset.nothint || rm?.dataset.trm)); if (!t) return;
+  if (rm){ todos = todos.filter(x => x !== t); renderView(); await sb.from("listing_todos").delete().eq("id", t.id); return; }
+  const patch = not ? { done_hint: "" } : { done: !t.done, done_at: t.done ? null : new Date().toISOString(), done_hint: "" };
+  Object.assign(t, patch); renderView();
+  const { error } = await sb.from("listing_todos").update(patch).eq("id", t.id);
+  if (error) alert("That didn't save: " + error.message);
 });
 
 // ---- files ----------------------------------------------------------------------------
@@ -553,7 +629,7 @@ $("#filePick").addEventListener("change", async e => {
     let text = "";
     if (type === "application/pdf"){ $("#upBusyText").textContent = `Reading ${f.name}`; try { text = await pdfText(await f.arrayBuffer()); } catch (_) {} }
     const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, transcript: text, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
-    if (data && type === "application/pdf") triedPdf.add(data.id);
+    if (data && type === "application/pdf"){ triedPdf.add(data.id); if (text) findTodos(data); }
     if (error){ problems.push(`${f.name}: ${error.message}`); await sb.storage.from(BUCKET).remove([path]); continue; }
     added.push(data);
     if (cur && cur.id === lead.id){ items.push(data); renderView(); }
@@ -595,7 +671,7 @@ async function fn(name, body){
 async function transcribe(it){
   const show = () => { if (cur && cur.id === it.lead_id && view === "files") renderFiles(); };
   it.status = "transcribing"; it.error = ""; show();
-  try { const d = await fn("listing-transcribe", { item_id: it.id }); it.transcript = d.transcript; it.status = "ready"; }
+  try { const d = await fn("listing-transcribe", { item_id: it.id }); it.transcript = d.transcript; it.status = "ready"; findTodos(it); }
   catch (err){ it.status = "failed"; it.error = err.message; }
   show();
   return it.status === "ready";
