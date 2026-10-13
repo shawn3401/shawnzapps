@@ -153,6 +153,13 @@ dialog h2{font-size:22px}
 .todo .tb{flex:1;min-width:0}
 .todo .meta{color:var(--ink-3);font-size:13px;margin-top:2px}
 .todo .warnbox{font-size:14px}
+.whoc{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap;flex:none;align-self:flex-start}
+.whoc.agent{background:var(--soft);border-color:transparent;color:var(--accent-deep)}
+.whoc.seller{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.whoc.team{background:var(--good-soft);border-color:transparent;color:var(--good)}
+.whoc.on{outline:2px solid var(--ink);outline-offset:1px}
+.whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
+@media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 .doneList{margin-top:14px}
 .doneList summary{cursor:pointer;color:var(--ink-2);font-size:15px}
 
@@ -223,7 +230,9 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
 
       <div id="todosTab" hidden>
         <div style="display:flex;gap:8px"><input type="text" id="todoText" placeholder="Add a to-do" aria-label="Add a to-do"><button class="btn primary" id="todoAdd">Add</button></div>
-        <p class="note" id="todoStatus" style="margin:8px 0 4px"></p>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px"><span class="note">Who:</span><span id="todoWho" style="display:flex;gap:5px;flex-wrap:wrap"></span></div>
+        <p class="note" id="todoStatus" style="margin:10px 0 4px"></p>
+        <div class="pills" id="todoFilters" style="margin-bottom:4px"></div>
         <div id="todos"></div>
       </div>
 
@@ -305,6 +314,7 @@ fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } })
 const BUCKET = "listing-files", BLANK_PATH = "_shared/form-blank.pdf", MAX_FILE = 200 * 1024 * 1024;
 const STAGES = [["new", "New lead"], ["call", "First call done"], ["walk_set", "Walkthrough set"], ["walked", "Walked"], ["pricing", "Pricing"], ["signed", "Signed"], ["listed", "Listed"], ["hold", "On hold"], ["closed", "Closed out"]];
 const VIEWS = [["notes", "Notes"], ["files", "Files"], ["todos", "To-dos"], ["brief", "Brief"], ["form", "Property form"]];
+const WHO = [["agent", "Listing Agent"], ["seller", "Seller"], ["team", "Success Team"]];   // who a to-do belongs to
 const FTYPES = [["photo", "Photos"], ["audio", "Recordings"], ["video", "Video"], ["doc", "Documents"]];
 const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"]];   // inside Brief
 const LONG_FIELDS = ["improvements", "additional_notes"];
@@ -321,7 +331,7 @@ const todayISO = () => new Date().toLocaleDateString("en-CA");
 const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
-let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
+let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, todoWho = "agent", whoFilter = "all", whoEdit = null, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
 let formMode = innerWidth >= 760 ? "page" : "list", pageImgs = null, pagesLoading = false, pagesFailed = false;   // the form as the real page (wide screens) or as a list of boxes (phones)
 const triedPdf = new Set();
 
@@ -438,7 +448,7 @@ $("#noteSave").addEventListener("click", async () => {
   $("#noteSave").disabled = false;
   if (error){ err.textContent = "That didn't save: " + error.message; err.hidden = false; return; }
   items.push(data); $("#noteText").value = ""; renderView();
-  const ok = $("#noteOk"), lead = cur; ok.textContent = "Saved. Checking it for to-dos…"; ok.hidden = false;
+  whoEdit = null; const ok = $("#noteOk"), lead = cur; ok.textContent = "Saved. Checking it for to-dos…"; ok.hidden = false;
   const res = await findTodos(data);
   if (cur !== lead) return;
   const got = res.added || [];
@@ -450,18 +460,25 @@ $("#noteSave").addEventListener("click", async () => {
 // The running list of what has to happen before the home goes live. He can type one, and every note,
 // transcript, and PDF he adds is read for more (the listing-todos function). Nothing is ticked off for him:
 // when new material shows a to-do is finished, it gets a "Looks done" prompt instead.
+const whoName = k => (WHO.find(w => w[0] === k) || WHO[0])[1];
 function renderTodos(){
-  const open = todos.filter(t => !t.done), done = todos.filter(t => t.done).sort((a, b) => (b.done_at || "").localeCompare(a.done_at || ""));
+  const all = todos.filter(t => !t.done), counts = {}; all.forEach(t => counts[t.who] = (counts[t.who] || 0) + 1);
+  if (whoFilter !== "all" && !counts[whoFilter]) whoFilter = "all";
+  const open = all.filter(t => whoFilter === "all" || t.who === whoFilter), done = todos.filter(t => t.done).sort((a, b) => (b.done_at || "").localeCompare(a.done_at || ""));
   const from = t => { if (t.source !== "ai") return "Added by you"; const it = items.find(i => i.id === t.item_id); return it ? (isNote(it) ? "From your note of " + niceDate(it.occurred_on) : "From " + esc(it.title)) : "From your notes and files"; };
+  const who = t => whoEdit === t.id ? `<div class="whopick">${WHO.map(([k, n]) => `<button class="whoc ${k}${t.who === k ? " on" : ""}" data-setwho="${t.id}|${k}">${n}</button>`).join("")}</div>`
+    : `<button class="whoc ${t.who}" data-who="${t.id}" aria-label="Who: ${whoName(t.who)}. Tap to change">${whoName(t.who)}</button>`;
   const row = t => `<div class="todo${t.done ? " done" : ""}">
       <button class="tick" data-tick="${t.id}" aria-label="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
       <div class="tb"><div class="tt">${esc(t.text)}</div>
-        <div class="meta">${t.who && !/^me$/i.test(t.who) ? `<b>${esc(t.who)}</b> · ` : ""}${from(t)}${t.done && t.done_at ? " · done " + niceDate(t.done_at) : ""} · <button class="btn link" data-trm="${t.id}">Remove</button></div>
+        <div class="meta">${from(t)}${t.done && t.done_at ? " · done " + niceDate(t.done_at) : ""} · <button class="btn link" data-trm="${t.id}">Remove</button></div>
         ${!t.done && t.done_hint ? `<div class="warnbox">Looks done: ${esc(t.done_hint)} <button class="btn small" data-tick="${t.id}">Mark done</button> <button class="btn small" data-nothint="${t.id}">Not yet</button></div>` : ""}
-      </div></div>`;
+      </div>${who(t)}</div>`;
+  $("#todoWho").innerHTML = WHO.map(([k, n]) => `<button class="whoc ${k}${todoWho === k ? " on" : ""}" data-addwho="${k}">${n}</button>`).join("");
+  $("#todoFilters").innerHTML = Object.keys(counts).length > 1 ? [["all", "All"], ...WHO.filter(([k]) => counts[k])].map(([k, n]) => `<button class="pill${whoFilter === k ? " on" : ""}" data-wf="${k}">${n}<span class="n">${k === "all" ? all.length : counts[k]}</span></button>`).join("") : "";
   $("#todos").innerHTML = (open.length ? open.map(row).join("") : `<p class="sub" style="margin-top:10px">${done.length ? "Nothing open. Everything on the list is done." : "Nothing here yet. Type one above, or just write it in a note (\"need to measure the property\") and it lands here."}</p>`)
     + (done.length ? `<details class="doneList"><summary>Done (${done.length})</summary>${done.map(row).join("")}</details>` : "");
-  $("#todoStatus").innerHTML = scanning ? "Checking for to-dos…" : `To-dos are picked up from the notes and files you add.${items.some(i => i.transcript) ? ` <button class="btn link" id="todoScan">Check everything again</button>` : ""}`;
+  $("#todoStatus").innerHTML = scanning ? "Checking for to-dos…" : `To-dos are picked up from the notes and files you add. Tap a name to change who it belongs to.${items.some(i => i.transcript) ? ` <button class="btn link" id="todoScan">Check everything again</button>` : ""}`;
 }
 async function findTodos(item){   // one new entry, or with no item, everything on the lead
   const lead = cur; scanning++; if (view === "todos") renderTodos();
@@ -477,7 +494,7 @@ async function findTodos(item){   // one new entry, or with no item, everything 
 }
 async function addTodo(){
   const text = $("#todoText").value.trim(); if (!text) return;
-  const { data, error } = await sb.from("listing_todos").insert({ lead_id: cur.id, text, who: "Me" }).select().single();
+  const { data, error } = await sb.from("listing_todos").insert({ lead_id: cur.id, text, who: todoWho }).select().single();
   if (error) return alert("That didn't save: " + error.message);
   todos.push(data); $("#todoText").value = ""; renderView(); $("#todoText").focus();
 }
@@ -486,6 +503,15 @@ $("#todoText").addEventListener("keydown", e => { if (e.key === "Enter"){ e.prev
 $("#todosTab").addEventListener("click", async e => {
   const tick = e.target.closest("[data-tick]"), not = e.target.closest("[data-nothint]"), rm = e.target.closest("[data-trm]");
   if (e.target.id === "todoScan") return void findTodos(null);
+  const aw = e.target.closest("[data-addwho]"), wf = e.target.closest("[data-wf]"), w = e.target.closest("[data-who]"), sw = e.target.closest("[data-setwho]");
+  if (aw){ todoWho = aw.dataset.addwho; return renderTodos(); }
+  if (wf){ whoFilter = wf.dataset.wf; return renderTodos(); }
+  if (w){ whoEdit = w.dataset.who; return renderTodos(); }
+  if (sw){
+    const [id, k] = sw.dataset.setwho.split("|"), td = todos.find(x => x.id === id); whoEdit = null;
+    if (td && td.who !== k){ td.who = k; sb.from("listing_todos").update({ who: k }).eq("id", id).then(({ error }) => { if (error) alert("That didn't save: " + error.message); }); }
+    return renderTodos();
+  }
   const t = todos.find(x => x.id === (tick?.dataset.tick || not?.dataset.nothint || rm?.dataset.trm)); if (!t) return;
   if (rm){ todos = todos.filter(x => x !== t); renderView(); await sb.from("listing_todos").delete().eq("id", t.id); return; }
   const patch = not ? { done_hint: "" } : { done: !t.done, done_at: t.done ? null : new Date().toISOString(), done_hint: "" };

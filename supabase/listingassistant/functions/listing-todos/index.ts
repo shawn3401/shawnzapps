@@ -10,6 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MODEL = "claude-opus-5-5";
 const MAX_WORDS = 120000;   // characters of material sent
 const MAX_ADD = 25;
+const WHO: Record<string, string> = { agent: "Listing Agent", seller: "Seller", team: "Success Team" };
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +32,8 @@ Not a to-do: a description of the house, an observation, something already done,
 
 Rules for add:
 - text is a short instruction that starts with a verb and names the specific thing, about 3 to 12 words. Keep names, dates, and amounts that were given ("Send Darlene Josh's number", "Meet Amanda and Katrina at the office Thursday at 2").
-- who is "Me" when it is the agent's job, otherwise the first name or role of the person who owns it.
+- who is one of three. "agent": the listing agent's own job (measuring, pricing, calls and meetings with the seller, anything the agent said "I" will do). "seller": the seller's job, or their family's or anyone on the seller's side (repairs, cleaning out, finding documents, decisions). "team": the agent's Success Team, the office staff who handle the listing's paperwork and logistics (listing documents and signatures, MLS entry, ordering title work, scheduling photos, signs and lockboxes, marketing pieces); use it when the material hands the task to the team, the office, or an admin, or when the task is plainly that kind of office work. When it is unclear, use "agent".
+- Since who is only one of three, put any other person's name in the text itself ("Ask Craig what caused the basement flooding").
 - Do not add anything that means the same as a to-do already on the list, whether open or done. One task, one line.
 - When the note is itself just a task the agent jotted down, that task is the to-do.
 
@@ -52,7 +54,7 @@ const TOOL = {
     properties: {
       add: {
         type: "array",
-        items: { type: "object", additionalProperties: false, required: ["text", "who"], properties: { text: { type: "string" }, who: { type: "string" } } },
+        items: { type: "object", additionalProperties: false, required: ["text", "who"], properties: { text: { type: "string" }, who: { type: "string", enum: ["agent", "seller", "team"] } } },
       },
       done: {
         type: "array",
@@ -95,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const words = it.transcript.slice(0, Math.max(0, room)); room -= words.length;
     return `<entry>\n${it.kind === "note" ? "Agent's note" : "File: " + it.title}, ${it.occurred_on}\n${words}\n</entry>`;
   });
-  const list = todos.length ? todos.map((t, n) => `${n + 1}. [${t.done ? "done" : "open"}] ${t.text}${t.who ? " (" + t.who + ")" : ""}`).join("\n") : "(none yet)";
+  const list = todos.length ? todos.map((t, n) => `${n + 1}. [${t.done ? "done" : "open"}] ${t.text} (${WHO[t.who] ?? "Listing Agent"})`).join("\n") : "(none yet)";
   const ask = `Seller: ${lead.name || "(no name yet)"}${lead.address ? ", " + lead.address : ""}
 Today is ${new Date().toLocaleDateString("en-US", { timeZone: "America/Boise", weekday: "long", year: "numeric", month: "long", day: "numeric" })}.
 
@@ -130,7 +132,7 @@ Call save_todos.`;
     console.log(`todos lead=${lead.id} entries=${items.length} add=${out.add?.length ?? 0} done=${out.done?.length ?? 0} in=${res.usage.input_tokens} out=${res.usage.output_tokens}`);
 
     const rows = (out.add || []).filter((a) => a.text?.trim()).slice(0, MAX_ADD).map((a) => ({
-      lead_id: lead.id, user_id: userId, text: a.text.trim().slice(0, 300), who: (a.who || "").trim().slice(0, 60), source: "ai", item_id: body.item_id ?? null,
+      lead_id: lead.id, user_id: userId, text: a.text.trim().slice(0, 300), who: WHO[a.who] ? a.who : "agent", source: "ai", item_id: body.item_id ?? null,
     }));
     let added: unknown[] = [];
     if (rows.length) {
