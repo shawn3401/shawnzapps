@@ -209,5 +209,5 @@ shawnzapps.com/listingassistant/. A work tool for Shawn's real estate business (
 - "Download the form PDF" writes the marks onto the team's actual blank PDF with pdf-lib: X for marked, ? for inferred and not yet confirmed (Shawn left that choice to Claude), a circle for Paved Y or N, small x in sub-option boxes, blue ink. The blank PDF is NOT in the repo: it is stored privately at `_shared/form-blank.pdf` in the bucket, and the first PDF download asks for it once.
 
 ### Not built yet
-- Reading video footage (only its sound is transcribed), pulling text out of uploaded PDFs or documents, sharing a lead with teammates or an admin view, sending notes by email, a CMA or pricing step, tasks with due dates, and a link from the home page (on purpose: it is a work tool; the home page shows it as a "Seller Assistant" Coming soon card with no link, Shawn's name for it there).
+- Reading video footage (only its sound is transcribed), pulling text out of uploaded PDFs or documents, sharing a lead with teammates or an admin view, sending notes by email, a CMA or pricing step, and tasks with due dates. The home page link exists (Oct 13, 2026: Shawn asked for it; the home page has a "Listing Assistant" card under Business with a "Team only" chip, linking to /listingassistant/).
 
