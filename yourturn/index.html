@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Your Turn: answer a few quick questions, rule a few places out, and settle where to eat. It remembers where you've been and whose turn it is to pick.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+<title>Your Turn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{color-scheme:light dark;
+  --bg:#F3F1EA; --paper:#FFFEFA; --ink:#1E2A2B; --ink-2:#4E5C5C; --ink-3:#7D8A8A;
+  --line:#DDD9CC; --accent:#1F6F6B; --accent-deep:#16524F; --soft:#DFEEEB; --pop:#C98A12; --pop-soft:#FBF0D3;
+  --good:#3F7A45; --good-soft:#E0EEDD; --bad:#9B2A2A; --bad-soft:#F5DEDE; --on:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121819; --paper:#1A2223; --ink:#EDF1EF; --ink-2:#B9C4C2; --ink-3:#7F8C8B;
+    --line:#2E3A3B; --accent:#5CC2B8; --accent-deep:#8AD8CF; --soft:#1D3331; --pop:#EDBE55; --pop-soft:#3A3016;
+    --good:#8FBF88; --good-soft:#20311F; --bad:#E27373; --bad-soft:#3B1E1E; --on:#0E1717;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121819; --paper:#1A2223; --ink:#EDF1EF; --ink-2:#B9C4C2; --ink-3:#7F8C8B;
+  --line:#2E3A3B; --accent:#5CC2B8; --accent-deep:#8AD8CF; --soft:#1D3331; --pop:#EDBE55; --pop-soft:#3A3016;
+  --good:#8FBF88; --good-soft:#20311F; --bad:#E27373; --bad-soft:#3B1E1E; --on:#0E1717;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.45}
+a{color:var(--accent)}
+h1,h2,h3{font-family:"Fraunces",Georgia,serif;font-weight:700;margin:0;line-height:1.1}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px 70px}
+
+/* top bar */
+.bar{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar .in{max-width:680px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bar h1{font-size:28px}
+.who{font-size:13px;color:var(--ink-3);display:flex;gap:10px;align-items:center;min-width:0}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.btn{font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:6px;padding:8px 13px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.btn.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+.btn.big{width:100%;padding:14px;font-size:18px;text-align:center}
+.btn.link{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline;font-weight:400}
+.btn.warn{color:var(--bad)}
+.btn.primary.cut, .btn.primary.cut:hover{background:var(--bad);border-color:var(--bad)}
+.btn[disabled]{opacity:.6;cursor:default}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin:16px 0 14px;overflow-x:auto}
+.tabs button{font:inherit;font-weight:600;font-size:16px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:8px 16px;cursor:pointer;white-space:nowrap}
+.tabs button.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.tabs .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--pop);margin-left:6px;vertical-align:middle}
+
+/* cards */
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card + .card, .card + .pc, .pc + .pc, .pc + .card{margin-top:12px}
+.card h2{font-size:21px;margin-bottom:10px}
+.card p{margin:0 0 10px}
+.sub{color:var(--ink-2);font-size:15px}
+.note{color:var(--ink-3);font-size:14px;margin:8px 0 0}
+.intro h2{font-size:30px;margin-bottom:10px}
+.intro ol{margin:0 0 14px;padding-left:22px}
+.intro li{margin:4px 0}
+
+/* whose turn */
+.turn{background:var(--pop-soft);border:1px solid var(--line);border-left:6px solid var(--pop);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.turn b{font-family:"Fraunces",Georgia,serif;font-size:22px;line-height:1.15;display:block}
+.turn small{color:var(--ink-2);font-size:14px}
+.rate{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.rate .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+
+/* questions */
+.q{padding:13px 0;border-top:1px solid var(--line)}
+.q:first-child{border-top:0;padding-top:0}
+.q:last-child{padding-bottom:0}
+.q .lab{font-weight:700}
+.grp{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--pop-soft);border-left:5px solid var(--pop)}
+.grp .gv{font-size:14.5px;color:var(--ink-2)}
+.q .allnone{float:right;font-weight:400;font-size:15px}
+.q .hint{font-size:14px;color:var(--ink-3)}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.seg button{flex:1 1 0;min-width:76px;font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);border-radius:8px;padding:9px 6px;cursor:pointer;line-height:1.2}
+.seg button small{display:block;font-weight:400;font-size:12.5px;color:var(--ink-3)}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.seg button.on small{color:var(--on);opacity:.85}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);border-radius:999px;padding:7px 14px;cursor:pointer}
+.chips button.on{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.chips button.want{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.chips button.avoid{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);text-decoration:line-through}
+.chips button.ghost{border-style:dashed;background:none;color:var(--ink-3);font-weight:400}
+.chips button.me{cursor:default}
+.pick{margin-top:0}
+#plWaits button{flex:1 1 45%}
+.inline{display:flex;gap:8px;margin-top:8px}
+.inline input{flex:1;min-width:0}
+label.f{display:block;font-size:14px;font-weight:600;color:var(--ink-2);margin:12px 0 4px}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=search],select,textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 11px}
+textarea{min-height:64px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.ck{display:flex;gap:9px;align-items:center;margin-top:10px;font-size:16px}
+label.ck input{width:20px;height:20px;accent-color:var(--accent)}
+
+/* place cards */
+.sum .btn{flex:none;font-size:14px;padding:6px 12px}
+.sum{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font-size:15px;color:var(--ink-2)}
+.pc{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;position:relative}
+.pc h3{font-size:22px}
+.pc .meta{color:var(--ink-2);font-size:15px;margin-top:3px}
+.pc .facts{display:flex;flex-wrap:wrap;gap:5px 6px;margin-top:9px}
+.tag{font-size:13.5px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--ink-2);background:var(--bg);white-space:nowrap}
+.tag.good{border-color:var(--good);color:var(--good);background:var(--good-soft)}
+.tag.bad{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.tag.pop{border-color:var(--pop);color:var(--ink);background:var(--pop-soft)}
+.pc .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pc .acts .btn.primary{flex:1 1 130px;text-align:center}
+.pc.out{opacity:.62}
+.pc.out h3{text-decoration:line-through}
+.pc.lit{border-color:var(--pop);box-shadow:0 0 0 3px var(--pop)}
+.pc .hide{margin-top:8px;font-size:14px}
+.pc .hide .btn.link{color:var(--ink-3)}
+.pc .whoveto{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
+.left{margin-top:14px;font-size:15px;color:var(--ink-2)}
+.left summary{cursor:pointer}
+.left ul{margin:8px 0 0;padding-left:20px}
+.vetoes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.done{text-align:center;padding:26px 18px}
+.done .big{font-family:"Fraunces",Georgia,serif;font-weight:700;font-size:32px;line-height:1.1;margin:6px 0 8px}
+.done .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+
+/* lists */
+.li{padding:12px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.li:first-of-type{border-top:0}
+.li .t{font-weight:700}
+.li .d{font-size:14.5px;color:var(--ink-2)}
+.li .a{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+.li .a .btn{font-size:14px;padding:6px 10px}
+.stars{display:inline-flex;gap:2px}
+.stars button{font-size:26px;line-height:1;border:0;background:none;color:var(--line);cursor:pointer;padding:0 2px}
+.stars button.on{color:var(--pop)}
+.st{color:var(--pop);letter-spacing:1px}
+.empty{text-align:center;color:var(--ink-2);padding:26px 16px}
+
+.err{margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--bad-soft);color:var(--bad);border-left:4px solid var(--bad);font-size:15px}
+.ok{margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--good-soft);color:var(--good);border-left:4px solid var(--good);font-size:15px}
+dialog{border:1px solid var(--line);border-top:5px solid var(--accent);border-radius:10px;background:var(--paper);color:var(--ink);padding:22px;width:min(460px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(10,18,18,.55)}
+dialog h2{font-size:25px;margin-bottom:4px}
+dialog p.sub{margin:0 0 10px}
+dialog .row{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+dialog .or{text-align:center;color:var(--ink-3);font-size:14px;margin:10px 0 0}
+dialog h3{font-size:17px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+dialog h3 small{font-family:"Source Sans 3",sans-serif;font-weight:400;font-size:13.5px;color:var(--ink-3);display:block;margin-top:2px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:15px;z-index:20;max-width:calc(100vw - 32px)}
+footer{text-align:center;color:var(--ink-3);font-size:14px;margin-top:30px}
+@media (max-width:480px){
+  .bar h1{font-size:24px}
+  .who span{display:none}
+  .li{flex-direction:column}
+  .li .a{justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="in">
+  <h1>Your Turn</h1>
+  <div class="who">
+    <span id="whoEmail" hidden></span>
+    <button class="btn" id="signOut" hidden>Sign out</button>
+    <button class="btn primary" id="signIn">Sign in</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <!-- signed out -->
+  <div id="intro" hidden>
+    <div class="card intro" style="margin-top:18px">
+      <h2>Where should we eat?</h2>
+      <p>Your Turn settles it the way you already do, just faster.</p>
+      <ol>
+        <li>Tap who's eating and answer a few quick questions: how much time, how far, what sounds good.</li>
+        <li>It deals a handful of places that fit, and skips the ones you've been to lately.</li>
+        <li>Everyone gets to rule one out. Whoever's turn it is makes the final call.</li>
+      </ol>
+      <button class="btn primary big" data-act="signin">Sign in or create an account</button>
+      <p class="note">It needs an account so it can remember your places, your ratings, and whose turn it is.</p>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="tabs" id="tabs"></div>
+    <div id="view"></div>
+  </div>
+
+  <footer><a href="/">shawnzapps.com</a></footer>
+</div>
+
+<div id="toast" hidden></div>
+
+<!-- sign in / create account / reset -->
+<dialog id="authDlg">
+  <form id="authForm">
+    <h2 id="authTitle">Sign in</h2>
+    <p class="sub" id="authSub"></p>
+    <div id="googleWrap" hidden>
+      <button type="button" class="btn big" id="google">Continue with Google</button>
+      <p class="or">or use your email</p>
+    </div>
+    <label class="f" for="email">Email</label>
+    <input type="email" id="email" autocomplete="email" required>
+    <div id="pwWrap">
+      <label class="f" for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" minlength="8">
+    </div>
+    <div class="err" id="authErr" hidden></div>
+    <div class="ok" id="authOk" hidden></div>
+    <div class="row"><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
+    <p class="note" id="authLinks"></p>
+  </form>
+</dialog>
+
+<!-- new password, after a reset link -->
+<dialog id="pwDlg">
+  <form id="pwForm">
+    <h2>New password</h2>
+    <p class="sub">You're in from the reset link. Pick a new password.</p>
+    <label class="f" for="pw1">New password</label>
+    <input type="password" id="pw1" autocomplete="new-password" minlength="8" required>
+    <div class="err" id="pwErr" hidden></div>
+    <div class="row"><button class="btn primary" id="pwBtn">Save password</button></div>
+  </form>
+</dialog>
+
+<!-- first sign-in: what to call you -->
+<dialog id="nameDlg">
+  <form id="nameForm">
+    <h2>What should people call you?</h2>
+    <p class="sub">This is the name on your turn, and what friends see when you link accounts.</p>
+    <label class="f" for="myName">Your first name</label>
+    <input type="text" id="myName" maxlength="40" autocomplete="given-name" required>
+    <div class="err" id="nameErr" hidden></div>
+    <div class="row"><button class="btn primary">Save</button></div>
+  </form>
+</dialog>
+
+<!-- one-line question: rename, link an email -->
+<dialog id="askDlg">
+  <form id="askForm">
+    <h2 id="askTitle"></h2>
+    <p class="sub" id="askSub"></p>
+    <label class="f" for="askInput" id="askLabel"></label>
+    <input type="text" id="askInput" maxlength="120" required>
+    <div class="err" id="askErr" hidden></div>
+    <div class="row"><button type="button" class="btn" data-act="closeDlg">Cancel</button><button class="btn primary" id="askBtn">Save</button></div>
+  </form>
+</dialog>
+
+<!-- place details: shared facts plus my own rating -->
+<dialog id="placeDlg">
+  <form id="placeForm">
+    <h2 id="plName"></h2>
+    <p class="sub" id="plAddr"></p>
+    <label class="f">Kind of place</label><div class="seg pick" id="plStyle"></div>
+    <label class="f">Food type</label><div class="chips pick" id="plGenre"></div>
+    <label class="f">Wait for a table</label><div class="seg pick" id="plWaits"></div>
+    <label class="f" for="plMinutes">Minutes, in and out</label>
+    <input type="number" id="plMinutes" min="5" max="240" step="5" inputmode="numeric">
+    <label class="ck"><input type="checkbox" id="plNotFood"> This isn't a restaurant (hide it for everyone)</label>
+    <p class="note">These are shared: everyone using Your Turn sees them, and anyone can fix them.</p>
+    <h3>Just me <small>Only you and the people you've linked with see these.</small></h3>
+    <label class="f">My rating</label>
+    <div class="stars" id="plStars"></div> <button type="button" class="btn link" data-act="clearStars">clear</button>
+    <label class="ck"><input type="checkbox" id="plWant"> I want to try this place</label>
+    <label class="ck"><input type="checkbox" id="plNever"> Never again</label>
+    <label class="f" for="plRest">Days before suggesting it again</label>
+    <input type="number" id="plRest" min="0" max="365" inputmode="numeric" placeholder="14">
+    <label class="f" for="plNotes">Notes</label>
+    <textarea id="plNotes" maxlength="500"></textarea>
+    <div class="err" id="plErr" hidden></div>
+    <div class="row"><button type="button" class="btn" data-act="closeDlg">Cancel</button><button class="btn primary" id="plBtn">Save</button></div>
+  </form>
+</dialog>
+
+<!-- log a visit by hand -->
+<dialog id="visitDlg">
+  <form id="visitForm">
+    <h2>Log a visit</h2>
+    <p class="sub" id="viName"></p>
+    <label class="f" for="viDate">When</label>
+    <input type="date" id="viDate" required>
+    <label class="f">Who was there</label>
+    <div class="chips" id="viParty" style="margin-top:0"></div>
+    <label class="f">Who picked</label>
+    <div class="chips pick" id="viPicker"></div>
+    <div class="err" id="viErr" hidden></div>
+    <div class="row"><button type="button" class="btn" data-act="closeDlg">Cancel</button><button class="btn primary" id="viBtn">Save</button></div>
+  </form>
+</dialog>
+
+<script>
+const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
+const GOOGLE_ENABLED = false;   // flip to true once the Google provider is set up in Supabase Auth
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---- the app's fixed lists -----------------------------------------------------
+// Genre keys match GENRES in the Edge Function yourturn-search.
+const GENRES = { american: "American", burgers: "Burgers", pizza: "Pizza", mexican: "Mexican", italian: "Italian", chinese: "Chinese",
+  japanese: "Japanese & sushi", thai: "Thai", indian: "Indian", bbq: "BBQ", steak: "Steak", seafood: "Seafood", sandwiches: "Sandwiches",
+  breakfast: "Breakfast", mediterranean: "Mediterranean", asian: "Other Asian", other: "Other" };
+// minutes = typical time in and out, the starting guess until someone corrects a place.
+const STYLES = { fast_food: { label: "Fast food", minutes: 20 }, fast_casual: { label: "Fast casual", hint: "order at the counter", minutes: 35 },
+  sit_down: { label: "Sit-down", minutes: 70 } };
+// "Nice night out" was a fourth style until Oct 5, 2026 (Shawn: fewer options). Anything still marked that way counts as sit-down.
+const styleOf = (v) => STYLES[v] ? v : "sit_down";
+const TIMES = [[30, "30 min"], [45, "45 min"], [60, "1 hour"], [90, "1.5 hours"], [999, "No rush"]];
+const FARS = [[5, "5 min"], [10, "10 min"], [15, "15 min"], [25, "25 min"]];   // drive, one way
+const MAX_PARTY = 6;
+const DEAL = 5;            // places dealt at a time
+const DEFAULT_REST = 14;   // days before a place is suggested again, unless the person set their own
+const GENRE_REST = 2;      // days before the same genre is suggested again
+const WAITS = { rarely: "Rarely a wait", peak: "A wait at busy times", usually: "Usually a wait" };
+const HERE = location.origin + location.pathname;
+
+// ---- small helpers ---------------------------------------------------------------
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayISO = () => iso(new Date());
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+function fmtDate(s){ const [y, m, d] = s.split("-").map(Number); return `${MON[m - 1]} ${d}` + (y === new Date().getFullYear() ? "" : `, ${y}`); }
+function daysAgo(s){ const [y, m, d] = s.split("-").map(Number); const t = new Date(); return Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(y, m - 1, d)) / 864e5); }
+const agoText = (n) => n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
+function milesBetween(a, b){
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
+}
+// Drive time is a rough guess from straight-line distance; there is no routing behind it.
+const driveMin = (mi) => Math.round(2 + mi * 2.2);
+const milesFor = (min) => (min - 2) / 2.2;
+// Busy times, when "a wait at busy times" counts: lunch 11:45 to 1, dinner 5:30 to 8.
+function isPeak(d = new Date()){ const m = d.getHours() * 60 + d.getMinutes(); return (m >= 705 && m <= 780) || (m >= 1050 && m <= 1200); }
+const list = (names) => names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+let toastT;
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
+const store = { get(k, d){ try { return JSON.parse(localStorage.getItem("yourturn." + k)) ?? d; } catch (_) { return d; } },
+  set(k, v){ try { localStorage.setItem("yourturn." + k, JSON.stringify(v)); } catch (_) {} } };
+
+// ---- state -----------------------------------------------------------------------
+let session = null, me = null, loaded = false;
+let people = [], ratings = [], visits = [], invites = [];
+const places = new Map();          // saved places by Google place id
+let tab = "pick", placeFilter = "all", found = null;
+// The round on screen. Answers are remembered on this phone as a convenience.
+const saved = store.get("round", {});
+const R = { party: new Set(saved.party || []), passed: 0, time: saved.time || 60, far: saved.far || 10, styles: new Set((saved.styles || []).filter((k) => STYLES[k])),
+  genres: saved.genres || {}, waitOk: saved.waitOk !== false, from: saved.from || "here", town: saved.town || null,
+  origin: null, pool: null, dealt: [], shown: new Set(), out: [], elims: [], game: null, short: null, hiding: null, lit: null, done: null, busy: false, err: "", adding: false, towns: null, anyHours: false };
+// How a group decides: "turns" (one person picks) or "elim" (everyone eliminates, the last person picks).
+// Each group remembers the way it last played; R.mode is what is on screen.
+const modes = store.get("modes", {});
+R.mode = store.get("mode", "turns");
+function remember(){ store.set("round", { party: [...R.party], time: R.time, far: R.far, styles: [...R.styles], genres: R.genres, waitOk: R.waitOk, from: R.from, town: R.town }); }
+
+// ---- people and turns --------------------------------------------------------------
+const myId = () => session.user.id;
+const personKey = (p) => p.linked_user_id || "g:" + p.name.trim().toLowerCase();
+function sortedPeople(){ return [...people].sort((a, b) => (b.last_used_at || "").localeCompare(a.last_used_at || "") || a.name.localeCompare(b.name)); }
+// Who is at the table: me first, then the people tapped on.
+function party(ids = R.party){
+  const out = [{ key: myId(), name: me?.display_name || "Me", uid: myId() }];
+  for (const p of sortedPeople()) if (ids.has(p.id)) out.push({ key: personKey(p), name: p.name, uid: p.linked_user_id || null, id: p.id });
+  return out;
+}
+const groupKey = (pl) => pl.map((p) => p.key).sort().join("|");
+// "you picked in Take turns mode": the two modes keep separate rotations, so history says which one a pick counted toward.
+const pickedText = (v) => v.picker_name ? `${v.picker_key === myId() ? "you" : esc(v.picker_name)} picked in ${v.mode === "elim" ? "Elimination" : "Take turns"} mode` : "";
+const groupVisits = (pl) => { const gk = groupKey(pl); return visits.filter((v) => v.group_key === gk); };
+const modeOf = (pl = party()) => pl.length < 2 ? "turns" : R.mode;
+// When the people at the table change, switch to the way that group played last time, if it has played.
+function recallMode(){ const pl = party(); if (pl.length < 2) return; const m = modes[groupKey(pl)] || groupVisits(pl)[0]?.mode; if (m) R.mode = m; }
+function setMode(m){ R.mode = m; store.set("mode", m); const pl = party(); if (pl.length > 1){ modes[groupKey(pl)] = m; store.set("modes", modes); } }
+// Whoever picked longest ago with this same group goes first; someone who has never picked goes before that.
+// Each way of playing keeps its own rotation (Shawn, Oct 4, 2026). Meals from before modes existed count as taking turns.
+function turnOrder(pl, mode = modeOf(pl)){
+  const last = {};
+  for (const v of groupVisits(pl)) if (v.picker_key && (v.mode || "turns") === mode){ const t = v.visited_on + " " + v.created_at; if (!last[v.picker_key] || t > last[v.picker_key]) last[v.picker_key] = t; }
+  // Among people who have never picked, the phone's owner goes last: whoever suggests the app should not get the first pick.
+  return pl.map((p, i) => ({ p, i: i || pl.length, t: last[p.key] || "" })).sort((a, b) => a.t < b.t ? -1 : a.t > b.t ? 1 : a.i - b.i).map((x) => x.p);
+}
+function picker(pl = party()){ const o = turnOrder(pl); return o[R.passed % o.length]; }
+// Elimination: everyone but the picker eliminates R.game.per places in one go, one person after another, then the picker chooses from what is left.
+function gameState(pl, live){
+  const fin = picker(pl), order = turnOrder(pl), at = order.indexOf(fin);
+  const elimers = order.slice(at + 1).concat(order.slice(0, at));
+  const per = R.game?.per || 1, seq = elimers.flatMap((p) => Array(per).fill(p));
+  const n = R.elims.length, final = n >= seq.length || live.length <= 2;
+  if (final) return { fin, final, current: fin, next: null, mine: 0, done: 0 };
+  const mine = Math.min(per - (n % per), live.length - 2);   // how many this person still has to eliminate
+  return { fin, final, current: seq[n], next: seq[n + mine] || fin, mine, done: n % per };
+}
+
+// ---- judging a place -----------------------------------------------------------------
+function fromSaved(p){ return { id: p.place_id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, maps: p.maps_url, genre: p.genre || "other",
+  style: p.style || "sit_down", rating: null, count: 0, price: null, open: null, closes: null, reservable: p.reservable, saved: true }; }
+// Saved facts win over the search's guess. For the kind of place, only a person's correction (edited_by) beats
+// the search's answer, which is Claude's sort; a style that was merely copied in when a meal was logged does not.
+function facts(c){
+  const s = places.get(c.id), style = styleOf((s?.edited_by ? s.style : c.style) || s?.style);
+  return { genre: s?.genre || c.genre || "other", style, minutes: s?.minutes || STYLES[style].minutes, waits: s?.waits || null, guessed: !s };
+}
+// Locations of a chain count as one brand: same name once case, accents, and punctuation are dropped.
+const brandOf = (name) => String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function brandIds(c){ const k = brandOf(c.name), ids = new Set([c.id]); for (const p of places.values()) if (brandOf(p.name) === k) ids.add(p.place_id); return ids; }
+function lastVisit(id, uids){ const ids = typeof id === "string" ? new Set([id]) : id; let best = null; for (const v of visits) if (ids.has(v.place_id) && v.user_ids.some((u) => uids.has(u)) && (!best || v.visited_on > best)) best = v.visited_on; return best; }
+function judge(c, pl){
+  const f = facts(c), uids = new Set(pl.filter((p) => p.uid).map((p) => p.uid));
+  // Ratings, never again, and recent visits carry across a brand's locations. One rating per person: this location's if they have one.
+  const ids = brandIds(c), all = ratings.filter((r) => ids.has(r.place_id) && uids.has(r.user_id));
+  const mine = [...uids].map((u) => all.find((r) => r.user_id === u && r.place_id === c.id) || all.find((r) => r.user_id === u)).filter(Boolean);
+  const nameOf = (uid) => pl.find((p) => p.uid === uid)?.name || "Someone";
+  const mi = R.origin && c.lat != null ? milesBetween(R.origin, c) : null, drive = mi == null ? 0 : driveMin(mi);
+  const info = { f, mi, drive, mine, last: lastVisit(ids, uids) };
+  const out = (why) => ({ ...info, out: why });
+
+  if (places.get(c.id)?.not_food) return out("Marked as not a restaurant");
+  const never = all.find((r) => r.never_again);
+  if (never) return out(never.user_id === myId() ? "You said never again" : `${nameOf(never.user_id)} said never again`);
+  if (R.genres[f.genre] === "avoid") return out(`No ${GENRES[f.genre]} this time`);
+  if (R.styles.size && !R.styles.has(f.style)) return out(`${STYLES[f.style].label}, not what you picked`);
+  if (c.open === false && !R.anyHours) return out("Closed right now");
+  if (c.closes && !R.anyHours){ const left = (new Date(c.closes) - Date.now()) / 6e4; if (left < drive + f.minutes * 0.75) return out("Closes too soon"); }
+  if (R.time < 999 && drive * 2 + f.minutes > R.time) return out(`About ${drive * 2 + f.minutes} min with the drive`);
+  if (!R.waitOk && (f.waits === "usually" || (f.waits === "peak" && isPeak()))) return out(f.waits === "peak" ? "A wait at this hour" : "Usually a wait");
+  if (info.last != null){
+    const rest = Math.max(...mine.map((r) => r.rest_days ?? -1), -1), n = daysAgo(info.last);
+    if (n < (rest >= 0 ? rest : DEFAULT_REST)) return out(`You were there ${agoText(n)}`);
+  }
+  if (f.genre !== "other" && R.genres[f.genre] !== "want"){
+    const recent = visits.find((v) => !ids.has(v.place_id) && daysAgo(v.visited_on) < GENRE_REST && daysAgo(v.visited_on) >= 0 && v.user_ids.some((u) => uids.has(u)) && places.get(v.place_id)?.genre === f.genre);
+    if (recent) return out(`You had ${GENRES[f.genre]} ${agoText(daysAgo(recent.visited_on))}`);
+  }
+  // Score: the table's own ratings when there are any, Google's otherwise, with a little luck to keep it fresh.
+  const rated = mine.filter((r) => r.rating);
+  let score = rated.length ? rated.reduce((n, r) => n + r.rating, 0) / rated.length : c.rating ? c.rating - 0.5 : 3.2;
+  if (mine.some((r) => r.want_to_try)) score += 0.6;
+  if (R.genres[f.genre] === "want") score += 0.5;
+  return { ...info, out: null, score: score + Math.random() * 1.3 };
+}
+// Judge the whole pool, then keep only the closest location of each brand (Shawn's first deals had three McDonald's).
+function judgeAll(pl = party()){
+  const all = R.pool.map((c) => ({ c, j: judge(c, pl) })), best = new Map();
+  for (const x of all){
+    if (x.j.out) continue;
+    const k = brandOf(x.c.name), b = best.get(k);
+    if (!b || (x.j.mi ?? 1e9) < (b.j.mi ?? 1e9)) best.set(k, x);
+  }
+  for (const x of all) if (!x.j.out && best.get(brandOf(x.c.name)) !== x) x.j.out = `Another ${x.c.name} is closer`;
+  return all;
+}
+function deal(){
+  const pl = party(), judged = judgeAll(pl);
+  R.out = judged.filter((x) => x.j.out);
+  const fresh = judged.filter((x) => !x.j.out && !R.shown.has(x.c.id)).sort((a, b) => b.j.score - a.j.score);
+  let n = DEAL; R.game = null; R.short = null;
+  if (modeOf(pl) === "elim"){
+    // Two eliminations each needs twice the table; with fewer places everyone gets one; below that there is no game.
+    const full = pl.length * 2, min = pl.length + 1;
+    if (fresh.length >= full){ n = full; R.game = { per: 2 }; }
+    else if (fresh.length >= min){ n = min; R.game = { per: 1 }; }
+    else { n = 0; R.short = { have: fresh.length, need: min }; }
+  }
+  R.dealt = fresh.slice(0, n).map((x) => x.c); R.dealt.forEach((c) => R.shown.add(c.id));
+  R.elims = []; R.hiding = null; R.lit = null;
+}
+
+// ---- finding places --------------------------------------------------------------------
+async function callSearch(body){
+  const { data, error } = await sb.functions.invoke("yourturn-search", { body });
+  let msg = data?.error || "";
+  if (!msg && error?.context?.json){ try { msg = (await error.context.json()).error || ""; } catch (_) {} }
+  if (error && !msg) msg = "Couldn't reach the search. Check your connection and try again.";
+  if (msg) throw new Error(msg);
+  return data.places || [];
+}
+function whereAmI(){
+  return new Promise((ok, no) => {
+    if (!navigator.geolocation) return no(new Error("This browser can't share its location. Pick Home or a town instead."));
+    navigator.geolocation.getCurrentPosition((p) => ok({ lat: p.coords.latitude, lng: p.coords.longitude, label: "where you are" }),
+      () => no(new Error("I couldn't get your location. Allow it for this site, or pick Home or a town.")), { timeout: 12000, maximumAge: 120000 });
+  });
+}
+async function getOrigin(){
+  if (R.from === "home"){ if (me?.home_lat == null) throw new Error("Home isn't set yet. Set it on the People tab."); return { lat: me.home_lat, lng: me.home_lng, label: "home" }; }
+  if (R.from === "town"){ if (!R.town) throw new Error("Pick a town first."); return R.town; }
+  return whereAmI();
+}
+let lastSearch = null;
+async function findPlaces(){
+  R.busy = true; R.err = ""; render();
+  try {
+    R.origin = await getOrigin();
+    let want = Object.keys(R.genres).filter((g) => R.genres[g] === "want" && g !== "other");
+    if (want.length === Object.keys(GENRES).length - 1) want = [];   // every genre wanted is the same as no preference
+    const avoid = Object.keys(R.genres).filter((g) => R.genres[g] === "avoid" && g !== "other");
+    const radiusMi = milesFor(R.far);
+    // The same search within 15 minutes reuses Google's answer, so changing only the time, the table, or the mode costs nothing.
+    const ask = { lat: +R.origin.lat.toFixed(3), lng: +R.origin.lng.toFixed(3), radius_m: Math.round(radiusMi * 1609), want, avoid, styles: [...R.styles].sort() };
+    const key = JSON.stringify(ask);
+    if (!lastSearch || lastSearch.key !== key || Date.now() - lastSearch.at > 15 * 60000) lastSearch = { key, at: Date.now(), places: await callSearch(ask) };
+    const got = lastSearch.places.slice();
+    await knownPlaces(got.map((c) => c.id));
+    // Places the table already likes or wants to try are always in the running when they are close enough, even if Google's list missed them.
+    const have = new Set(got.map((c) => c.id)), uids = new Set(party().map((p) => p.uid).filter(Boolean));
+    for (const r of ratings){
+      const p = places.get(r.place_id);
+      if (!p || have.has(p.place_id) || !uids.has(r.user_id) || !(r.rating >= 4 || r.want_to_try) || p.lat == null) continue;
+      if (milesBetween(R.origin, p) > radiusMi) continue;
+      if (want.length && !want.includes(p.genre)) continue;
+      got.push(fromSaved(p)); have.add(p.place_id);
+    }
+    // With a kind of place picked, saved places a person has marked as that kind are in the running too when they are close enough.
+    if (R.styles.size) for (const p of places.values()){
+      if (have.has(p.place_id) || !p.edited_by || p.not_food || p.lat == null || !R.styles.has(styleOf(p.style))) continue;
+      if (milesBetween(R.origin, p) > radiusMi || (want.length && !want.includes(p.genre))) continue;
+      got.push(fromSaved(p)); have.add(p.place_id);
+    }
+    R.pool = got; R.shown = new Set(); R.done = null; deal();
+    if (history.state?.yt !== "cards") history.pushState({ yt: "cards" }, "");   // so the phone's back button returns to the questions
+  } catch (e){ R.err = e.message; }
+  R.busy = false; render(); window.scrollTo(0, 0);
+}
+// Pull in what anyone has already saved about these places (corrected facts, "not a restaurant").
+async function knownPlaces(ids){
+  ids = ids.filter((id) => !places.has(id));
+  for (let i = 0; i < ids.length; i += 100){
+    const { data } = await sb.from("yourturn_places").select("*").in("place_id", ids.slice(i, i + 100));
+    (data || []).forEach((p) => places.set(p.place_id, p));
+  }
+}
+const ST = "AL Alabama,AK Alaska,AZ Arizona,AR Arkansas,CA California,CO Colorado,CT Connecticut,DE Delaware,FL Florida,GA Georgia,HI Hawaii,ID Idaho,IL Illinois,IN Indiana,IA Iowa,KS Kansas,KY Kentucky,LA Louisiana,ME Maine,MD Maryland,MA Massachusetts,MI Michigan,MN Minnesota,MS Mississippi,MO Missouri,MT Montana,NE Nebraska,NV Nevada,NH New Hampshire,NJ New Jersey,NM New Mexico,NY New York,NC North Carolina,ND North Dakota,OH Ohio,OK Oklahoma,OR Oregon,PA Pennsylvania,RI Rhode Island,SC South Carolina,SD South Dakota,TN Tennessee,TX Texas,UT Utah,VT Vermont,VA Virginia,WA Washington,WV West Virginia,WI Wisconsin,WY Wyoming"
+  .split(",").reduce((o, s) => (o[s.slice(0, 2)] = s.slice(3), o), {});
+// Town lookup uses Open-Meteo's free geocoder (the same service the Rick tracker uses for weather).
+async function townSearch(q){
+  const [name, region] = q.split(",").map((s) => s.trim());
+  const res = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name=" + encodeURIComponent(name));
+  let hits = (await res.json()).results || [];
+  if (region){ const full = (ST[region.toUpperCase()] || region).toLowerCase(); const m = hits.filter((h) => (h.admin1 || "").toLowerCase() === full || (h.country || "").toLowerCase() === full); if (m.length) hits = m; }
+  return hits.slice(0, 5).map((h) => ({ lat: h.latitude, lng: h.longitude, label: [h.name, h.admin1 || h.country].filter(Boolean).join(", ") }));
+}
+
+// ---- saving ------------------------------------------------------------------------------
+const placeRow = (c) => { const f = facts(c); return { place_id: c.id, name: c.name, address: c.address || null, lat: c.lat, lng: c.lng, maps_url: c.maps || null,
+  genre: f.genre, style: f.style, minutes: f.minutes, waits: f.waits, reservable: c.reservable ?? null }; };
+// Save a place the first time someone touches it. An existing row is left alone so corrections stick.
+async function keepPlace(c){
+  if (places.has(c.id)) return;
+  const row = placeRow(c);
+  const { error } = await sb.from("yourturn_places").upsert(row, { onConflict: "place_id", ignoreDuplicates: true });
+  if (error) throw error;
+  const { data } = await sb.from("yourturn_places").select("*").eq("place_id", c.id).maybeSingle();
+  places.set(c.id, data || row);
+}
+async function logVisit(c, pl, pick, date, mode = "turns"){
+  await keepPlace(c);
+  const { data, error } = await sb.from("yourturn_visits").insert({
+    place_id: c.id, visited_on: date, party: pl.map((p) => ({ key: p.key, name: p.name })), user_ids: pl.filter((p) => p.uid).map((p) => p.uid),
+    group_key: groupKey(pl), picker_key: pick?.key || null, picker_name: pick?.name || null, mode: pick ? mode : null,
+  }).select().single();
+  if (error) throw error;
+  visits.unshift(data); visits.sort((a, b) => (b.visited_on + b.created_at).localeCompare(a.visited_on + a.created_at));
+  const ids = pl.filter((p) => p.id).map((p) => p.id);
+  if (ids.length){ const now = new Date().toISOString(); sb.from("yourturn_people").update({ last_used_at: now }).in("id", ids).then(() => {}); people.forEach((p) => { if (ids.includes(p.id)) p.last_used_at = now; }); }
+  return data;
+}
+async function saveRating(placeId, patch){
+  const cur = ratings.find((r) => r.place_id === placeId && r.user_id === myId());
+  const row = { never_again: false, want_to_try: false, ...cur, ...patch, user_id: myId(), place_id: placeId, updated_at: new Date().toISOString() };
+  const { data, error } = await sb.from("yourturn_ratings").upsert(row, { onConflict: "user_id,place_id" }).select().single();
+  if (error) throw error;
+  ratings = ratings.filter((r) => !(r.place_id === placeId && r.user_id === myId())).concat(data);
+}
+const myRating = (id) => ratings.find((r) => r.place_id === id && r.user_id === myId());
+
+// ---- load ------------------------------------------------------------------------------------
+async function load(){
+  people = []; ratings = []; visits = []; invites = []; places.clear(); me = null; loaded = false;
+  if (!session){ render(); return; }
+  const [pr, pe, ra, vi, inv] = await Promise.all([
+    sb.from("yourturn_profiles").select("*").eq("user_id", myId()).maybeSingle(),
+    sb.from("yourturn_people").select("*"),
+    sb.from("yourturn_ratings").select("*"),
+    sb.from("yourturn_visits").select("*").order("visited_on", { ascending: false }).order("created_at", { ascending: false }).limit(500),
+    sb.rpc("yourturn_invites"),
+  ]);
+  me = pr.data || null; people = pe.data || []; ratings = ra.data || []; visits = vi.data || []; invites = inv.data || [];
+  const ids = [...new Set([...ratings.map((r) => r.place_id), ...visits.map((v) => v.place_id)])];
+  for (let i = 0; i < ids.length; i += 100){
+    const { data } = await sb.from("yourturn_places").select("*").in("place_id", ids.slice(i, i + 100));
+    (data || []).forEach((p) => places.set(p.place_id, p));
+  }
+  R.party = new Set([...R.party].filter((id) => people.some((p) => p.id === id)));
+  recallMode(); loaded = true; render();
+  if (!me && !$("#nameDlg").open) $("#nameDlg").showModal();
+}
+
+// ---- render: Pick ------------------------------------------------------------------------------
+const seg = (act, opts, cur) => `<div class="seg">${opts.map(([v, l, h]) => `<button type="button" data-act="${act}" data-v="${v}" class="${String(cur) === String(v) ? "on" : ""}">${l}${h ? `<small>${h}</small>` : ""}</button>`).join("")}</div>`;
+function starsText(n){ return `<span class="st">${"★".repeat(n)}</span>`; }
+function unrated(){
+  const skip = store.get("skipRate", []);
+  return visits.find((v) => v.user_ids.includes(myId()) && daysAgo(v.visited_on) <= 14 && !myRating(v.place_id)?.rating && !skip.includes(v.id) && places.has(v.place_id));
+}
+function renderPick(){
+  const pl = party();
+  if (R.done) return renderDone();
+  let h = "";
+  const u = unrated();
+  if (u && !R.pool) h += `<div class="rate"><b>How was ${esc(places.get(u.place_id).name)}?</b> <span class="sub">${fmtDate(u.visited_on)}</span>
+    <div class="row"><span class="stars">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-act="quickRate" data-id="${esc(u.place_id)}" data-v="${n}" aria-label="${n} star${n > 1 ? "s" : ""}">★</button>`).join("")}</span>
+    <button type="button" class="btn link" data-act="skipRate" data-id="${u.id}">Skip</button></div></div>`;
+  return h + (R.pool ? renderCards(pl) : renderSetup(pl));
+}
+function renderSetup(pl){
+  const full = pl.length >= MAX_PARTY;
+  const chips = sortedPeople().map((p) => `<button type="button" data-act="who" data-id="${p.id}" class="${R.party.has(p.id) ? "on" : ""}">${esc(p.name)}</button>`).join("");
+  const genres = Object.entries(GENRES).filter(([k]) => k !== "other").map(([k, l]) => `<button type="button" data-act="genre" data-v="${k}" class="${R.genres[k] || ""}">${R.genres[k] === "want" ? "✓ " : ""}${l}</button>`).join("");
+  const styles = Object.entries(STYLES).map(([k, s]) => `<button type="button" data-act="style" data-v="${k}" class="${R.styles.has(k) ? "on" : ""}">${s.label}${s.hint ? `<small>${s.hint}</small>` : ""}</button>`).join("");
+  let from = "";
+  if (R.from === "town") from = `<div class="inline"><input type="search" id="townQ" placeholder="Town, like Oak Ridge, TN" value="${esc(R.town?.label || "")}"><button type="button" class="btn" data-act="townGo">Look up</button></div>`
+    + (R.towns ? `<div class="chips">${R.towns.length ? R.towns.map((t, i) => `<button type="button" data-act="townPick" data-v="${i}" class="${R.town?.label === t.label ? "on" : ""}">${esc(t.label)}</button>`).join("") : `<span class="hint">No town by that name. Try "Town, ST".</span>`}</div>` : "");
+  if (R.from === "home" && me?.home_lat == null) from = `<p class="note">Home isn't set yet. When you're at home, set it on the People tab.</p>`;
+  let grp = "";
+  if (pl.length > 1){
+    const p = picker(pl), whose = p.key === myId() ? "your" : esc(p.name) + "'s", past = groupVisits(pl).slice(0, 5);
+    const others = turnOrder(pl).filter((x) => x !== p).map((x) => x.key === myId() ? "you" : x.name);
+    grp = `<div class="grp"><b>${R.mode === "elim" ? `${p.key === myId() ? "You get" : esc(p.name) + " gets"} the final pick.` : `It's ${whose} turn to pick.`}</b>
+      ${R.mode === "elim" ? `<div class="hint">${esc(list(others).replace(/^you/, "You"))} ${others.length === 1 && others[0] !== "you" ? "eliminates" : "eliminate"} first.</div>` : ""}
+      ${past.length ? `<div class="hint" style="margin-top:6px">This group's last ${past.length === 1 ? "meal" : past.length + " meals"}:</div>` + past.map((v) => `<div class="gv">${fmtDate(v.visited_on)} · ${esc(places.get(v.place_id)?.name || "A place")}${v.picker_name ? " · " + pickedText(v) : ""}</div>`).join("")
+        : `<div class="hint">First time out with this group.</div>`}</div>`;
+  }
+  return `<div class="card">
+    <div class="q"><div class="lab">Who's eating?</div>
+      <div class="chips"><button type="button" class="on me">${esc(me?.display_name || "Me")}</button>${chips}
+        ${full ? "" : `<button type="button" class="ghost" data-act="addWho">+ Someone new</button>`}</div>
+      ${R.adding ? `<div class="inline"><input type="text" id="newWho" maxlength="40" placeholder="Their first name"><button type="button" class="btn primary" data-act="addWhoSave">Add</button><button type="button" class="btn" data-act="addWho">Cancel</button></div>` : ""}
+      ${full ? `<div class="hint">That's a full table of ${MAX_PARTY}.</div>` : ""}</div>
+    ${pl.length < 2 ? "" : `<div class="q"><div class="lab">How are you deciding?</div>${seg("mode", [["turns", "Take turns", "one person picks"], ["elim", "Elimination", "narrow it down together"]], R.mode)}${grp}</div>`}
+    <div class="q"><div class="lab">How much time do you have?</div><div class="hint">Door to door, drive included.</div>${seg("time", TIMES, R.time)}</div>
+    <div class="q"><div class="lab">How far will you drive?</div><div class="hint">One way, roughly.</div>${seg("far", FARS, R.far)}</div>
+    <div class="q"><div class="lab">What kind of place?</div><div class="hint">Tap any that work. None tapped means anything goes.</div><div class="seg">${styles}</div></div>
+    <div class="q"><div class="lab">What sounds good? <span class="allnone"><button type="button" class="btn link" data-act="genreAll">All</button> · <button type="button" class="btn link" data-act="genreNone">None</button></span></div><div class="hint">Tap once for "yes, that". Tap twice for "not that".</div><div class="chips">${genres}</div></div>
+    <div class="q"><div class="lab">Willing to wait for a table?</div>${seg("wait", [["yes", "Sure"], ["no", "No waiting"]], R.waitOk ? "yes" : "no")}</div>
+    <div class="q"><div class="lab">Starting from</div>${seg("from", [["here", "Where I am"], ["home", "Home"], ["town", "A town"]], R.from)}${from}</div>
+    <div class="q"><label class="ck" style="margin-top:0"><input type="checkbox" data-act="anyHours" ${R.anyHours ? "checked" : ""}> Ignore opening hours</label>
+      <div class="hint">For planning ahead or trying the app when everything's closed. It turns itself off when you reload.</div></div>
+  </div>
+  ${R.err ? `<div class="err">${esc(R.err)}</div>` : ""}
+  <button type="button" class="btn primary big" data-act="find" style="margin-top:14px" ${R.busy ? "disabled" : ""}>${R.busy ? "Looking…" : "Find us a place"}</button>`;
+}
+function placeMeta(c, j){
+  const bits = [GENRES[j.f.genre], STYLES[j.f.style].label];
+  if (c.price) bits.push("$".repeat(c.price));
+  if (j.mi != null) bits.push(`${j.mi < 10 ? j.mi.toFixed(1) : Math.round(j.mi)} mi, about ${j.drive} min`);
+  return bits.join(" · ");
+}
+function placeTags(c, j, pl){
+  const t = [];
+  const rated = j.mine.filter((r) => r.rating);
+  if (rated.length) t.push(`<span class="tag pop">${rated.map((r) => `${esc(pl.find((p) => p.uid === r.user_id)?.name || "")} ${starsText(r.rating)}`).join(" · ")}</span>`);
+  if (j.mine.some((r) => r.want_to_try)) t.push(`<span class="tag good">Want to try</span>`);
+  if (c.rating) t.push(`<span class="tag">Google ${c.rating.toFixed(1)} ★ (${c.count.toLocaleString()})</span>`);
+  t.push(`<span class="tag">About ${j.f.minutes} min${j.f.guessed ? ", a guess" : ""}</span>`);
+  t.push(j.last ? `<span class="tag">Last here ${agoText(daysAgo(j.last))}</span>` : `<span class="tag">New to you</span>`);
+  if (j.f.waits === "usually") t.push(`<span class="tag">Usually a wait</span>`);
+  if (j.f.waits === "peak") t.push(`<span class="tag">${isPeak() ? "Likely a wait right now" : "No wait at this hour"}</span>`);
+  if (c.reservable) t.push(`<span class="tag">Takes reservations</span>`);
+  if (c.open == null) t.push(`<span class="tag">Hours not checked</span>`);
+  if (c.open === false) t.push(`<span class="tag bad">Closed right now</span>`);
+  return t.join("");
+}
+// When nothing can be dealt, sum up the reasons so the fix is obvious without opening the full list.
+function whyNot(){
+  if (!R.out.length || R.shown.size) return "";
+  const kinds = [[/not what you picked$/, "the wrong kind of place"], [/^About \d+ min/, "too long for your time"], [/^Closed|^Closes/, "closed"],
+    [/^No .* this time$/, "a food type you ruled out"], [/wait/i, "likely a wait"], [/were there|You had/, "too recent"], [/never again|not a restaurant/, "hidden"], [/is closer$/, "another location of a chain"]];
+  const tally = new Map();
+  for (const x of R.out){ const k = (kinds.find(([re]) => re.test(x.j.out)) || [0, "left out for other reasons"])[1]; tally.set(k, (tally.get(k) || 0) + 1); }
+  const top = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${n} ${k}`);
+  return `<p class="sub">Google found ${R.pool.length} nearby: ${esc(list(top))}.</p>`;
+}
+function renderCards(pl){
+  const solo = pl.length === 1, elim = !solo && modeOf(pl) === "elim";
+  const gone = new Set(R.elims.map((e) => e.id)), live = R.dealt.filter((c) => !gone.has(c.id));
+  const nm = (p) => p.key === myId() ? "you" : esc(p.name);
+  const answers = [TIMES.find((t) => t[0] === R.time)[1], `${R.far} min away`, R.origin ? "from " + R.origin.label : ""].filter(Boolean).join(" · ");
+  let h = `<div class="sum"><span>${esc(list(pl.map((p) => p.name)))} · ${esc(answers)}${R.anyHours ? " · ignoring opening hours" : ""}</span><button type="button" class="btn" data-act="back">‹ Back</button></div>`;
+  if (!R.dealt.length){
+    const why = R.short ? `Elimination with ${pl.length} of you needs at least ${R.short.need} places, and only ${R.short.have} ${R.short.have === 1 ? "fits" : "fit"}${R.shown.size ? " that you haven't seen" : ""}.`
+      : R.shown.size ? "That's everything that fits." : R.pool.length ? "Nothing fits those answers right now." : "Google didn't find any restaurants in that range.";
+    h += `<div class="card empty"><p>${why}</p>${whyNot()}
+      <div>${R.shown.size ? `<button type="button" class="btn" data-act="reshuffle">Go through them again</button> ` : ""}${R.short && R.short.have ? `<button type="button" class="btn" data-act="mode" data-v="turns">Take turns instead</button> ` : ""}<button type="button" class="btn primary" data-act="back">Change answers</button></div></div>`;
+  } else {
+    const g = elim ? gameState(pl, live) : null, pk = solo ? null : picker(pl);
+    if (g && !g.final) h += `<div class="turn"><div><b>${g.current.key === myId() ? "You" : esc(g.current.name) + ","} eliminate ${g.mine > 1 ? "two" : g.done ? "one more" : "one"}</b>
+      <small>${R.game?.per === 1 ? "One each this time, not many places fit. " : ""}Then pass to ${nm(g.next)}${g.next === g.fin ? " for the final pick" : ""}.</small></div>
+      ${R.elims.length ? "" : `<button type="button" class="btn" data-act="pass" title="Give the final pick to the next person">Pass</button>`}</div>`;
+    else if (g) h += `<div class="turn"><div><b>${g.fin.key === myId() ? "Your pick" : esc(g.fin.name) + ", your pick"}</b><small>Choose from what's left.</small></div></div>`;
+    else if (pk) h += `<div class="turn"><div><b>${pk.key === myId() ? "It's your turn to pick" : `It's ${esc(pk.name)}'s turn to pick`}</b>
+      <small>Pass and you keep your turn for next time.</small></div><button type="button" class="btn" data-act="pass">Pass</button></div>`;
+    const cutting = g && !g.final;
+    for (const c of live){
+      const j = judge(c, pl);
+      h += `<div class="pc ${R.lit === c.id ? "lit" : ""}" data-pc="${esc(c.id)}"><h3>${esc(c.name)}</h3><div class="meta">${esc(placeMeta(c, j))}</div>
+        <div class="facts">${placeTags(c, j, pl)}</div>
+        <div class="acts">${cutting ? `<button type="button" class="btn primary cut" data-act="elim" data-id="${esc(c.id)}">Eliminate</button>`
+          : `<button type="button" class="btn primary" data-act="go" data-id="${esc(c.id)}" ${R.busy ? "disabled" : ""}>Go here</button>`}
+          <button type="button" class="btn" data-act="details" data-id="${esc(c.id)}">Details</button></div>
+        <div class="hide"><button type="button" class="btn link" data-act="hide" data-id="${esc(c.id)}">Don't show this again</button></div>`;
+      if (R.hiding === c.id) h += `<div class="whoveto">Why not? <span class="chips" style="display:inline-flex;margin:0 0 0 6px"><button type="button" data-act="hideNotFood" data-id="${esc(c.id)}">It's not a restaurant</button><button type="button" data-act="hideNever" data-id="${esc(c.id)}">Never again for me</button></span>
+        <div class="note">"Not a restaurant" hides it for everyone. "Never again" is yours, and counts whenever you're at the table.${elim ? " A new place takes its spot and nobody loses an elimination." : ""}</div></div>`;
+      h += `</div>`;
+    }
+    // Eliminated places drop off the list so the next person sees a shorter one. Only the newest can be undone, to keep the order straight.
+    if (R.elims.length) h += `<div class="left" style="margin:12px 0">${R.elims.map((e, i) => `<div><b>${esc(R.dealt.find((c) => c.id === e.id)?.name || "")}</b> eliminated by ${esc(pl.find((p) => p.key === e.key)?.name || "someone")}.${i === R.elims.length - 1 ? ` <button type="button" class="btn link" data-act="undoElim">Undo</button>` : ""}</div>`).join("")}</div>`;
+    h += `<div class="pc" style="display:flex;gap:8px;flex-wrap:wrap">${elim ? `<button type="button" class="btn" data-act="again" style="flex:1">Start over with new places</button>`
+      : `${live.length > 1 ? `<button type="button" class="btn" data-act="spin" style="flex:1">Can't decide? Spin for it</button>` : ""}
+      <button type="button" class="btn" data-act="again" style="flex:1">Deal ${DEAL} more</button>`}</div>`;
+  }
+  if (R.err) h += `<div class="err">${esc(R.err)}</div>`;
+  if (R.out.length) h += `<details class="left"><summary>${R.out.length} left out, and why</summary><ul>${R.out.map((x) => `<li><b>${esc(x.c.name)}</b>: ${esc(x.j.out)} <button type="button" class="btn link" data-act="details" data-id="${esc(x.c.id)}">details</button></li>`).join("")}</ul></details>`;
+  return h;
+}
+function renderDone(){
+  const d = R.done, pl = party(), next = turnOrder(pl)[0], elim = modeOf(pl) === "elim";
+  const maps = d.c.maps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.c.name)}&query_place_id=${encodeURIComponent(d.c.id)}`;
+  return `<div class="card done"><div class="sub">You're going to</div><div class="big">${esc(d.c.name)}</div>
+    <div class="sub">${esc(d.c.address || "")}</div>
+    ${pl.length > 1 ? `<p style="margin-top:12px">${d.pick.key === myId() ? "You" : esc(d.pick.name)} picked. ${elim ? `Next time this group plays Elimination, ${next.key === myId() ? "you get" : esc(next.name) + " gets"} the final pick.` : `Next time this group takes turns, it's ${next.key === myId() ? "your" : esc(next.name) + "'s"} turn.`}</p>` : ""}
+    <div class="acts"><a class="btn primary" href="${esc(maps)}" target="_blank" rel="noopener">Directions</a>
+      <button type="button" class="btn" data-act="undoGo">We changed our minds</button>
+      <button type="button" class="btn" data-act="newRound">Done</button></div>
+    <p class="note">It's saved in your history. Open Your Turn afterward to rate it.</p></div>`;
+}
+
+// ---- render: Places, History, People ---------------------------------------------------------
+function placeLine(p, c){
+  const r = myRating(p.place_id), last = lastVisit(p.place_id, new Set([myId()]));
+  const bits = [GENRES[p.genre] || "Other", STYLES[styleOf(p.style)].label];
+  const mine = [r?.rating ? starsText(r.rating) : "", r?.want_to_try ? "Want to try" : "", r?.never_again ? "Never again" : "", last ? "Last here " + fmtDate(last) : ""].filter(Boolean);
+  return `<div class="li"><div><div class="t">${esc(p.name)}</div><div class="d">${esc(bits.join(" · "))}${p.address ? " · " + esc(p.address) : ""}</div>${mine.length ? `<div class="d">${mine.join(" · ")}</div>` : ""}</div>
+    <div class="a"><button type="button" class="btn" data-act="details" data-id="${esc(p.place_id)}">${c ? "Rate or save" : "Details"}</button><button type="button" class="btn" data-act="visit" data-id="${esc(p.place_id)}">Log a visit</button></div></div>`;
+}
+function renderPlaces(){
+  const all = [...places.values()].filter((p) => myRating(p.place_id) || visits.some((v) => v.place_id === p.place_id)).sort((a, b) => a.name.localeCompare(b.name));
+  const pass = { all: () => true, want: (r) => r?.want_to_try, fav: (r) => r?.rating >= 4, never: (r) => r?.never_again }[placeFilter];
+  const rows = all.filter((p) => pass(myRating(p.place_id)));
+  const pills = [["all", "All"], ["fav", "Favorites"], ["want", "Want to try"], ["never", "Never again"]].map(([k, l]) => `<button type="button" data-act="pfilter" data-v="${k}" class="${placeFilter === k ? "on" : ""}">${l}</button>`).join("");
+  let h = `<div class="card"><h2>Look up a place</h2><p class="sub">Add somewhere you want to try, or log a meal Your Turn didn't pick.</p>
+    <div class="inline" style="margin-top:0"><input type="search" id="findQ" placeholder="Restaurant name"><button type="button" class="btn primary" data-act="findName" ${R.busy ? "disabled" : ""}>${R.busy ? "Looking…" : "Look up"}</button></div>
+    ${R.err ? `<div class="err">${esc(R.err)}</div>` : ""}
+    ${found ? (found.length ? found.map((c) => placeLine({ place_id: c.id, ...placeRow(c) }, c)).join("") : `<p class="note">Nothing by that name nearby.</p>`) : ""}</div>`;
+  h += `<div class="card"><h2>My places</h2><div class="chips" style="margin:0 0 6px">${pills}</div>
+    ${rows.length ? rows.map((p) => placeLine(p)).join("") : `<div class="empty">${all.length ? "Nothing in this list yet." : "Places show up here once you've picked, rated, or saved them."}</div>`}</div>`;
+  return h;
+}
+function renderHistory(){
+  // Adding a meal after the fact: look the place up by name, then "Log a visit" asks when, who was there, and who picked.
+  const add = `<div class="card"><h2>Add a meal you already had</h2><p class="sub">Look up the place, then say when, who was there, and who picked. It counts toward whose turn it is.</p>
+    <div class="inline" style="margin-top:0"><input type="search" id="histQ" placeholder="Restaurant name"><button type="button" class="btn primary" data-act="findName" ${R.busy ? "disabled" : ""}>${R.busy ? "Looking…" : "Look up"}</button></div>
+    ${R.err ? `<div class="err">${esc(R.err)}</div>` : ""}
+    ${found ? (found.length ? found.map((c) => placeLine({ place_id: c.id, ...placeRow(c) }, c)).join("") : `<p class="note">Nothing by that name nearby.</p>`) : ""}</div>`;
+  if (!visits.length) return add + `<div class="card empty">No meals yet. Your first pick will show up here.</div>`;
+  return add + `<div class="card"><h2>Where we've been</h2>${visits.map((v) => {
+    const p = places.get(v.place_id), names = (v.party || []).map((x) => x.key === myId() ? "you" : x.name), r = myRating(v.place_id);
+    return `<div class="li"><div><div class="t">${esc(p?.name || "A place")} ${r?.rating ? starsText(r.rating) : ""}</div>
+      <div class="d">${fmtDate(v.visited_on)} · ${esc(list(names))}${v.picker_name ? " · " + pickedText(v) : ""}</div></div>
+      <div class="a">${p ? `<button type="button" class="btn" data-act="details" data-id="${esc(v.place_id)}">${r?.rating ? "Details" : "Rate it"}</button>` : ""}
+      ${v.created_by === myId() ? `<button type="button" class="btn warn" data-act="delVisit" data-id="${v.id}">Remove</button>` : ""}</div></div>`;
+  }).join("")}</div>`;
+}
+function renderPeople(){
+  let h = "";
+  if (invites.length) h += `<div class="card"><h2>Invites</h2>${invites.map((i) => `<div class="li"><div><div class="t">${esc(i.from_name)} wants to link with you</div>
+    <div class="d">Linked people see each other's ratings and history, so picks work for both of you.</div></div>
+    <div class="a"><button type="button" class="btn primary" data-act="accept" data-id="${i.id}">Link</button><button type="button" class="btn" data-act="decline" data-id="${i.id}">No thanks</button></div></div>`).join("")}</div>`;
+  h += `<div class="card"><h2>People I eat with</h2><p class="sub">Add someone once and they're a tap away next time. Link their account and their ratings count too.</p>
+    ${sortedPeople().map((p) => `<div class="li"><div><div class="t">${esc(p.name)}</div>
+      <div class="d">${p.linked_user_id ? "Linked account" : p.invite_email ? `Waiting for ${esc(p.invite_email)} to sign in to Your Turn and accept` : "Guest, no account"}</div></div>
+      <div class="a">${p.linked_user_id ? "" : `<button type="button" class="btn" data-act="link" data-id="${p.id}">${p.invite_email ? "Change email" : "Link an account"}</button>`}
+      <button type="button" class="btn" data-act="rename" data-id="${p.id}">Rename</button><button type="button" class="btn warn" data-act="delPerson" data-id="${p.id}">Remove</button></div></div>`).join("") || `<div class="empty">Nobody yet.</div>`}
+    <div class="inline"><input type="text" id="addName" maxlength="40" placeholder="First name"><button type="button" class="btn primary" data-act="addPerson">Add</button></div></div>`;
+  h += `<div class="card"><h2>Me</h2>
+    <div class="li"><div><div class="t">${esc(me?.display_name || "")}</div><div class="d">${esc(session.user.email)}</div></div><div class="a"><button type="button" class="btn" data-act="myName">Change name</button></div></div>
+    <div class="li"><div><div class="t">Home</div><div class="d">${me?.home_lat != null ? esc(me.home_label || "Set") : "Not set. Do this while you're at home."}</div></div>
+      <div class="a"><button type="button" class="btn" data-act="setHome">${me?.home_lat != null ? "Reset to where I am" : "Set to where I am now"}</button></div></div></div>`;
+  return h;
+}
+function render(){
+  $("#intro").hidden = !!session; $("#app").hidden = !session;
+  if (!session) return;
+  $("#tabs").innerHTML = [["pick", "Pick"], ["places", "Places"], ["history", "History"], ["people", "People"]]
+    .map(([k, l]) => `<button type="button" data-act="tab" data-v="${k}" class="${tab === k ? "on" : ""}">${l}${k === "people" && invites.length ? `<span class="dot"></span>` : ""}</button>`).join("");
+  $("#view").innerHTML = !loaded ? `<div class="card empty">Loading…</div>` : !me ? "" : { pick: renderPick, places: renderPlaces, history: renderHistory, people: renderPeople }[tab]();
+}
+
+// ---- dialogs -------------------------------------------------------------------------------------
+let dlgPlace = null, dlgStars = 0, dlgVisit = null, viParty = new Set(), askDone = null;
+function candOf(id){ return R.pool?.find((c) => c.id === id) || found?.find((c) => c.id === id) || (places.has(id) ? fromSaved(places.get(id)) : null); }
+// Tap-to-choose rows used where a dropdown would go (Shawn dislikes the phone's native dropdown menu, as he did the Mac one in Dough).
+function setPick(id, opts, value){
+  const el = $("#" + id); el.dataset.value = value ?? "";
+  el.innerHTML = opts.map(([v, l]) => `<button type="button" data-act="pick" data-g="${id}" data-v="${esc(v)}" class="${String(v) === el.dataset.value ? "on" : ""}">${esc(l)}</button>`).join("");
+}
+const picked = (id) => $("#" + id).dataset.value || "";
+function drawStars(){ $("#plStars").innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" data-act="star" data-v="${n}" class="${n <= dlgStars ? "on" : ""}" aria-label="${n} star${n > 1 ? "s" : ""}">★</button>`).join(""); }
+function openPlace(id){
+  const c = candOf(id); if (!c) return;
+  dlgPlace = c; const f = facts(c), r = myRating(id);
+  $("#plName").textContent = c.name; $("#plAddr").textContent = c.address || "";
+  setPick("plStyle", Object.entries(STYLES).map(([k, s]) => [k, s.label]), f.style);
+  setPick("plGenre", Object.entries(GENRES), f.genre);
+  setPick("plWaits", [["", "Not sure"], ["rarely", "Rarely"], ["peak", "At busy times"], ["usually", "Usually"]], f.waits || "");
+  $("#plMinutes").value = f.minutes; $("#plNotFood").checked = !!places.get(id)?.not_food;
+  dlgStars = r?.rating || 0; drawStars();
+  $("#plWant").checked = !!r?.want_to_try; $("#plNever").checked = !!r?.never_again;
+  $("#plRest").value = r?.rest_days ?? ""; $("#plNotes").value = r?.notes || "";
+  $("#plErr").hidden = true; $("#placeDlg").showModal();
+}
+$("#placeForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const c = dlgPlace, b = $("#plBtn"); b.disabled = true; $("#plErr").hidden = true;
+  try {
+    const row = { ...placeRow(c), style: picked("plStyle"), genre: picked("plGenre"), minutes: Math.min(240, Math.max(5, +$("#plMinutes").value || STYLES[picked("plStyle")].minutes)),
+      waits: picked("plWaits") || null, not_food: $("#plNotFood").checked, edited_by: myId() };
+    const { data, error } = await sb.from("yourturn_places").upsert(row, { onConflict: "place_id" }).select().single();
+    if (error) throw error;
+    places.set(c.id, data);
+    const rest = $("#plRest").value.trim();
+    await saveRating(c.id, { rating: dlgStars || null, want_to_try: $("#plWant").checked, never_again: $("#plNever").checked, rest_days: rest === "" ? null : Math.min(365, Math.max(0, +rest)), notes: $("#plNotes").value.trim() || null });
+    if (R.pool && !R.done) R.out = judgeAll().filter((x) => x.j.out);
+    $("#placeDlg").close(); render();
+  } catch (err){ $("#plErr").textContent = "That didn't save: " + err.message; $("#plErr").hidden = false; }
+  b.disabled = false;
+});
+function drawVisitParty(){
+  const pl = party(viParty);
+  $("#viParty").innerHTML = `<button type="button" class="on me">${esc(me.display_name)}</button>` + sortedPeople().map((p) => `<button type="button" data-act="viWho" data-id="${p.id}" class="${viParty.has(p.id) ? "on" : ""}">${esc(p.name)}</button>`).join("");
+  const cur = picked("viPicker");
+  setPick("viPicker", [["", "Nobody in particular"], ...pl.map((p) => [p.key, p.name])], pl.some((p) => p.key === cur) ? cur : "");
+}
+function openVisit(id){
+  const c = candOf(id); if (!c) return;
+  dlgVisit = c; viParty = new Set(R.party);
+  $("#viName").textContent = c.name; $("#viDate").value = todayISO(); $("#viDate").max = todayISO();
+  $("#viPicker").dataset.value = ""; drawVisitParty(); $("#viErr").hidden = true; $("#visitDlg").showModal();
+}
+$("#visitForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const b = $("#viBtn"); b.disabled = true; $("#viErr").hidden = true;
+  try {
+    const pl = party(viParty);
+    await logVisit(dlgVisit, pl, pl.find((p) => p.key === picked("viPicker")) || null, $("#viDate").value);
+    $("#visitDlg").close(); toast("Saved to your history."); if (tab === "history") found = null; render();
+  } catch (err){ $("#viErr").textContent = "That didn't save: " + err.message; $("#viErr").hidden = false; }
+  b.disabled = false;
+});
+function ask({ title, sub = "", label, value = "", type = "text", button = "Save" }, done){
+  $("#askTitle").textContent = title; $("#askSub").textContent = sub; $("#askSub").hidden = !sub; $("#askLabel").textContent = label;
+  $("#askInput").type = type; $("#askInput").value = value; $("#askBtn").textContent = button; $("#askErr").hidden = true;
+  askDone = done; $("#askDlg").showModal(); $("#askInput").focus();
+}
+$("#askForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#askBtn").disabled = true; $("#askErr").hidden = true;
+  try { await askDone($("#askInput").value.trim()); $("#askDlg").close(); render(); }
+  catch (err){ $("#askErr").textContent = err.message; $("#askErr").hidden = false; }
+  $("#askBtn").disabled = false;
+});
+$("#nameForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const { data, error } = await sb.from("yourturn_profiles").upsert({ user_id: myId(), display_name: $("#myName").value.trim() }, { onConflict: "user_id" }).select().single();
+  if (error){ $("#nameErr").textContent = "That didn't save: " + error.message; $("#nameErr").hidden = false; return; }
+  me = data; $("#nameDlg").close(); render();
+});
+$("#nameDlg").addEventListener("cancel", (e) => e.preventDefault());
+
+// ---- actions ---------------------------------------------------------------------------------------
+async function addPerson(name){
+  if (!name) throw new Error("Type a name first.");
+  if (people.some((p) => p.name.trim().toLowerCase() === name.toLowerCase())) throw new Error(`${name} is already on your list.`);
+  const { data, error } = await sb.from("yourturn_people").insert({ name }).select().single();
+  if (error) throw new Error("That didn't save: " + error.message);
+  people.push(data); return data;
+}
+const fail = (e) => toast(e.message || "Something went wrong.");
+function toQuestions(){ R.pool = null; R.err = ""; tab = "pick"; render(); window.scrollTo(0, 0); }
+window.addEventListener("popstate", () => { if (R.pool && !R.done) toQuestions(); });
+// Take a dealt place out for good, then deal the next best one into its spot.
+async function hidePlace(id, mark){
+  const c = candOf(id);
+  try { await keepPlace(c); await mark(c); } catch (e){ return fail(e); }
+  const pl = party(), at = R.dealt.findIndex((x) => x.id === id);
+  const judged = judgeAll(pl), next = judged.filter((x) => !x.j.out && !R.shown.has(x.c.id)).sort((a, b) => b.j.score - a.j.score)[0];
+  if (next){ R.dealt[at] = next.c; R.shown.add(next.c.id); } else R.dealt.splice(at, 1);
+  R.hiding = null;
+  R.dealt = R.dealt.filter((x) => !judged.find((y) => y.c.id === x.id)?.j.out);   // other locations of a brand just ruled out
+  R.out = judged.filter((x) => x.j.out);
+  toast(`${c.name} won't come up again.`); render();
+}
+const ACTS = {
+  signin: () => openAuth("in"),
+  closeDlg: (d, b) => b.closest("dialog").close(),
+  tab: (d) => { tab = d.v; R.err = ""; render(); window.scrollTo(0, 0); },
+  // setup
+  who: (d) => { if (R.party.has(d.id)) R.party.delete(d.id); else if (R.party.size + 1 < MAX_PARTY) R.party.add(d.id); R.passed = 0; recallMode(); remember(); render(); },
+  mode: (d) => { setMode(d.v); R.passed = 0; if (R.pool){ R.shown = new Set(); deal(); } render(); },
+  addWho: () => { R.adding = !R.adding; render(); $("#newWho")?.focus(); },
+  addWhoSave: async () => { try { const p = await addPerson($("#newWho").value.trim()); if (R.party.size + 1 < MAX_PARTY) R.party.add(p.id); R.adding = false; R.passed = 0; recallMode(); remember(); render(); } catch (e){ fail(e); } },
+  pass: () => { R.passed++; render(); },
+  time: (d) => { R.time = +d.v; remember(); render(); },
+  far: (d) => { R.far = +d.v; remember(); render(); },
+  style: (d) => { R.styles.has(d.v) ? R.styles.delete(d.v) : R.styles.add(d.v); remember(); render(); },
+  genre: (d) => { const cur = R.genres[d.v]; if (!cur) R.genres[d.v] = "want"; else if (cur === "want") R.genres[d.v] = "avoid"; else delete R.genres[d.v]; remember(); render(); },
+  anyHours: (d, b) => { R.anyHours = b.checked; },
+  genreAll: () => { R.genres = Object.fromEntries(Object.keys(GENRES).filter((g) => g !== "other").map((g) => [g, "want"])); remember(); render(); },
+  genreNone: () => { R.genres = {}; remember(); render(); },
+  wait: (d) => { R.waitOk = d.v === "yes"; remember(); render(); },
+  from: (d) => { R.from = d.v; R.err = ""; remember(); render(); },
+  townGo: async () => { const q = $("#townQ").value.trim(); if (!q) return; try { R.towns = await townSearch(q); if (R.towns.length === 1) R.town = R.towns[0]; } catch (_) { R.towns = []; } remember(); render(); },
+  townPick: (d) => { R.town = R.towns[+d.v]; remember(); render(); },
+  find: () => findPlaces(),
+  // cards
+  back: () => { if (history.state?.yt === "cards") history.back(); else toQuestions(); },
+  again: () => { deal(); render(); window.scrollTo(0, 0); },
+  reshuffle: () => { R.shown = new Set(); deal(); render(); },
+  elim: (d) => {
+    const pl = party(), gone = new Set(R.elims.map((e) => e.id)), g = gameState(pl, R.dealt.filter((c) => !gone.has(c.id)));
+    if (g.final) return;
+    R.elims.push({ id: d.id, key: g.current.key }); R.hiding = null; render(); window.scrollTo(0, 0);
+  },
+  undoElim: () => { R.elims.pop(); render(); },
+  hide: (d) => { R.hiding = R.hiding === d.id ? null : d.id; render(); },
+  hideNotFood: (d) => hidePlace(d.id, async (c) => {
+    const { data, error } = await sb.from("yourturn_places").update({ not_food: true, edited_by: myId() }).eq("place_id", c.id).select().single();
+    if (error) throw error; places.set(c.id, data);
+  }),
+  hideNever: (d) => hidePlace(d.id, (c) => saveRating(c.id, { never_again: true })),
+  spin: () => {
+    const live = R.dealt; if (live.length < 2) return;
+    const win = live[Math.floor(Math.random() * live.length)], hops = 10 + live.indexOf(win) + live.length;
+    let i = 0; const hop = () => {
+      document.querySelectorAll(".pc.lit").forEach((el) => el.classList.remove("lit"));
+      const c = live[i % live.length]; document.querySelector(`[data-pc="${CSS.escape(c.id)}"]`)?.classList.add("lit");
+      if (i++ < hops) setTimeout(hop, 70 + i * 12); else { R.lit = win.id; toast(`The wheel says ${win.name}.`); document.querySelector(`[data-pc="${CSS.escape(win.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    }; hop();
+  },
+  go: async (d) => {
+    const c = candOf(d.id), pl = party(), pick = picker(pl);
+    R.busy = true; R.err = ""; render();
+    try { const visit = await logVisit(c, pl, pl.length > 1 ? pick : null, todayISO(), modeOf(pl)); R.passed = 0; if (pl.length > 1) setMode(R.mode); R.done = { c, visit, pick }; }
+    catch (e){ R.err = "That didn't save: " + e.message; }
+    R.busy = false; render(); window.scrollTo(0, 0);
+  },
+  undoGo: async () => {
+    const { error } = await sb.from("yourturn_visits").delete().eq("id", R.done.visit.id);
+    if (error) return fail(error);
+    visits = visits.filter((v) => v.id !== R.done.visit.id); R.done = null; render();
+  },
+  newRound: () => { R.done = null; R.pool = null; render(); },
+  details: (d) => openPlace(d.id),
+  pick: (d, b) => { const el = $("#" + d.g); el.dataset.value = d.v; el.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); },
+  star: (d) => { dlgStars = +d.v; drawStars(); },
+  clearStars: () => { dlgStars = 0; drawStars(); },
+  quickRate: async (d) => { try { await saveRating(d.id, { rating: +d.v }); toast("Rated. Thanks."); render(); } catch (e){ fail(e); } },
+  skipRate: (d) => { store.set("skipRate", [...store.get("skipRate", []), d.id].slice(-30)); render(); },
+  // places and history
+  pfilter: (d) => { placeFilter = d.v; render(); },
+  findName: async () => {
+    const box = () => $("#findQ") || $("#histQ"), q = box().value.trim(); if (q.length < 2) return;
+    R.busy = true; R.err = ""; render();
+    try {
+      const at = R.origin || (me?.home_lat != null ? { lat: me.home_lat, lng: me.home_lng } : await whereAmI());
+      found = await callSearch({ action: "find", query: q, lat: at.lat, lng: at.lng });
+      await knownPlaces(found.map((c) => c.id));
+    } catch (e){ R.err = e.message; }
+    R.busy = false; render(); if (box()) box().value = q;
+  },
+  visit: (d) => openVisit(d.id),
+  viWho: (d) => { if (viParty.has(d.id)) viParty.delete(d.id); else if (viParty.size + 1 < MAX_PARTY) viParty.add(d.id); drawVisitParty(); },
+  delVisit: async (d) => {
+    if (!confirm("Remove this meal from your history?")) return;
+    const { error } = await sb.from("yourturn_visits").delete().eq("id", d.id);
+    if (error) return fail(error);
+    visits = visits.filter((v) => v.id !== d.id); render();
+  },
+  // people
+  addPerson: async () => { try { await addPerson($("#addName").value.trim()); render(); } catch (e){ fail(e); } },
+  rename: (d) => { const p = people.find((x) => x.id === d.id); ask({ title: "Rename", label: "Name", value: p.name }, async (v) => {
+    if (!v) throw new Error("Type a name.");
+    const { error } = await sb.from("yourturn_people").update({ name: v }).eq("id", p.id); if (error) throw new Error(error.message); p.name = v; }); },
+  link: (d) => { const p = people.find((x) => x.id === d.id); ask({ title: `Link ${p.name}'s account`, sub: `Enter the email ${p.name} uses (or will use) to sign in to Your Turn. They'll see your invite on their People tab. No email is sent, so let them know.`,
+    label: "Their email", value: p.invite_email || "", type: "email", button: "Invite" }, async (v) => {
+    if (v.toLowerCase() === session.user.email.toLowerCase()) throw new Error("That's your own email.");
+    const { error } = await sb.from("yourturn_people").update({ invite_email: v.toLowerCase() }).eq("id", p.id); if (error) throw new Error(error.message); p.invite_email = v.toLowerCase(); }); },
+  delPerson: async (d) => {
+    const p = people.find((x) => x.id === d.id);
+    if (!confirm(`Remove ${p.name} from your list?` + (p.linked_user_id ? " This unlinks your accounts." : ""))) return;
+    const { error } = await sb.from("yourturn_people").delete().eq("id", p.id);
+    if (error) return fail(error);
+    R.party.delete(p.id); remember(); p.linked_user_id ? load() : (people = people.filter((x) => x.id !== p.id), render());
+  },
+  accept: async (d) => { const { error } = await sb.rpc("yourturn_accept", { p_id: d.id }); if (error) return fail(error); toast("Linked."); load(); },
+  decline: async (d) => { const { error } = await sb.rpc("yourturn_decline", { p_id: d.id }); if (error) return fail(error); invites = invites.filter((i) => i.id !== d.id); render(); },
+  myName: () => ask({ title: "Your name", label: "First name", value: me.display_name }, async (v) => {
+    if (!v) throw new Error("Type a name.");
+    const { data, error } = await sb.from("yourturn_profiles").update({ display_name: v, updated_at: new Date().toISOString() }).eq("user_id", myId()).select().single();
+    if (error) throw new Error(error.message); me = data; }),
+  setHome: async () => {
+    try {
+      const at = await whereAmI();
+      const { data, error } = await sb.from("yourturn_profiles").update({ home_lat: at.lat, home_lng: at.lng, home_label: "Set " + fmtDate(todayISO()), updated_at: new Date().toISOString() }).eq("user_id", myId()).select().single();
+      if (error) throw error; me = data; toast("Home is set."); render();
+    } catch (e){ fail(e); }
+  },
+};
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) ACTS[b.dataset.act]?.(b.dataset, b); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && e.target.id === "newWho"){ R.adding = false; render(); return; }
+  if (e.key !== "Enter") return;
+  const go = { newWho: "addWhoSave", townQ: "townGo", findQ: "findName", histQ: "findName", addName: "addPerson" }[e.target.id];
+  if (go){ e.preventDefault(); ACTS[go]({}); }
+});
+
+// ---- auth --------------------------------------------------------------------------------------------
+let mode = "in";   // "in" | "up" | "reset"
+function openAuth(m){
+  mode = m;
+  $("#authTitle").textContent = m === "in" ? "Sign in" : m === "up" ? "Create an account" : "Reset your password";
+  $("#authSub").textContent = m === "reset" ? "Enter your email and I'll send a link to set a new password." : "One account works across Shawn's apps, so if you use Dough, sign in with the same one.";
+  $("#authBtn").textContent = m === "in" ? "Sign in" : m === "up" ? "Create account" : "Send the link";
+  $("#pwWrap").hidden = m === "reset"; $("#password").required = m !== "reset";
+  $("#password").autocomplete = m === "up" ? "new-password" : "current-password";
+  $("#googleWrap").hidden = !GOOGLE_ENABLED || m === "reset";
+  $("#authLinks").innerHTML = m === "in"
+    ? `<button type="button" class="btn link" data-mode="up">Create an account</button> · <button type="button" class="btn link" data-mode="reset">Forgot your password?</button>`
+    : `<button type="button" class="btn link" data-mode="in">Back to sign in</button>`;
+  $("#authErr").hidden = $("#authOk").hidden = true;
+  if (!$("#authDlg").open) $("#authDlg").showModal();
+}
+$("#authLinks").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
+$("#authCancel").addEventListener("click", () => $("#authDlg").close());
+$("#signIn").addEventListener("click", () => openAuth("in"));
+$("#signOut").addEventListener("click", () => sb.auth.signOut());
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE } }));
+$("#authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#email").value.trim(), password = $("#password").value, b = $("#authBtn");
+  const bad = (m) => { $("#authErr").textContent = m; $("#authErr").hidden = false; };
+  const good = (m) => { $("#authOk").textContent = m; $("#authOk").hidden = false; };
+  $("#authErr").hidden = $("#authOk").hidden = true; b.disabled = true;
+  if (mode === "in"){
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) bad(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message I sent when you signed up." : "That email and password didn't match."); else $("#authDlg").close();
+  } else if (mode === "up"){
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: HERE } });
+    if (error) bad("Couldn't create the account: " + error.message);
+    else if (data.session) $("#authDlg").close();
+    else good("Almost there. Check your email (and spam) for a confirmation link, then sign in here.");
+  } else {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: HERE });
+    if (error) bad("Couldn't send that: " + error.message); else good("Sent. Check your email (and spam) for a link back here.");
+  }
+  b.disabled = false;
+});
+$("#pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#pwErr").hidden = true; $("#pwBtn").disabled = true;
+  const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
+  $("#pwBtn").disabled = false;
+  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else $("#pwDlg").close();
+});
+function setSession(sess){
+  const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
+  session = sess;
+  $("#signIn").hidden = !!sess; $("#signOut").hidden = !sess;
+  $("#whoEmail").hidden = !sess; $("#whoEmail").textContent = sess ? sess.user.email : "";
+  if (changed || !sess){ R.pool = null; R.done = null; found = null; load(); } else render();
+}
+
+// ---- boot ----------------------------------------------------------------------------------------------
+sb.auth.onAuthStateChange((event, sess) => {
+  if (event === "PASSWORD_RECOVERY") $("#pwDlg").showModal();
+  setTimeout(() => setSession(sess), 0);   // never call back into supabase from inside this callback
+});
+</script>
+</body>
+</html>

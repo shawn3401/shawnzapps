@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="description" content="Listing Assistant: a private tool for working seller leads.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏡</text></svg>">
+<title>Listing Assistant</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="form.js"></script>
+<style>
+:root{color-scheme:light dark;
+  --bg:#F4F4F2; --paper:#FFFFFF; --ink:#1F2124; --ink-2:#565B62; --ink-3:#8A9097;
+  --line:#DEDFDC; --accent:#C8322B; --accent-deep:#A02620; --soft:#F8E9E7;
+  --good:#2F7A4B; --good-soft:#E1F0E6; --warn:#9A6A00; --warn-soft:#FBF1D6; --bad:#A32B2B; --bad-soft:#F7E0E0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181A; --paper:#1F2225; --ink:#EEF0F1; --ink-2:#BDC2C7; --ink-3:#8A9097;
+    --line:#34383D; --accent:#EC6A60; --accent-deep:#F38F86; --soft:#3A2321;
+    --good:#86C79D; --good-soft:#1D3024; --warn:#E3B95A; --warn-soft:#352C14; --bad:#E67C7C; --bad-soft:#3B1F1F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181A; --paper:#1F2225; --ink:#EEF0F1; --ink-2:#BDC2C7; --ink-3:#8A9097;
+  --line:#34383D; --accent:#EC6A60; --accent-deep:#F38F86; --soft:#3A2321;
+  --good:#86C79D; --good-soft:#1D3024; --warn:#E3B95A; --warn-soft:#352C14; --bad:#E67C7C; --bad-soft:#3B1F1F;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.45}
+a{color:var(--accent)}
+h1,h2,h3{margin:0;line-height:1.15;font-weight:700}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px 80px}
+.bar{background:var(--paper);border-bottom:1px solid var(--line);border-top:4px solid var(--accent);position:sticky;top:0;z-index:5}
+.bar .in{max-width:900px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bar h1{font-size:22px;letter-spacing:.01em}
+.who{font-size:13px;color:var(--ink-3);display:flex;gap:10px;align-items:center;min-width:0}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.btn{font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:6px;padding:8px 13px;cursor:pointer}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+:root[data-theme="dark"] .btn.primary{color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#1B120E}}
+.btn.big{width:100%;padding:13px;font-size:17px}
+.btn.small{font-size:13px;padding:5px 9px}
+.btn.link{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline;font-weight:400}
+.btn[disabled]{opacity:.6;cursor:default}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px;margin-top:16px}
+.card h2{font-size:20px}
+.sub{color:var(--ink-2);font-size:15px;margin:6px 0 0}
+.note{color:var(--ink-3);font-size:14px}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:9px 12px;font-size:15px;margin-top:10px}
+.ok{background:var(--good-soft);color:var(--good);border-radius:6px;padding:9px 12px;font-size:15px;margin-top:10px}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:9px 12px;font-size:15px;margin-top:10px}
+.row{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+label.f{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=email],input[type=password],input[type=tel],input[type=date],textarea{font:inherit;width:100%;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);padding:9px 11px}
+textarea{min-height:120px;resize:vertical}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:6px 13px;cursor:pointer}
+.pill.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.pill .n{font-weight:400;opacity:.7;margin-left:4px}
+.stage{display:inline-block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:999px;padding:3px 10px;background:var(--soft);color:var(--accent-deep)}
+
+/* signed out */
+.hero{text-align:center;padding:60px 10px}
+.hero h2{font-size:30px}
+.hero p{color:var(--ink-2);max-width:460px;margin:12px auto 22px}
+
+/* list */
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:22px 0 12px;flex-wrap:wrap}
+.head h2{font-size:26px}
+.lead{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:14px 16px;margin-top:10px;cursor:pointer}
+.lead:hover{background:var(--soft)}
+.lead .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.lead b{font-size:19px}
+.lead .addr{color:var(--ink-2);font-size:15px}
+.lead .sum{color:var(--ink-2);font-size:15px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lead .nx{font-size:15px;margin-top:6px}
+.lead .when{color:var(--ink-3);font-size:13px;margin-top:6px}
+.empty{text-align:center;color:var(--ink-2);padding:40px 10px}
+
+/* lead view */
+.back{margin:16px 0 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media (max-width:620px){.grid2{grid-template-columns:1fr}}
+.item{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px}
+.item .ih{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.item .meta{color:var(--ink-3);font-size:14px}
+.item details{margin-top:8px}
+.item summary{cursor:pointer;color:var(--accent);font-size:15px}
+.item textarea{margin-top:8px;min-height:180px;font-size:15px}
+.files{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.files img{width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.chipf{font-size:13px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;color:var(--ink-2)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}
+.sec{margin-top:16px}
+.sec h3{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-bottom:6px}
+.sec p{margin:0 0 8px;white-space:pre-wrap}
+.sec ul{margin:0;padding-left:20px}
+.sec li{margin-bottom:5px}
+.act{display:grid;grid-template-columns:110px 1fr;gap:4px 12px;margin-bottom:6px}
+.act .w{font-weight:700}
+.act .t{color:var(--ink-3);font-size:14px}
+.busy{display:flex;gap:10px;align-items:center;color:var(--ink-2);margin-top:12px}
+.spin{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* form tab */
+.grp{font-size:18px;margin:22px 0 0;padding:6px 12px;background:var(--ink);color:var(--bg);border-radius:6px}
+.fsec{margin-top:12px}
+.fsec h4{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:6px;padding:4px 9px;cursor:pointer}
+.chip.on{background:var(--good-soft);border-color:var(--good);color:var(--ink);font-weight:600}
+.chip.inf{background:var(--warn-soft);border:1px dashed var(--warn);color:var(--ink);font-weight:600}
+.extra{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0 2px;padding-left:10px;border-left:3px solid var(--good);font-size:14px;color:var(--ink-2)}
+.extra input{width:120px;padding:4px 7px;font-size:14px}
+.extra input.cnt{width:56px}
+.rooms{overflow-x:auto;margin-top:6px}
+.rooms table{border-collapse:collapse;font-size:13px}
+.rooms th,.rooms td{border:1px solid var(--line);padding:3px 5px;text-align:center;white-space:nowrap}
+.rooms th{color:var(--ink-2);font-weight:600}
+.rooms input{width:46px;padding:4px;text-align:center;font-size:14px;border:0;background:transparent}
+.rev{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
+.rev:first-of-type{border-top:0}
+.rev .why{color:var(--ink-2);font-size:14px}
+.rev .b{display:flex;gap:6px;flex:none}
+
+dialog{border:1px solid var(--line);border-top:5px solid var(--accent);border-radius:10px;background:var(--paper);color:var(--ink);padding:22px;width:min(520px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(15,15,15,.55)}
+dialog h2{font-size:22px}
+.or{text-align:center;color:var(--ink-3);font-size:14px;margin:12px 0 0}
+.chk{display:flex;gap:7px;align-items:center;font-size:14px;color:var(--ink-2);margin-top:8px}
+footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font-size:13px}
+</style>
+</head>
+<body>
+<header class="bar"><div class="in">
+  <h1>Listing Assistant</h1>
+  <div class="who"><span id="whoEmail" hidden></span><button class="btn small" id="signIn">Sign in</button><button class="btn small" id="signOut" hidden>Sign out</button></div>
+</div></header>
+
+<main class="wrap">
+  <section id="out" class="hero">
+    <h2>From the phone call to the listing, in one place.</h2>
+    <p>Drop in a call recording, walkthrough notes, or photos for a seller, and get the property form, team notes, and next steps back. Private to the team.</p>
+    <button class="btn primary" id="heroIn">Sign in</button>
+  </section>
+
+  <section id="noAccess" class="hero" hidden>
+    <h2>Not turned on yet</h2>
+    <p>You're signed in, but Listing Assistant isn't turned on for this account. Ask Shawn to add you.</p>
+  </section>
+
+  <section id="list" hidden>
+    <div class="head"><h2>Seller leads</h2><button class="btn primary" id="newLead">New seller lead</button></div>
+    <div class="pills" id="filters"></div>
+    <div id="leadCards"></div>
+  </section>
+
+  <section id="lead" hidden>
+    <p class="back"><button class="btn link" id="backBtn">‹ All seller leads</button></p>
+    <div class="card">
+      <div class="grid2">
+        <div><label class="f" for="lName">Seller</label><input type="text" id="lName" data-col="name" placeholder="Name"></div>
+        <div><label class="f" for="lAddr">Property</label><input type="text" id="lAddr" data-col="address" placeholder="Street address, city"></div>
+        <div><label class="f" for="lPhone">Phone</label><input type="tel" id="lPhone" data-col="phone"></div>
+        <div><label class="f" for="lEmail">Email</label><input type="email" id="lEmail" data-col="email"></div>
+      </div>
+      <label class="f">Stage</label>
+      <div class="pills" id="stagePills"></div>
+      <label class="f" for="lNext">Next step</label>
+      <input type="text" id="lNext" data-col="next_step" placeholder="The one thing to do next">
+    </div>
+
+    <div class="card">
+      <div class="head" style="margin:0"><h2>What you've gathered</h2><button class="btn" id="addMat">Add a call, walkthrough, notes, or photos</button></div>
+      <div id="items"></div>
+    </div>
+
+    <div class="card" id="briefCard">
+      <div class="head" style="margin:0"><h2>The brief</h2><button class="btn primary" id="buildBtn">Build the brief</button></div>
+      <p class="sub" id="briefHint"></p>
+      <div class="busy" id="briefBusy" hidden><div class="spin"></div><span>Reading everything and writing the brief. This takes a minute or two, keep this page open.</span></div>
+      <div class="err" id="briefErr" hidden></div>
+      <div id="briefBody" hidden>
+        <div class="tabs pills" id="tabs"></div>
+        <div id="tabBody"></div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:22px"><button class="btn link" id="delLead">Delete this lead</button></p>
+  </section>
+</main>
+<footer>Private. Client details stay behind the sign-in. <a href="/">shawnzapps.com</a></footer>
+<input type="file" id="blankPick" accept="application/pdf" hidden>
+
+<!-- add material, and new lead -->
+<dialog id="matDlg">
+  <form id="matForm">
+    <h2 id="matTitle">Add to this lead</h2>
+    <div id="newFields">
+      <p class="sub">Fill in what you know. If you leave the name or address blank, the brief fills them in from the recording.</p>
+      <label class="f" for="nName">Seller</label><input type="text" id="nName" placeholder="Name">
+      <label class="f" for="nAddr">Property</label><input type="text" id="nAddr" placeholder="Street address, city">
+      <label class="f" for="nPhone">Phone</label><input type="tel" id="nPhone">
+    </div>
+    <label class="f">What is it?</label>
+    <div class="pills" id="kindPills"></div>
+    <label class="f" for="mDate">When</label>
+    <input type="date" id="mDate">
+    <label class="f" for="mFiles">Recording, photos, or video</label>
+    <input type="file" id="mFiles" multiple accept="audio/*,video/*,image/*,.m4a,.mp3,.wav,.aac,.mp4,.mov">
+    <label class="f" for="mText">Transcript or notes</label>
+    <textarea id="mText" placeholder="Paste a transcript, or type what you remember. Leave blank to have a recording transcribed."></textarea>
+    <div class="busy" id="matBusy" hidden><div class="spin"></div><span id="matBusyText">Saving…</span></div>
+    <div class="err" id="matErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="matCancel">Cancel</button><button class="btn primary" id="matBtn">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="authDlg">
+  <form id="authForm">
+    <h2 id="authTitle">Sign in</h2>
+    <p class="sub" id="authSub">The same account works across Shawn's apps.</p>
+    <div id="googleWrap" hidden>
+      <button type="button" class="btn big" id="google" style="margin-top:14px">Continue with Google</button>
+      <p class="or">or use your email</p>
+    </div>
+    <label class="f" for="email">Email</label>
+    <input type="email" id="email" autocomplete="email" required>
+    <div id="pwWrap">
+      <label class="f" for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" minlength="8">
+      <label class="chk"><input type="checkbox" id="showPw"> Show password</label>
+    </div>
+    <div class="err" id="authErr" hidden></div>
+    <div class="ok" id="authOk" hidden></div>
+    <div class="row"><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
+    <p class="note" id="authLinks"></p>
+  </form>
+</dialog>
+
+<dialog id="pwDlg">
+  <form id="pwForm">
+    <h2>New password</h2>
+    <p class="sub">You're signed in from the reset link. Pick a new password, at least 8 characters.</p>
+    <label class="f" for="pw1">New password</label>
+    <input type="text" id="pw1" autocomplete="new-password" minlength="8" required autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="err" id="pwErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="pwSkip">Not now</button><button class="btn primary" id="pwBtn">Save password</button></div>
+  </form>
+</dialog>
+
+<script>
+const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let GOOGLE_ENABLED = false;   // set at load from Supabase Auth's public settings
+fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then(r => r.json()).then(d => { GOOGLE_ENABLED = !!d?.external?.google; const w = $("#googleWrap"); if (w && $("#authDlg").open && mode !== "reset") w.hidden = !GOOGLE_ENABLED; }).catch(() => {});
+
+const BUCKET = "listing-files", BLANK_PATH = "_shared/form-blank.pdf", MAX_FILE = 200 * 1024 * 1024;
+const STAGES = [["new", "New lead"], ["call", "First call done"], ["walk_set", "Walkthrough set"], ["walked", "Walked"], ["pricing", "Pricing"], ["signed", "Signed"], ["listed", "Listed"], ["hold", "On hold"], ["closed", "Closed out"]];
+const KINDS = [["call", "Phone call"], ["walkthrough", "Walkthrough"], ["note", "Note"], ["photos", "Photos"]];
+const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"], ["form", "Property form"]];
+const LONG_FIELDS = ["improvements", "additional_notes"];
+const EXT_TYPE = { m4a: "audio/mp4", mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", mov: "video/quicktime", m4v: "video/mp4", webm: "video/webm" };
+// the form's boxes, as the AI function wants them: {section: {t, g, i: {item: [label, option keys, has count, has text]}}}
+const CATALOG = Object.fromEntries(FORM.sections.map(s => [s.key, { t: s.title, g: s.group, i: Object.fromEntries(s.items.map(it => [it.key, [it.label, (it.opts || []).map(o => o.key), it.count ? 1 : 0, it.text ? 1 : 0]])) }]));
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const stageName = k => (STAGES.find(s => s[0] === k) || [0, k])[1];
+const kindName = k => (KINDS.find(s => s[0] === k) || [0, k])[1];
+const todayISO = () => new Date().toLocaleDateString("en-CA");
+const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+const words = t => (t.trim().match(/\S+/g) || []).length;
+
+let session = null, leads = [], cur = null, items = [], thumbs = {}, tab = "overview", filter = "all", matKind = "call", matNew = false, blank = null;
+
+function show(id){ for (const s of ["out", "noAccess", "list", "lead"]) $("#" + s).hidden = s !== id; }
+
+// ---- leads list ----------------------------------------------------------------
+async function load(){
+  if (!session){ show("out"); return; }
+  const { data: a } = await sb.from("listing_access").select("user_id").maybeSingle();
+  if (!a){ show("noAccess"); return; }
+  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, next_step, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
+  leads = error ? [] : data;
+  route();
+}
+function route(){
+  if (!session) return;
+  const id = location.hash.slice(1);
+  if (id) openLead(id); else { cur = null; renderList(); show("list"); }
+}
+function renderList(){
+  const counts = {}; leads.forEach(l => counts[l.stage] = (counts[l.stage] || 0) + 1);
+  const used = STAGES.filter(s => counts[s[0]]);
+  if (filter !== "all" && !counts[filter]) filter = "all";
+  $("#filters").innerHTML = leads.length > 1 ? [["all", "All"], ...used].map(([k, n]) => `<button class="pill${filter === k ? " on" : ""}" data-f="${k}">${n}<span class="n">${k === "all" ? leads.length : counts[k]}</span></button>`).join("") : "";
+  const shown = leads.filter(l => filter === "all" || l.stage === filter);
+  $("#leadCards").innerHTML = shown.length ? shown.map(l => `
+    <button class="lead" data-id="${l.id}">
+      <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
+      ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
+      ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
+      ${l.next_step ? `<div class="nx"><b style="font-size:15px">Next:</b> ${esc(l.next_step)}</div>` : ""}
+      <div class="when">Updated ${niceDate(l.updated_at)}</div>
+    </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> and drop in your first call or walkthrough.</div>`;
+}
+$("#filters").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b){ filter = b.dataset.f; renderList(); } });
+$("#leadCards").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) location.hash = b.dataset.id; });
+$("#backBtn").addEventListener("click", () => { location.hash = ""; });
+let skipHash = false;   // set when the page changes the hash itself and has already loaded that lead
+window.addEventListener("hashchange", () => { if (skipHash){ skipHash = false; return; } if (session) (location.hash.slice(1) ? route() : load()); });
+
+// ---- one lead ----------------------------------------------------------------------
+async function openLead(id){
+  const [{ data: l }, { data: its }] = await Promise.all([
+    sb.from("listing_leads").select("*").eq("id", id).maybeSingle(),
+    sb.from("listing_items").select("*").eq("lead_id", id).order("occurred_on").order("created_at"),
+  ]);
+  if (!l){ location.hash = ""; return; }
+  cur = l; cur.form = normForm(cur.form); items = its || []; tab = "overview";
+  show("lead"); renderLead(); window.scrollTo(0, 0);
+  loadThumbs();
+}
+function normForm(f){ f = f || {}; return { fields: f.fields || {}, checks: f.checks || {}, rooms: f.rooms || {}, locked: f.locked || {} }; }
+function renderLead(){
+  $("#lName").value = cur.name; $("#lAddr").value = cur.address; $("#lPhone").value = cur.phone; $("#lEmail").value = cur.email; $("#lNext").value = cur.next_step;
+  $("#stagePills").innerHTML = STAGES.map(([k, n]) => `<button class="pill${cur.stage === k ? " on" : ""}" data-s="${k}">${n}</button>`).join("");
+  renderItems(); renderBrief();
+}
+async function saveLead(patch){
+  Object.assign(cur, patch);
+  const { error } = await sb.from("listing_leads").update(patch).eq("id", cur.id);
+  if (error) alert("That didn't save: " + error.message);
+}
+document.querySelectorAll("#lead [data-col]").forEach(el => el.addEventListener("change", () => saveLead({ [el.dataset.col]: el.value.trim() })));
+$("#stagePills").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b){ saveLead({ stage: b.dataset.s }); renderLead(); } });
+$("#delLead").addEventListener("click", async () => {
+  if (!confirm("Delete " + (cur.name || "this lead") + " and everything gathered on it? This can't be undone.")) return;
+  const paths = items.flatMap(i => i.files.map(f => f.path));
+  if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+  await sb.from("listing_leads").delete().eq("id", cur.id);
+  location.hash = "";
+});
+
+// ---- what's been gathered --------------------------------------------------------
+function renderItems(){
+  $("#items").innerHTML = items.length ? items.map(i => {
+    const imgs = i.files.filter(f => f.type.startsWith("image/")), other = i.files.filter(f => !f.type.startsWith("image/"));
+    const media = i.files.some(f => /^(audio|video)\//.test(f.type));
+    const state = i.status === "transcribing" ? `<div class="busy"><div class="spin"></div><span>Transcribing the recording…</span></div>`
+      : i.status === "failed" ? `<div class="err">${esc(i.error || "The recording couldn't be transcribed.")} <button class="btn link" data-retry="${i.id}">Try again</button></div>` : "";
+    return `<div class="item">
+      <div class="ih"><b>${esc(kindName(i.kind))}</b><span class="meta">${niceDate(i.occurred_on)} · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      ${i.files.length ? `<div class="files">${imgs.map(f => thumbs[f.path] ? `<a href="${thumbs[f.path]}" target="_blank" rel="noopener"><img src="${thumbs[f.path]}" alt="${esc(f.name)}" loading="lazy"></a>` : `<span class="chipf">${esc(f.name)}</span>`).join("")}${other.map(f => `<span class="chipf">${esc(f.name)}</span>`).join("")}</div>` : ""}
+      ${state}
+      ${i.transcript || !media ? `<details><summary>${i.kind === "note" ? "Note" : "Transcript"} (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
+        : i.status === "ready" ? `<p class="note" style="margin:8px 0 0">Not transcribed. <button class="btn link" data-retry="${i.id}">Transcribe it</button></p>` : ""}
+    </div>`;
+  }).join("") : `<p class="sub">Nothing yet. Add a call recording, a walkthrough, typed notes, or photos, and the brief is built from all of it.</p>`;
+}
+async function loadThumbs(){
+  const paths = items.flatMap(i => i.files.filter(f => f.type.startsWith("image/")).map(f => f.path)).filter(p => !thumbs[p]);
+  if (!paths.length) return;
+  const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+  (data || []).forEach(d => { if (d.signedUrl) thumbs[d.path] = d.signedUrl; });
+  if (cur) renderItems();
+}
+$("#items").addEventListener("click", async e => {
+  const rm = e.target.closest("[data-rm]"), re = e.target.closest("[data-retry]");
+  if (rm){
+    const it = items.find(i => i.id === rm.dataset.rm);
+    if (!confirm("Remove this " + kindName(it.kind).toLowerCase() + " and its files?")) return;
+    if (it.files.length) await sb.storage.from(BUCKET).remove(it.files.map(f => f.path));
+    await sb.from("listing_items").delete().eq("id", it.id);
+    items = items.filter(i => i !== it); renderItems(); renderBrief();
+  }
+  if (re) transcribe(items.find(i => i.id === re.dataset.retry));
+});
+$("#items").addEventListener("change", async e => {
+  const t = e.target.closest("[data-tr]"); if (!t) return;
+  const it = items.find(i => i.id === t.dataset.tr); it.transcript = t.value;
+  await sb.from("listing_items").update({ transcript: t.value }).eq("id", it.id);
+});
+
+async function fn(name, body){
+  const { data } = await sb.auth.getSession();
+  const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, { method: "POST", headers: { Authorization: "Bearer " + data.session.access_token, apikey: SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || d.message || "Something went wrong (" + r.status + ").");
+  return d;
+}
+async function transcribe(it){
+  it.status = "transcribing"; it.error = ""; if (cur) renderItems();
+  try { const d = await fn("listing-transcribe", { item_id: it.id }); it.transcript = d.transcript; it.status = "ready"; }
+  catch (err){ it.status = "failed"; it.error = err.message; }
+  if (cur && cur.id === it.lead_id){ renderItems(); renderBrief(); }
+  return it.status === "ready";
+}
+
+// ---- add material / new lead ------------------------------------------------------
+function openMat(isNew){
+  matNew = isNew; matKind = "call";
+  $("#matTitle").textContent = isNew ? "New seller lead" : "Add to this lead";
+  $("#newFields").hidden = !isNew; $("#matBtn").textContent = isNew ? "Start the lead" : "Save";
+  $("#matForm").reset(); $("#mDate").value = todayISO();
+  $("#matErr").hidden = true; $("#matBusy").hidden = true; $("#matBtn").disabled = false;
+  renderKinds(); $("#matDlg").showModal();
+}
+function renderKinds(){ $("#kindPills").innerHTML = KINDS.map(([k, n]) => `<button type="button" class="pill${matKind === k ? " on" : ""}" data-k="${k}">${n}</button>`).join(""); }
+$("#kindPills").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b){ matKind = b.dataset.k; renderKinds(); } });
+$("#newLead").addEventListener("click", () => openMat(true));
+$("#addMat").addEventListener("click", () => openMat(false));
+$("#matCancel").addEventListener("click", () => $("#matDlg").close());
+
+async function shrink(file){   // photos go up as JPEGs no bigger than the AI can use
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const k = Math.min(1, 1568 / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+  } catch (_) { return null; }
+}
+$("#matForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const files = [...$("#mFiles").files], text = $("#mText").value.trim();
+  const fail = m => { $("#matErr").textContent = m; $("#matErr").hidden = false; $("#matBusy").hidden = true; $("#matBtn").disabled = false; };
+  const busy = m => { $("#matBusyText").textContent = m; $("#matBusy").hidden = false; };
+  $("#matErr").hidden = true;
+  if (!matNew && !files.length && !text) return fail("Add a file, or paste or type something.");
+  const big = files.find(f => f.size > MAX_FILE); if (big) return fail(big.name + " is over 200 MB. Trim it, or send the audio only.");
+  $("#matBtn").disabled = true; busy("Saving…");
+
+  let lead = cur;
+  if (matNew){
+    const { data, error } = await sb.from("listing_leads").insert({ name: $("#nName").value.trim(), address: $("#nAddr").value.trim(), phone: $("#nPhone").value.trim() }).select().single();
+    if (error) return fail("Couldn't start the lead: " + error.message);
+    lead = data;
+  }
+  let item = null;
+  if (files.length || text){
+    const meta = [], uid = session.user.id;
+    for (let n = 0; n < files.length; n++){
+      const f = files[n], ext = (f.name.split(".").pop() || "").toLowerCase();
+      busy(`Uploading ${n + 1} of ${files.length}: ${f.name}`);
+      let type = f.type || EXT_TYPE[ext] || "application/octet-stream", blob = f, outExt = ext || "bin";
+      if (type.startsWith("image/")){
+        const small = await shrink(f);
+        if (small){ blob = small; type = "image/jpeg"; outExt = "jpg"; } else type = "application/octet-stream";   // a photo this browser can't read (HEIC on some); kept, but the AI can't see it
+      }
+      const path = `${uid}/${lead.id}/${crypto.randomUUID()}.${outExt}`;
+      const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: type });
+      if (error) return fail(`Couldn't upload ${f.name}: ${error.message}`);
+      meta.push({ path, name: f.name, type, size: blob.size });
+    }
+    const media = meta.some(f => /^(audio|video)\//.test(f.type));
+    const kind = !media && !text && meta.length ? "photos" : matKind;
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind, occurred_on: $("#mDate").value || todayISO(), transcript: text, files: meta, status: media && !text ? "transcribing" : "ready" }).select().single();
+    if (error) return fail("Couldn't save that: " + error.message);
+    item = data;
+  }
+  $("#matDlg").close();
+  if (matNew){ leads.unshift(lead); skipHash = true; location.hash = lead.id; await openLead(lead.id); }
+  else if (item){ items.push(item); renderItems(); renderBrief(); loadThumbs(); }
+  if (item && item.status === "transcribing"){
+    const mine = items.find(i => i.id === item.id) || item;
+    const ok = await transcribe(mine);
+    if (ok && matNewStarted(lead)) buildBrief();
+  } else if (item && matNewStarted(lead)) buildBrief();
+});
+// a brand-new lead builds its first brief by itself, so one upload kicks everything off
+function matNewStarted(lead){ return cur && cur.id === lead.id && !cur.brief; }
+
+// ---- the brief ---------------------------------------------------------------------------
+function renderBrief(){
+  const b = cur.brief, newer = b && items.some(i => new Date(i.created_at) > new Date(cur.brief_at));
+  $("#buildBtn").textContent = b ? "Update the brief" : "Build the brief";
+  $("#buildBtn").disabled = !items.length;
+  $("#briefHint").textContent = !items.length ? "Add something above first." : !b ? "Reads every call, walkthrough, note, and photo above and writes the form, the notes, and the next steps."
+    : (newer ? "There is new material since this brief was built. " : "") + "Built " + new Date(cur.brief_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ". Updating rereads everything; boxes and fields you changed by hand are kept.";
+  $("#briefBody").hidden = !b;
+  if (!b) return;
+  $("#tabs").innerHTML = TABS.map(([k, n]) => `<button class="pill${tab === k ? " on" : ""}" data-t="${k}">${n}</button>`).join("");
+  $("#tabBody").innerHTML = tab === "form" ? formHtml() : `<div class="row" style="margin-top:8px"><button class="btn small" id="copyBtn">Copy</button></div>` + noteHtml(tab);
+}
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (b){ tab = b.dataset.t; renderBrief(); } });
+const ul = a => a?.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="note">Nothing here.</p>`;
+function noteHtml(t){
+  const b = cur.brief;
+  if (t === "team") return (b.team_notes || []).map(s => `<div class="sec"><h3>${esc(s.heading)}</h3><p>${esc(s.body)}</p></div>`).join("") || `<p class="note">Nothing here.</p>`;
+  if (t === "admin") return `<div class="sec">${ul(b.admin_notes)}</div>`;
+  if (t === "private") return `<div class="sec"><p class="note">For you only. Keep this out of what you send the team.</p>${ul(b.private_notes)}</div>`;
+  return `<div class="sec"><p>${esc(b.summary)}</p></div>
+    ${b.motivation ? `<div class="sec"><h3>Why they're selling</h3><p>${esc(b.motivation)}</p></div>` : ""}
+    ${b.timeline ? `<div class="sec"><h3>Timeline</h3><p>${esc(b.timeline)}</p></div>` : ""}
+    <div class="sec"><h3>Action items</h3>${(b.actions || []).map(a => `<div class="act"><div class="w">${esc(a.who)}</div><div>${esc(a.what)}${a.when ? `<div class="t">${esc(a.when)}</div>` : ""}</div></div>`).join("") || `<p class="note">None.</p>`}</div>
+    <div class="sec"><h3>Ask next time</h3>${ul(b.questions)}</div>
+    ${b.photos_total > b.photos_used ? `<p class="note">Only the first ${b.photos_used} of ${b.photos_total} photos were read.</p>` : ""}`;
+}
+function noteText(t){
+  const b = cur.brief, li = a => (a || []).map(x => "- " + x).join("\n"), head = (cur.name || "Seller lead") + (cur.address ? ", " + cur.address : "");
+  if (t === "team") return head + "\n\n" + (b.team_notes || []).map(s => s.heading.toUpperCase() + "\n" + s.body).join("\n\n");
+  if (t === "admin") return head + "\nAdmin notes\n\n" + li(b.admin_notes);
+  if (t === "private") return head + "\nMy notes\n\n" + li(b.private_notes);
+  return [head, b.summary, b.motivation && "Why they're selling: " + b.motivation, b.timeline && "Timeline: " + b.timeline,
+    "Action items\n" + (b.actions || []).map(a => `- ${a.who}: ${a.what}${a.when ? " (" + a.when + ")" : ""}`).join("\n"), "Ask next time\n" + li(b.questions)].filter(Boolean).join("\n\n");
+}
+$("#tabBody").addEventListener("click", async e => {
+  if (e.target.id === "copyBtn"){ await navigator.clipboard.writeText(noteText(tab)); e.target.textContent = "Copied"; setTimeout(() => { if (e.target.isConnected) e.target.textContent = "Copy"; }, 1500); }
+});
+$("#buildBtn").addEventListener("click", () => buildBrief());
+async function buildBrief(){
+  if (!$("#briefBusy").hidden) return;
+  const waiting = items.some(i => i.status === "transcribing");
+  if (waiting){ $("#briefErr").textContent = "A recording is still being transcribed. Give it a moment, then build the brief."; $("#briefErr").hidden = false; return; }
+  $("#briefErr").hidden = true; $("#briefBusy").hidden = false; $("#buildBtn").disabled = true;
+  const leadId = cur.id, oldNext = cur.brief?.next_step || "";
+  try {
+    const d = await fn("listing-ai", { lead_id: leadId, catalog: CATALOG });
+    if (!cur || cur.id !== leadId) return;
+    const b = d.brief, patch = { form: applyBrief(b, cur.form) };
+    cur.brief = b; cur.brief_at = d.brief_at;
+    for (const k of ["name", "address", "phone", "email"]) if (!cur[k] && b.lead?.[k]) patch[k] = b.lead[k];
+    if (cur.stage === "new" && b.suggested_stage) patch.stage = b.suggested_stage;
+    if (b.next_step && (!cur.next_step || cur.next_step === oldNext)) patch.next_step = b.next_step;
+    await saveLead(patch);
+    const row = leads.find(l => l.id === leadId); if (row) Object.assign(row, { name: cur.name, address: cur.address, stage: cur.stage, next_step: cur.next_step, summary: b.summary });
+    renderLead();
+  } catch (err){
+    $("#briefErr").textContent = err.message + " If it timed out, wait a minute and reload: the brief may have finished on its own."; $("#briefErr").hidden = false;
+  } finally { $("#briefBusy").hidden = true; if (cur) $("#buildBtn").disabled = !items.length; }
+}
+// The AI's draft becomes the form; anything the agent changed by hand (locked) is carried over on top.
+function applyBrief(b, old){
+  const f = { fields: {}, checks: {}, rooms: {}, locked: { ...old.locked } };
+  (b.fields || []).forEach(x => { if (x.value) f.fields[x.key] = x.value; });
+  (b.checks || []).forEach(c => { f.checks[c.section + "." + c.item] = { b: c.basis, why: c.why, opts: c.options || [], count: c.count || "", text: c.text || "" }; });
+  (b.rooms || []).forEach(r => { if (r.value) f.rooms[r.row + "." + r.col] = r.value; });
+  for (const k of Object.keys(f.locked)){
+    const src = { f: "fields", c: "checks", r: "rooms" }[k[0]], key = k.slice(2);
+    if (key in old[src]) f[src][key] = old[src][key]; else delete f[src][key];
+  }
+  return f;
+}
+
+// ---- the property form ----------------------------------------------------------------
+const itemOf = id => { const [s, i] = id.split("."); const sec = FORM.sections.find(x => x.key === s); return [sec, sec?.items.find(x => x.key === i)]; };
+function formHtml(){
+  const f = cur.form, b = cur.brief;
+  const inferred = Object.entries(f.checks).filter(([, c]) => c.b === "inferred");
+  const field = k => { const d = FORM.fields.find(x => x.key === k); return `<div><label class="f">${esc(d.label)}</label>${LONG_FIELDS.includes(k) ? `<textarea data-fld="${k}" style="min-height:74px">${esc(f.fields[k] || "")}</textarea>` : `<input type="text" data-fld="${k}" value="${esc(f.fields[k] || "")}">`}</div>`; };
+  const short = FORM.fields.map(x => x.key).filter(k => !LONG_FIELDS.includes(k));
+  let html = `<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span class="note">Green is marked. Yellow is the AI's best reading and prints as a ? until you confirm it. Tap a box to change it.</span><button class="btn primary" id="pdfBtn">Download the form PDF</button></div><div class="err" id="pdfErr" hidden></div>`;
+  if (inferred.length) html += `<div class="sec"><h3>Confirm these (${inferred.length})</h3>${inferred.map(([id, c]) => { const [s, it] = itemOf(id); return `<div class="rev"><div><b>${esc(s.title)}: ${esc(it.label)}</b><div class="why">${esc(c.why)}</div></div><div class="b"><button class="btn small" data-yes="${id}">Yes</button><button class="btn small" data-no="${id}">No</button></div></div>`; }).join("")}</div>`;
+  if (b.not_captured?.length) html += `<div class="sec"><h3>Not captured yet</h3>${ul(b.not_captured)}</div>`;
+  html += `<div class="sec"><h3>Top of the form</h3><div class="grid2">${short.slice(0, 2).concat(short.filter(k => ["year_built", "total_sf", "lot_size", "beds", "baths"].includes(k))).map(field).join("")}</div>${LONG_FIELDS.map(field).join("")}</div>`;
+  html += `<div class="sec"><h3>Room count</h3><div class="rooms"><table><tr><th></th>${FORM.rooms.cols.map(c => `<th>${esc(c.label)}</th>`).join("")}</tr>${FORM.rooms.rows.map(r => `<tr><th>${esc(r.label)}</th>${FORM.rooms.cols.map(c => `<td><input type="text" inputmode="numeric" data-room="${r.key}.${c.key}" value="${esc(f.rooms[r.key + "." + c.key] || "")}"></td>`).join("")}</tr>`).join("")}</table></div></div>`;
+  let grp = "";
+  for (const s of FORM.sections){
+    if (s.group !== grp){ grp = s.group; html += `<h3 class="grp">${grp}</h3>`; }
+    html += `<div class="fsec"><h4>${esc(s.title)}</h4><div class="chips">${s.items.map(it => { const c = f.checks[s.key + "." + it.key]; return `<button class="chip${c ? (c.b === "inferred" ? " inf" : " on") : ""}" data-chk="${s.key}.${it.key}"${c?.why ? ` title="${esc(c.why)}"` : ""}>${esc(it.label)}</button>`; }).join("")}</div>`;
+    for (const it of s.items){
+      const id = s.key + "." + it.key, c = f.checks[id];
+      if (!c || !(it.opts || it.count || it.text)) continue;
+      html += `<div class="extra"><b>${esc(it.label)}</b>${(it.opts || []).map(o => `<button class="chip${c.opts?.includes(o.key) ? " on" : ""}" data-opt="${id}|${o.key}">${esc(o.label)}</button>`).join("")}${it.count ? `how many <input class="cnt" type="text" inputmode="numeric" data-cnt="${id}" value="${esc(c.count || "")}">` : ""}${it.text ? `<input type="text" data-txt="${id}" value="${esc(c.text || "")}" placeholder="detail">` : ""}</div>`;
+    }
+    const mine = FORM.fields.filter(x => x.section === s.key);
+    if (mine.length) html += `<div class="grid2">${mine.map(x => field(x.key)).join("")}</div>`;
+    html += `</div>`;
+  }
+  const schools = FORM.fields.filter(x => x.section === "schools");
+  html += `<div class="fsec"><h4>Schools</h4><div class="grid2">${schools.map(x => field(x.key)).join("")}</div></div>`;
+  return html;
+}
+let saveT = 0;
+function saveForm(rerender){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => sb.from("listing_leads").update({ form: cur.form }).eq("id", cur.id).then(({ error }) => { if (error) alert("The form didn't save: " + error.message); }), 500);
+  if (rerender){ const y = window.scrollY; renderBrief(); window.scrollTo(0, y); }
+}
+$("#tabBody").addEventListener("click", e => {
+  if (tab !== "form") return;
+  const f = cur.form, t = e.target;
+  const chk = t.closest("[data-chk]"), yes = t.closest("[data-yes]"), no = t.closest("[data-no]"), opt = t.closest("[data-opt]");
+  if (chk || yes || no){
+    const id = (chk || yes || no).dataset.chk || (yes || no).dataset.yes || no.dataset.no, c = f.checks[id];
+    if (no || (chk && c && c.b !== "inferred")) delete f.checks[id];
+    else f.checks[id] = { ...(c || { opts: [], count: "", text: "" }), b: "agent", why: "" };   // a tap on a yellow box confirms it
+    f.locked["c:" + id] = 1; saveForm(true);
+  } else if (opt){
+    const [id, o] = opt.dataset.opt.split("|"), c = f.checks[id], [, it] = itemOf(id);
+    const single = it.opts.some(x => x.mark === "circle");   // Paved yes or no: only one
+    c.opts = c.opts.includes(o) ? c.opts.filter(x => x !== o) : (single ? [o] : [...c.opts, o]);
+    f.locked["c:" + id] = 1; saveForm(true);
+  } else if (t.id === "pdfBtn") makePdf();
+});
+$("#tabBody").addEventListener("change", e => {
+  if (tab !== "form") return;
+  const f = cur.form, d = e.target.dataset, v = e.target.value.trim();
+  if (d.fld){ if (v) f.fields[d.fld] = v; else delete f.fields[d.fld]; f.locked["f:" + d.fld] = 1; }
+  else if (d.room){ if (v) f.rooms[d.room] = v; else delete f.rooms[d.room]; f.locked["r:" + d.room] = 1; }
+  else if (d.cnt){ f.checks[d.cnt].count = v; f.locked["c:" + d.cnt] = 1; }
+  else if (d.txt){ f.checks[d.txt].text = v; f.locked["c:" + d.txt] = 1; }
+  else return;
+  saveForm(false);
+});
+
+// ---- the PDF: marks written onto the team's own blank form --------------------------------
+async function blankForm(){
+  if (blank) return blank;
+  const { data, error } = await sb.storage.from(BUCKET).download(BLANK_PATH);
+  if (error || !data) return null;
+  return blank = await data.arrayBuffer();
+}
+$("#blankPick").addEventListener("change", async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  const bytes = await file.arrayBuffer();
+  try {
+    const doc = await PDFLib.PDFDocument.load(bytes), p = doc.getPages();
+    if (p.length !== 2 || Math.round(p[0].getWidth()) !== 612) throw 0;
+  } catch (_) { return pdfFail("That doesn't look like the two-page On Site Property Info Form. Pick the blank PDF."); }
+  const { error } = await sb.storage.from(BUCKET).upload(BLANK_PATH, file, { contentType: "application/pdf", upsert: true });
+  if (error) return pdfFail("Couldn't store the blank form: " + error.message);
+  blank = bytes; makePdf();
+});
+function pdfFail(m){ const el = $("#pdfErr"); if (el){ el.textContent = m; el.hidden = false; } else alert(m); }
+const latin = s => String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/…/g, "...").replace(/[^\x20-\x7E\xA1-\xFF]/g, "");
+function wrapTo(text, widths, font){   // fit words onto the form's ruled lines, shrinking the type before cutting anything off
+  const all = latin(text).split(/\s+/).filter(Boolean); let out, size;
+  for (size = 7; size >= 5; size -= 0.5){
+    out = []; let i = 0;
+    for (const w of widths){ let line = ""; while (i < all.length && font.widthOfTextAtSize((line ? line + " " : "") + all[i], size) <= w) line = (line ? line + " " : "") + all[i++]; out.push(line); }
+    if (i >= all.length) break;
+  }
+  return { out, size: Math.max(size, 5) };
+}
+async function makePdf(){
+  const btn = $("#pdfBtn"); if ($("#pdfErr")) $("#pdfErr").hidden = true;
+  const bytes = await blankForm();
+  if (!bytes){
+    if (confirm("One-time setup: the blank On Site Property Info Form isn't stored yet. Pick the blank PDF now and it's kept privately for every lead from here on.")) $("#blankPick").click();
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const { PDFDocument, StandardFonts, rgb } = PDFLib;
+    const doc = await PDFDocument.load(bytes.slice(0)), font = await doc.embedFont(StandardFonts.Helvetica), pages = doc.getPages(), H = FORM.size[1], ink = rgb(0.05, 0.2, 0.75), f = cur.form;
+    const put = (pg, x, y, s, size, center, maxw) => {
+      s = latin(s); if (!s) return;
+      while (maxw && font.widthOfTextAtSize(s, size) > maxw && size > 4.5) size -= 0.25;
+      while (maxw && s.length > 1 && font.widthOfTextAtSize(s, size) > maxw) s = s.slice(0, -1);
+      if (center) x -= font.widthOfTextAtSize(s, size) / 2;
+      pages[pg - 1].drawText(s, { x, y: H - y, size, font, color: ink });
+    };
+    for (const d of FORM.fields){
+      const v = f.fields[d.key]; if (!v) continue;
+      if (d.lines){ const w = wrapTo(v, d.lines.map(l => l.x1 - l.x - 4), font); d.lines.forEach((l, n) => put(d.page, l.x + 2, l.y - 1.5, w.out[n], w.size)); }
+      else put(d.page, d.x + 2, d.y - 1.5, v, 7.5, false, d.x1 - d.x - 3);
+    }
+    for (const s of FORM.sections) for (const it of s.items){
+      const c = f.checks[s.key + "." + it.key]; if (!c) continue;
+      put(s.page, it.x, it.y - 0.3, c.b === "inferred" ? "?" : "X", 7.5, true);
+      for (const o of it.opts || []){
+        if (!c.opts?.includes(o.key)) continue;
+        if (o.mark === "circle") pages[s.page - 1].drawCircle({ x: o.x, y: H - o.y, size: 4.2, borderColor: ink, borderWidth: 0.8 });
+        else put(s.page, o.x, o.y - 0.2, "x", 6.5, true);
+      }
+      if (it.count && c.count) put(s.page, it.count.x + 1, it.count.y - 1, c.count, 6.5, false, it.count.x1 - it.count.x + 6);
+      if (it.text && c.text) put(s.page, it.text.x + 1, it.text.y - 1, c.text, 6.5, false, it.text.x1 - it.text.x - 2);
+    }
+    for (const r of FORM.rooms.rows) for (const c of FORM.rooms.cols){ const v = f.rooms[r.key + "." + c.key]; if (v) put(FORM.rooms.page, c.x, r.y, v, 7.5, true, 40); }
+    const url = URL.createObjectURL(new Blob([await doc.save()], { type: "application/pdf" })), a = document.createElement("a");
+    a.href = url; a.download = (f.fields.client_last_name || cur.name || "Seller").replace(/[^\w .-]/g, "") + " - On Site Property Info Form.pdf";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return url;
+  } catch (err){ pdfFail("The PDF couldn't be made: " + err.message); }
+  finally { if (btn) btn.disabled = false; }
+}
+
+// ---- auth --------------------------------------------------------------------
+let mode = "in";   // "in" | "up" | "reset"
+const HERE = location.origin + location.pathname;
+function openAuth(m){
+  mode = m;
+  $("#authTitle").textContent = m === "in" ? "Sign in" : m === "up" ? "Create an account" : "Reset your password";
+  $("#authSub").textContent = m === "reset" ? "Enter your email and I'll send a link to set a new password." : "The same account works across Shawn's apps.";
+  $("#authBtn").textContent = m === "in" ? "Sign in" : m === "up" ? "Create account" : "Send the link";
+  $("#pwWrap").hidden = m === "reset"; $("#password").required = m !== "reset";
+  $("#password").autocomplete = m === "up" ? "new-password" : "current-password";
+  $("#googleWrap").hidden = !GOOGLE_ENABLED || m === "reset";
+  $("#authLinks").innerHTML = m === "in"
+    ? `<button type="button" class="btn link" data-mode="up">Create an account</button> · <button type="button" class="btn link" data-mode="reset">Forgot your password?</button>`
+    : `<button type="button" class="btn link" data-mode="in">Back to sign in</button>`;
+  $("#authErr").hidden = $("#authOk").hidden = true;
+  if (!$("#authDlg").open) $("#authDlg").showModal();
+}
+$("#authLinks").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
+$("#authCancel").addEventListener("click", () => $("#authDlg").close());
+$("#signIn").addEventListener("click", () => openAuth("in"));
+$("#heroIn").addEventListener("click", () => openAuth("in"));
+$("#signOut").addEventListener("click", () => sb.auth.signOut());
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE } }));
+$("#authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("#email").value.trim(), password = $("#password").value, b = $("#authBtn");
+  const fail = (m) => { $("#authErr").textContent = m; $("#authErr").hidden = false; };
+  const good = (m) => { $("#authOk").textContent = m; $("#authOk").hidden = false; };
+  $("#authErr").hidden = $("#authOk").hidden = true; b.disabled = true;
+  if (mode === "in"){
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) fail(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message I sent when you signed up." : "That email and password didn't match. Check for a typo, or tap Forgot your password." + (GOOGLE_ENABLED ? " Continue with Google also works if it's a Google address." : "")); else $("#authDlg").close();
+  } else if (mode === "up"){
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: HERE } });
+    if (error) fail("Couldn't create the account: " + error.message);
+    else if (data.session) $("#authDlg").close();
+    // Supabase answers a sign-up for an existing email with a user that has no identities, and sends nothing
+    else if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length){
+      openAuth("in"); $("#email").value = email;
+      fail("You already have an account with that email (Shawn's apps share one sign-in). Sign in with your password" + (GOOGLE_ENABLED ? " or Continue with Google" : "") + ", or tap Forgot your password.");
+    }
+    else good("Almost there. Check your email (and spam) for a confirmation link. Open it on this same device and browser, then you're in.");
+  } else {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: HERE });
+    if (error) fail("Couldn't send that: " + error.message); else good("Sent. Check your email (and spam). Open the link on this same device and browser, since that is where it signs you in.");
+  }
+  b.disabled = false;
+});
+$("#showPw").addEventListener("change", e => { $("#password").type = e.target.checked ? "text" : "password"; });
+$("#pwSkip").addEventListener("click", () => $("#pwDlg").close());
+$("#pwForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("#pwErr").hidden = true; $("#pwBtn").disabled = true;
+  const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
+  $("#pwBtn").disabled = false;
+  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else $("#pwDlg").close();
+});
+function setSession(sess){
+  const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
+  session = sess;
+  $("#signIn").hidden = !!sess; $("#signOut").hidden = !sess;
+  $("#whoEmail").hidden = !sess; $("#whoEmail").textContent = sess ? sess.user.email : "";
+  if (changed || !sess) load();
+}
+sb.auth.onAuthStateChange((event, sess) => {
+  if (event === "PASSWORD_RECOVERY") $("#pwDlg").showModal();
+  setTimeout(() => setSession(sess), 0);   // never call back into supabase from inside this callback
+});
+</script>
+</body>
+</html>

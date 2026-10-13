@@ -1,0 +1,1808 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dough: a dough calculator for pizza, bread, and more that remembers every batch, what you changed, and how it turned out.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍕</text></svg>">
+<title>Dough</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{color-scheme:light dark;
+  --bg:#F6F1E7; --paper:#FFFDF8; --ink:#2A211B; --ink-2:#5E5248; --ink-3:#8F8276;
+  --line:#E2D8C8; --accent:#B8402A; --accent-deep:#8F2E1C; --soft:#F4E3D7; --crust:#C98B3C;
+  --good:#3F7A45; --good-soft:#E0EEDD; --bad:#9B2A2A; --bad-soft:#F5DEDE;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#191512; --paper:#221D19; --ink:#F1EAE0; --ink-2:#C6BBAE; --ink-3:#8F8276;
+    --line:#3A322B; --accent:#E8765C; --accent-deep:#F29A84; --soft:#3A2620; --crust:#E0A85A;
+    --good:#8FBF88; --good-soft:#20311F; --bad:#E27373; --bad-soft:#3B1E1E;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#191512; --paper:#221D19; --ink:#F1EAE0; --ink-2:#C6BBAE; --ink-3:#8F8276;
+  --line:#3A322B; --accent:#E8765C; --accent-deep:#F29A84; --soft:#3A2620; --crust:#E0A85A;
+  --good:#8FBF88; --good-soft:#20311F; --bad:#E27373; --bad-soft:#3B1E1E;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.45}
+a{color:var(--accent)}
+h1,h2,h3{font-family:"Fraunces",Georgia,serif;font-weight:700;margin:0;line-height:1.1}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 70px}
+
+/* top bar */
+.bar{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar .in{max-width:980px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bar h1{font-size:28px}
+.bar h1 small{font-family:"Source Sans 3",sans-serif;font-weight:400;font-size:13px;color:var(--ink-3);margin-left:8px;letter-spacing:.08em;text-transform:uppercase}
+.who{font-size:13px;color:var(--ink-3);display:flex;gap:10px;align-items:center;min-width:0}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.btn{font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:6px;padding:8px 13px;cursor:pointer}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+:root[data-theme="dark"] .btn.primary{color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#1B120E}}
+.btn.big{width:100%;padding:13px;font-size:17px}
+.btn.link{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline;font-weight:400}
+.btn[disabled]{opacity:.6;cursor:default}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin:18px 0 16px}
+.tabs button{font:inherit;font-weight:600;font-size:16px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:8px 18px;cursor:pointer}
+.tabs button.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+
+/* cards */
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card + .card{margin-top:14px}
+.card h2{font-size:22px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.col > .card + .card{margin-top:14px}
+
+.last{background:var(--soft);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:16px}
+.last b{font-weight:700}
+.last .nt{display:block;margin-top:4px;color:var(--ink-2)}
+
+/* controls */
+.ctl{padding:10px 0;border-top:1px solid var(--line)}
+.ctl:first-of-type{border-top:0;padding-top:0}
+.ctl .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ctl .lab{font-weight:600}
+.ctl .val{font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.ctl .hint{font-size:14px;color:var(--ink-3);margin-top:2px}
+.sl{display:flex;align-items:center;gap:8px;margin-top:6px}
+.sl button{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:20px;font-weight:600;line-height:1;cursor:pointer}
+.sl button:hover{background:var(--soft)}
+input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:30px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.seg button{flex:1 1 0;min-width:88px;font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);border-radius:8px;padding:8px 6px;cursor:pointer;line-height:1.2}
+.seg button small{display:block;font-weight:400;font-size:12.5px;color:var(--ink-3)}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg button.on small{color:#fff;opacity:.85}
+:root[data-theme="dark"] .seg button.on, :root[data-theme="dark"] .seg button.on small{color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .seg button.on, :root:not([data-theme="light"]) .seg button.on small{color:#1B120E}}
+.chips{display:flex;gap:6px;margin-top:6px}
+.chips button{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chips button.on{border-color:var(--accent);color:var(--accent)}
+label.f{display:block;font-size:14px;font-weight:600;color:var(--ink-2);margin:12px 0 4px}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],select,textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 11px}
+textarea{min-height:70px;resize:vertical}
+select + input[type=text]{margin-top:8px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2);margin-top:8px;cursor:pointer}
+label.chk input{width:18px;height:18px;accent-color:var(--accent)}
+
+.sharebar{background:var(--paper);border:1px solid var(--accent);border-top-width:5px;border-radius:10px;padding:14px;margin-bottom:14px}
+.sharebar h2{font-size:22px;margin-bottom:4px}
+.sharebar p{margin:0 0 10px;color:var(--ink-2)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{font:inherit;text-align:left;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:12px;cursor:pointer}
+.opt:hover{border-color:var(--accent)}
+.opt b{display:block;font-size:17px;margin-bottom:3px}
+.opt span{display:block;font-size:14.5px;color:var(--ink-2)}
+.opt[disabled]{opacity:.6;cursor:default}
+dialog .opts{grid-template-columns:1fr;margin-top:6px}
+.rlist button small{font-weight:400;opacity:.8;margin-left:6px}
+.abake{padding:10px 0;border-top:1px solid var(--line)}
+.abake:first-of-type{border-top:0;padding-top:0}
+.abake .when{font-size:14px;color:var(--ink-3)}
+.abake .stars{color:var(--crust);letter-spacing:2px}
+.abake p{margin:4px 0}
+.abake p b{color:var(--ink-2);font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:block}
+.abake ul{margin:4px 0 0;padding-left:18px;color:var(--ink-2);font-size:15px}
+@media (max-width:620px){.opts{grid-template-columns:1fr}}
+.picker{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.cats button{flex:1 0 auto;font:inherit;font-size:15px;font-weight:600;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);border-radius:8px;padding:8px 12px;cursor:pointer}
+.catbtn{display:none;width:100%;align-items:baseline;justify-content:space-between;gap:10px;font:inherit;border:0;background:none;color:var(--ink);padding:0;cursor:pointer;text-align:left}
+.catbtn span{font-family:"Fraunces",Georgia,serif;font-weight:700;font-size:24px;line-height:1.1}
+.catbtn small{font-size:14px;color:var(--accent);text-decoration:underline;white-space:nowrap}
+.cats button small{font-weight:400;color:var(--ink-3);margin-left:5px}
+.cats button.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.cats button.on small{color:var(--bg);opacity:.7}
+.recipe{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.rlist{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 260px}
+.rlist button{font:inherit;font-size:16px;font-weight:600;text-align:left;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:7px 15px;cursor:pointer}
+.rlist button:hover{border-color:var(--accent);color:var(--accent)}
+.rlist button.on{background:var(--accent);border-color:var(--accent);color:#fff;cursor:default}
+:root[data-theme="dark"] .rlist button.on{color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rlist button.on{color:#1B120E}}
+.ract{display:flex;gap:6px;flex-wrap:wrap}
+.recipe .btn.ai{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+.empty .acts{justify-content:center}
+.types{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.types button{font:inherit;font-size:15px;font-weight:600;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:6px 15px;cursor:pointer}
+.types button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.types button.ghost{border-style:dashed;background:none;color:var(--ink-3);font-weight:400}
+:root[data-theme="dark"] .types button.on{color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .types button.on{color:#1B120E}}
+.ctl .val input.valin{width:96px;text-align:right;font-weight:700;font-size:20px;padding:3px 8px;font-variant-numeric:tabular-nums}
+#stepsEdit{min-height:230px}
+#recipeNotes{min-height:110px}
+.acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.adapt{margin-top:12px;padding:12px;border:1px solid var(--accent);border-left-width:5px;border-radius:8px;background:var(--soft)}
+.adapt p{margin:0 0 8px}
+.adapt h3{font-size:18px;margin-bottom:6px}
+.adapt .tsub{font-size:14px;color:var(--ink-2)}
+.adapt .tips{margin:0 0 8px;padding-left:20px}
+.adapt .tips li{margin:6px 0}
+.adapt .tips b{display:block}
+.adapt .tnote{font-size:15px;color:var(--ink-2);font-style:italic}
+.adapt .tfoot{margin:10px 0 0;font-size:14px}
+.adapt .wait{color:var(--ink-2);font-style:italic;margin:0}
+.seg button.base{box-shadow:inset 0 -4px 0 var(--crust)}
+.irow{display:grid;grid-template-columns:auto minmax(0,1fr) 78px auto auto;gap:6px;align-items:center;margin-top:6px}
+.irow .mv{display:flex;flex-direction:column;gap:2px}
+.irow .mv button{font:inherit;font-size:11px;line-height:1;width:30px;height:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:4px;cursor:pointer;padding:0}
+.irow .mv button:hover:not([disabled]){background:var(--soft);color:var(--accent)}
+.irow .mv button[disabled]{opacity:.3;cursor:default}
+.irow .btn{padding:8px 11px}
+.irow span{color:var(--ink-3)}
+.bake details{margin-top:10px}
+.bake summary{cursor:pointer;color:var(--accent);font-weight:600}
+
+.types button.ai{border-color:var(--accent);color:var(--accent);background:var(--soft);font-weight:600;border-style:solid}
+dialog.wide{width:min(640px,calc(100vw - 24px))}
+.aihead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.aihead h2{margin:0}
+#aiLog{max-height:52vh;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:10px}
+.msg{padding:10px 12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px}
+.msg.user{background:var(--soft);align-self:flex-end;max-width:88%}
+.msg.ai{background:var(--bg);border:1px solid var(--line)}
+.msg.wait{color:var(--ink-3);font-style:italic}
+.msg.hint{color:var(--ink-2);background:none;border:1px dashed var(--line)}
+.prop{border:1px solid var(--accent);border-radius:10px;padding:12px;background:var(--paper)}
+.prop h3{font-size:19px;margin-bottom:2px}
+.prop .when{font-size:14px;color:var(--ink-3)}
+.prop table{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+.prop td{padding:4px 0;border-top:1px solid var(--line)}
+.prop td:last-child{text-align:right}
+.prop details{margin-top:8px}
+.prop summary{cursor:pointer;color:var(--accent);font-weight:600}
+.prop .src{font-size:14px;color:var(--ink-3);margin:8px 0 0}
+
+/* output */
+.sum{display:flex;gap:10px;margin-bottom:12px}
+.sum div{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.sum b{display:block;font-family:"Fraunces",Georgia,serif;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sum span{font-size:12.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.seg.five button{min-width:0;padding:9px 2px;font-size:14.5px}
+.ingc{padding:12px 0 10px;border-top:1px solid var(--line)}
+.ingc:first-child{border-top:0;padding-top:4px}
+.itop{display:flex;align-items:center;gap:12px}
+.ingc .box{flex:none;width:28px;height:28px;border:2px solid var(--line);border-radius:7px;background:var(--paper);display:grid;place-items:center;color:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0}
+.ingc .nm{flex:1;min-width:0;font-weight:600}
+.ingc .nm small{display:block;color:var(--ink-3);font-size:13.5px;font-weight:400}
+.ingc .g{font-family:"Fraunces",Georgia,serif;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
+.ingc .gin{font:inherit;width:4.2ch;min-width:92px;text-align:right;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px 8px;cursor:text;-moz-appearance:textfield;appearance:textfield}
+.ingc .gin::-webkit-outer-spin-button,.ingc .gin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ingc .gin:hover{border-color:var(--ink-3)}
+.ingc .gin:focus{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px}
+.ingc.typed .gin{color:var(--accent);border-color:var(--accent)}
+.ingc .g small{font-family:"Source Sans 3",sans-serif;font-size:15px;font-weight:600;color:var(--ink-3);margin-left:2px}
+.ingc .p{width:58px;text-align:right;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.ingc .sl{margin-top:6px;padding-left:40px}
+.ingc .hint{padding-left:40px}
+.ingc.done .itop{opacity:.45}
+.ingc.done .box{background:var(--good);border-color:var(--good);color:#fff}
+.ingc.done .nm{text-decoration:line-through}
+.diff{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--line);font-size:15.5px}
+.diff b{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.diff ul{margin:4px 0 0;padding-left:18px}
+.lastcard{background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:0;margin-bottom:14px}
+.lastcard summary{cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap;list-style:none}
+.lastcard summary::-webkit-details-marker{display:none}
+.lastcard summary h3{font-size:20px;display:inline}
+.lastcard summary .when{font-size:14.5px;color:var(--ink-2);margin-left:8px}
+.lastcard .stars{color:var(--crust);letter-spacing:2px;white-space:nowrap}
+.lastcard .pend{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:2px 10px}
+.lastcard .lbody{padding:0 14px 14px;border-top:1px solid var(--line)}
+.lastcard .lbody p{margin:10px 0 0}
+.lastcard .lbody p b{color:var(--ink-2);font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:block}
+.lastcard ul.lg{margin:4px 0 0;padding-left:18px;color:var(--ink-2);font-size:15.5px}
+.sugg{margin-top:12px;padding:12px;border:1px solid var(--accent);border-radius:8px;background:var(--soft)}
+.sugg h4{margin:0 0 6px;font-family:"Fraunces",Georgia,serif;font-size:18px}
+.sugg .chg{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
+.sugg .chg b{display:block}
+.sugg .chg span{color:var(--ink-2);font-size:15.5px}
+.sugg .chg .btn{flex:none}
+.sugg ul{margin:6px 0 0;padding-left:18px}
+.sugg li{margin:5px 0}
+.keep{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.keep p{margin:0 0 8px}
+.keep label{display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer;font-weight:400;font-size:16px;color:var(--ink);margin:0}
+.keep input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.ing{list-style:none;margin:0;padding:0}
+.ing li{display:flex;align-items:center;gap:12px;padding:11px 4px;border-top:1px solid var(--line);cursor:pointer;user-select:none;-webkit-user-select:none}
+.ing li:first-child{border-top:0}
+.ing .box{flex:none;width:24px;height:24px;border:2px solid var(--line);border-radius:6px;display:grid;place-items:center;color:transparent;font-weight:700}
+.ing .nm{flex:1}
+.ing .nm small{display:block;color:var(--ink-3);font-size:13.5px}
+.ing .g{font-family:"Fraunces",Georgia,serif;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.ing .gin{font:inherit;width:4.2ch;min-width:96px;text-align:right;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px 8px;cursor:text;-moz-appearance:textfield;appearance:textfield}
+.ing .gin::-webkit-outer-spin-button,.ing .gin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ing .gin:hover{border-color:var(--ink-3)}
+.ing .gin:focus{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px}
+.ing li.typed .gin{color:var(--accent);border-color:var(--accent)}
+.ing .g small{font-family:"Source Sans 3",sans-serif;font-size:15px;font-weight:600;color:var(--ink-3);margin-left:2px}
+.ing .p{width:54px;text-align:right;color:var(--ink-3);font-size:14px;font-variant-numeric:tabular-nums}
+.ing li.done{opacity:.45}
+.ing li.done .box{background:var(--good);border-color:var(--good);color:#fff}
+.ing li.done .nm{text-decoration:line-through}
+.steps{margin:0;padding-left:22px;color:var(--ink-2)}
+.steps li{margin:6px 0}
+.note{font-size:14px;color:var(--ink-3);margin-top:10px}
+.err{margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--bad-soft);color:var(--bad);border-left:4px solid var(--bad);font-size:15px}
+.ok{margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--good-soft);color:var(--good);border-left:4px solid var(--good);font-size:15px}
+
+/* history */
+.bake .head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.bake h3{font-size:21px}
+.bake .when{font-size:14px;color:var(--ink-3)}
+.bake .stars{color:var(--crust);font-size:20px;letter-spacing:2px;white-space:nowrap}
+.bake .pend{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:2px 10px}
+.bake .facts{margin:8px 0 0;color:var(--ink-2)}
+.bake table{width:100%;border-collapse:collapse;margin-top:10px;font-variant-numeric:tabular-nums}
+.bake td{padding:5px 0;border-top:1px solid var(--line)}
+.bake td:nth-child(2),.bake td:nth-child(3){text-align:right}
+.bake td:nth-child(3){color:var(--ink-3);width:70px}
+.photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.photos button.ph{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg);width:96px;height:96px}
+.photos img{width:100%;height:100%;object-fit:cover;display:block}
+.photos .wait{font-size:14px;color:var(--ink-3);font-style:italic}
+#photoBig{display:block;max-width:100%;max-height:72vh;margin:0 auto;border-radius:6px}
+.rlinks{list-style:none;margin:10px 0 0;padding:0}
+.rlinks li{display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)}
+.rlinks a{flex:1;overflow-wrap:anywhere;font-weight:600}
+.rlinks small{color:var(--ink-3);font-weight:400;margin-left:6px}
+.rlinks button{border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:14px;padding:2px 6px}
+.linkform{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.linkform input{flex:1 1 150px;width:auto}
+.bake .log{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.bake .lh{color:var(--ink-2);font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:block}
+.bake .log ul{list-style:none;margin:6px 0 0;padding:0}
+.bake .log li{display:flex;gap:10px;align-items:baseline;padding:5px 0}
+.bake .lt{flex:none;width:150px;color:var(--ink-3);font-size:14px;font-variant-numeric:tabular-nums}
+.bake .lx{flex:1;overflow-wrap:anywhere}
+.bake .log li button{flex:none;border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:14px;padding:2px 6px}
+.bake .log li button:hover{color:var(--bad)}
+.logform{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.logform input[type=text]{flex:1 1 240px;width:auto}
+.logform input[type=datetime-local]{flex:0 1 210px;width:auto;font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 9px}
+.bake .rep{margin-top:10px}
+.bake .rep p{margin:6px 0}
+.bake .rep b{color:var(--ink-2);font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:block}
+.bake .acts{gap:8px;margin-top:14px}
+.empty{text-align:center;color:var(--ink-2);padding:34px 18px}
+
+/* dialogs */
+dialog{border:1px solid var(--line);border-top:5px solid var(--accent);border-radius:10px;background:var(--paper);color:var(--ink);padding:22px;width:min(440px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(20,14,10,.55)}
+dialog h2{font-size:26px;margin-bottom:4px}
+dialog p.sub{margin:0 0 10px;color:var(--ink-2);font-size:15px}
+.rate{display:flex;gap:4px;margin:6px 0 2px}
+.rate button{font-size:36px;line-height:1;background:none;border:0;color:var(--line);cursor:pointer;padding:0 2px}
+.rate button.on{color:var(--crust)}
+.row{display:flex;gap:8px;margin-top:16px}
+.row .btn{flex:1}
+.or{text-align:center;color:var(--ink-3);font-size:13px;margin:14px 0 0}
+.foot{margin-top:26px;font-size:14px;color:var(--ink-3);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+@media (max-width:820px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:700px){
+  .catbtn{display:flex}
+  .cats{display:none;grid-template-columns:1fr 1fr;margin-top:10px}
+  .cats.open{display:grid}
+  .cats button{padding:10px 8px;white-space:normal}
+}
+@media (max-width:480px){
+  .bake .log li{flex-wrap:wrap;gap:0 10px}
+  .bake .lt{width:auto;flex:1 1 100%}
+  body{font-size:16px}
+  .card{padding:14px}
+  .who span{display:none}
+  .ing .g{font-size:26px}
+  .ing .p{width:46px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="in">
+  <h1>Dough <small id="typeSmall">Pizza</small></h1>
+  <div class="who">
+    <span id="whoEmail" hidden></span>
+    <button class="btn" id="signOut" hidden>Sign out</button>
+    <button class="btn primary" id="signIn">Sign in</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <div class="tabs" role="tablist">
+    <button id="tabCalc" class="on" role="tab">Calculator</button>
+    <button id="tabHist" role="tab">My bakes</button>
+  </div>
+
+  <!-- ================= calculator ================= -->
+  <div id="calc">
+    <div class="sharebar" id="sharedBar" hidden></div>
+    <div class="picker" id="typeBar"></div>
+    <div class="card empty" id="emptyCat" hidden></div>
+    <div id="calcBody">
+    <details class="lastcard" id="last" hidden></details>
+    <div class="grid">
+      <div class="col">
+        <div class="card">
+          <h2>The plan</h2>
+          <div id="sizeCtl"></div>
+          <div class="ctl">
+            <div class="top"><span class="lab">How long until you bake?</span></div>
+            <div class="seg" id="fermentSeg"></div>
+            <div class="hint" id="fermentNote"></div>
+          </div>
+          <div class="ctl" id="yeastCtl">
+            <div class="top"><span class="lab">Yeast</span></div>
+            <div class="seg" id="yeastSeg"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Ingredients</h2>
+          <div class="sum">
+            <div id="oBallBox"><b class="num" id="oBall"></b><span id="oBallLab">g per ball</span></div>
+            <div><b class="num" id="oTotal"></b><span>g of dough</span></div>
+          </div>
+          <p class="note" style="margin:0 0 4px">Slide a ratio and its grams follow. Every gram number is a box you can type in: round it, or enter what actually went in. Changing the flour re-scales the rest.</p>
+          <div id="ratios"></div>
+          <p class="note">Tick the box once an ingredient is in the bowl. Each ratio is a percent of the flour weight. <button type="button" class="btn link" id="unType" hidden>Back to the slider amounts</button> <button type="button" class="btn link" id="resetPct">Back to this recipe's saved ratios</button></p>
+          <div class="diff" id="diffBox" hidden></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <h2>Steps</h2>
+          <ol class="steps" id="steps"></ol>
+          <p class="note" id="stepsEmpty" style="margin-top:0" hidden>No steps yet for this recipe. Add your own, one per line, and they will be here next time.</p>
+          <textarea id="stepsEdit" maxlength="6000" aria-label="Steps, one per line" hidden></textarea>
+          <p class="note" id="stepsNote"></p>
+          <div class="acts"><button type="button" class="btn" id="editSteps">Edit steps</button><button type="button" class="btn link" id="basicSteps" hidden>Back to the basic steps</button></div>
+          <div class="adapt" id="adaptBox" hidden></div>
+          <div class="err" id="adaptErr" hidden></div>
+        </div>
+
+        <div class="card" id="notesCard" hidden>
+          <h2>Recipe notes and links</h2>
+          <textarea id="recipeNotes" maxlength="4000" aria-label="Notes about this recipe" placeholder="Where this recipe came from, what makes it work, things to remember. These stay with the recipe, not with one bake."></textarea>
+          <p class="note" id="notesState"></p>
+          <div id="recipeLinks"></div>
+        </div>
+
+        <div class="card" id="authorCard" hidden></div>
+
+        <div class="card">
+          <h2>Lock it in</h2>
+          <label class="f" for="flourName" id="flourLab">Flour</label>
+          <select id="flourPick" aria-label="Flour" hidden></select>
+          <input type="text" id="flourName" maxlength="80" placeholder="King Arthur Bread Flour, 12.7%">
+          <div class="two">
+            <div><label class="f" for="madeOn">Made on</label><input type="date" id="madeOn"></div>
+            <div><label class="f" for="bakeOn">Baking on</label><input type="date" id="bakeOn"></div>
+          </div>
+          <label class="f" for="planNotes">Notes on what you did</label>
+          <textarea id="planNotes" maxlength="2000" placeholder="Anything different this time?"></textarea>
+          <div style="margin-top:14px"><button class="btn primary big" id="lock">Lock it in</button></div>
+          <div class="err" id="lockErr" hidden></div>
+          <div class="ok" id="lockOk" hidden></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ================= history ================= -->
+  <div id="hist" hidden>
+    <div class="types" id="histFilter" hidden></div>
+    <div id="bakes"></div>
+  </div>
+
+  <div class="foot"><span>Starting recipe and thickness stops borrowed from <a href="https://doughguy.co/pages/dough" rel="noopener">Dough Guy's calculator</a>.</span><a href="/">shawnzapps.com</a></div>
+</div>
+
+<!-- sign in -->
+<dialog id="authDlg">
+  <form id="authForm">
+    <h2 id="authTitle">Sign in</h2>
+    <p class="sub" id="authSub">Your bakes are saved to your account and only you can see them.</p>
+    <div id="googleWrap" hidden>
+      <button type="button" class="btn big" id="google">Continue with Google</button>
+      <p class="or">or use your email</p>
+    </div>
+    <label class="f" for="email">Email</label>
+    <input type="email" id="email" autocomplete="email" required>
+    <div id="pwWrap">
+      <label class="f" for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" minlength="8">
+      <label class="chk"><input type="checkbox" id="showPw"> Show password</label>
+    </div>
+    <div class="err" id="authErr" hidden></div>
+    <div class="ok" id="authOk" hidden></div>
+    <div class="row"><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
+    <p class="note" id="authLinks"><button type="button" class="btn link" id="toSignUp">Create an account</button> · <button type="button" class="btn link" id="toReset">Forgot your password?</button></p>
+  </form>
+</dialog>
+
+<!-- new password, after a reset link -->
+<dialog id="pwDlg">
+  <form id="pwForm">
+    <h2>New password</h2>
+    <p class="sub">You're signed in from the reset link. Pick a new password, at least 8 characters. You'll use it next time you sign in.</p>
+    <label class="f" for="pw1">New password</label>
+    <input type="text" id="pw1" autocomplete="new-password" minlength="8" required autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="err" id="pwErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="pwSkip">Not now</button><button class="btn primary" id="pwBtn">Save password</button></div>
+  </form>
+</dialog>
+
+<!-- share a recipe -->
+<dialog id="shareDlg">
+  <form id="shareForm">
+    <h2 id="shareTitle">Share this recipe</h2>
+    <p class="sub">Anyone with the link can open it, no account needed. They always see your current recipe: ingredients, steps, your recipe notes, your ratings and reports, and saved timing suggestions.</p>
+    <label class="f" for="shareName">Your name, shown as "Shared by ..."</label>
+    <input type="text" id="shareName" maxlength="40" placeholder="Shawn" required>
+    <div id="shareOn" hidden>
+      <label class="f" for="shareLink">The link</label>
+      <input type="text" id="shareLink" readonly>
+      <div class="acts"><button type="button" class="btn primary" id="shareCopy">Copy link</button><button type="button" class="btn" id="shareNative" hidden>Send it</button></div>
+      <p class="note">People who follow it get your changes. People who took a copy do not. <button type="button" class="btn link" id="shareStop">Stop sharing this recipe</button></p>
+    </div>
+    <div class="err" id="shareErr" hidden></div>
+    <div class="ok" id="shareOk" hidden></div>
+    <div class="row"><button type="button" class="btn" id="shareClose">Close</button><button class="btn primary" id="shareGo">Create the link</button></div>
+  </form>
+</dialog>
+
+<!-- a recipe you follow -->
+<dialog id="followDlg">
+  <h2 id="followTitle">Following</h2>
+  <p class="sub" id="followSub"></p>
+  <div class="opts">
+    <button type="button" class="opt" id="followCopy"><b>Make it my own copy</b><span id="followCopySub"></span></button>
+    <button type="button" class="opt" id="followDrop"><b>Remove it from my recipes</b><span>Bakes you already logged stay in your history.</span></button>
+  </div>
+  <div class="err" id="followErr" hidden></div>
+  <div class="row"><button type="button" class="btn" id="followClose">Close</button></div>
+</dialog>
+
+<!-- recipe -->
+<dialog id="typeDlg">
+  <form id="typeForm">
+    <h2 id="typeTitle">New recipe</h2>
+    <p class="sub">Each ingredient is a percent of the flour weight. Flour is always 100%, so leave it off the list.</p>
+    <label class="f" for="tName">Name</label>
+    <input type="text" id="tName" maxlength="40" placeholder="Sunday sandwich loaf, Overnight cinnamon rolls">
+    <div class="two">
+      <div><label class="f" for="tCat">Category</label><select id="tCat"></select></div>
+      <div><label class="f" for="tSizing">Batch size by</label><select id="tSizing"></select></div>
+    </div>
+    <label class="f" for="tTiming">This recipe is written for</label>
+    <select id="tTiming"></select>
+    <label class="f">Ingredients <span style="font-weight:400;color:var(--ink-3)">(use the arrows to put them in the order you weigh them)</span></label>
+    <div id="tIngs"></div>
+    <div class="acts" style="margin-top:8px"><button type="button" class="btn" id="tAdd">＋ Add an ingredient</button><button type="button" class="btn link" id="tAskAI" data-ai hidden>Not sure of the numbers? Ask AI</button></div>
+    <div class="err" id="typeErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="typeCancel">Cancel</button><button class="btn primary" id="typeSave">Save</button></div>
+    <p class="note"><button type="button" class="btn link" id="tDelete" hidden>Delete this recipe</button></p>
+  </form>
+</dialog>
+
+<!-- ask AI -->
+<dialog id="aiDlg" class="wide">
+  <div class="aihead"><h2>Ask AI</h2><button type="button" class="btn" id="aiClose">Close</button></div>
+  <div id="aiLog" aria-live="polite"></div>
+  <form id="aiForm">
+    <textarea id="aiInput" maxlength="4000" rows="3" placeholder="What do you want to make, and who should I look to?" aria-label="Your message"></textarea>
+    <div class="err" id="aiErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="aiReset">Start over</button><button class="btn primary" id="aiSend">Send</button></div>
+  </form>
+</dialog>
+
+<!-- photo viewer -->
+<dialog id="photoDlg" class="wide">
+  <img id="photoBig" alt="">
+  <div class="row"><button type="button" class="btn" id="photoDel" hidden>Remove photo</button><button type="button" class="btn primary" id="photoClose">Close</button></div>
+</dialog>
+
+<!-- report -->
+<dialog id="repDlg">
+  <form id="repForm">
+    <h2>How did it go?</h2>
+    <p class="sub" id="repSub"></p>
+    <div class="rate" id="rate" role="group" aria-label="Rating"></div>
+    <label class="f" for="wentWell">What went well</label>
+    <textarea id="wentWell" maxlength="2000"></textarea>
+    <label class="f" for="wentPoorly">What went poorly</label>
+    <textarea id="wentPoorly" maxlength="2000"></textarea>
+    <label class="f" for="nextTime">Next time, try</label>
+    <textarea id="nextTime" maxlength="2000" placeholder="This shows up at the top of the calculator next time."></textarea>
+    <div class="keep" id="repKeep" hidden></div>
+    <p class="note">Photos go on the bake's card in My bakes, with the Add photos button.</p>
+    <div class="err" id="repErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="repCancel">Cancel</button><button class="btn primary" id="repBtn">Save</button></div>
+  </form>
+</dialog>
+
+<script>
+// Shared "ShawnZapps" Supabase project. Publishable key only; rows are protected by RLS.
+const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
+let GOOGLE_ENABLED = false;   // set at load from Supabase Auth's public settings: true once the Google provider is saved there
+fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then(r => r.json()).then(d => { GOOGLE_ENABLED = !!d?.external?.google; const w = document.getElementById("googleWrap"); if (w && document.getElementById("authDlg").open && mode !== "reset") w.hidden = !GOOGLE_ENABLED; }).catch(() => {});
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---- the dough model ------------------------------------------------------
+// A dough type is a name, a way of sizing the batch, and a list of ingredients as a percent of flour.
+// Sizing: "pizza" (count x diameter x thickness), "pieces" (count x grams each), "flour" (start from the flour weight).
+// Pizza thickness is grams of dough per square inch. The three stops match Dough Guy's
+// thin / regular / thick (409, 480, 626 g for a 16 inch pizza).
+const THICK = [["Thin", 2.04], ["Thin+", 2.215], ["Regular", 2.39], ["Regular+", 2.75], ["Thick", 3.11]];   // the + stops are halfway to the next one
+const nearThick = (t) => THICK.reduce((a, b) => Math.abs(b[1] - t) < Math.abs(a[1] - t) ? b : a);
+// Dough Guy's 3 day dough, active dry yeast. The starter recipe for the built-in Pizza type.
+const PIZZA_INGS = [
+  { key: "water", name: "Water", pct: 62 }, { key: "yeast", name: "Yeast", pct: 0.4 }, { key: "salt", name: "Salt", pct: 2.5 },
+  { key: "sugar", name: "Sugar", pct: 2 }, { key: "oil", name: "Olive oil", pct: 3.3 },
+];
+// Slider ranges for the usual ingredients: min, max, slider step, button step. Anything else gets a range from its own percent.
+// Minimums are 0: a milk bread can have very little water, so no ingredient gets a floor.
+const RANGES = { water: [0, 100, 0.5, 0.5], yeast: [0, 4, 0.05, 0.05], salt: [0, 4, 0.1, 0.1], sugar: [0, 20, 0.1, 0.5], oil: [0, 15, 0.1, 0.1] };
+const PLAN = { count: [1, 12, 1, 1], size: [8, 20, 1, 1], thickness: [1.6, 3.8, 0.01, 0.05], piece_g: [50, 2000, 10, 10], flour_g: [100, 3000, 10, 10] };
+// Yeast starting points are for active dry in pizza dough; the others convert from it.
+const FERMENT = {
+  quick:     { label: "Quick",       sub: "about 2 hours",       ady: 1.5 },
+  same_day:  { label: "Same day",    sub: "4 to 6 hours",        ady: 0.8 },
+  cold_1:    { label: "Overnight",   sub: "1 day in the fridge", ady: 0.6 },
+  cold_long: { label: "2 to 4 days", sub: "cold ferment",        ady: 0.4 },
+};
+const YEAST = {
+  active_dry: { label: "Active dry", f: 1 },
+  instant:    { label: "Instant",    f: 0.75 },
+  fresh:      { label: "Fresh",      f: 2.5 },
+};
+const SIZING = { pizza: "Pizzas, by size and thickness", pieces: "Loaves, rolls, or balls, by weight", flour: "Start from the flour weight" };
+// Categories are fixed (Shawn and Claude decide them); people make their own recipes inside each one.
+// key, label, the usual way to size a batch in it
+const CATS = [["pizza", "Pizza Dough", "pizza"], ["bread", "Bread", "pieces"], ["rolls", "Rolls", "pieces"], ["cinnamon_rolls", "Cinnamon Rolls", "pieces"],
+  ["focaccia", "Focaccia", "flour"], ["bagels", "Bagels & Pretzels", "pieces"], ["other", "Other", "pieces"]];
+const catLabel = (k) => (CATS.find(c => c[0] === k) || CATS[1])[1];
+function guessCat(name, sizing, fallback){
+  const n = String(name || "").toLowerCase();
+  return /cinnamon/.test(n) ? "cinnamon_rolls" : /pizza/.test(n) || sizing === "pizza" ? "pizza" : /focaccia/.test(n) ? "focaccia" : /bagel|pretzel/.test(n) ? "bagels"
+    : /roll|bun/.test(n) ? "rolls" : /naan|pita|tortilla|brioche|challah|donut|doughnut/.test(n) ? "other" : fallback || "bread";
+}
+const BASE = { count: 3, size: 14, thickness: 2.39, piece_g: 900, flour_g: 500, yeast_type: "active_dry", ferment: "cold_long" };
+const LOCAL_PIZZA = { id: null, name: "Pizza", category: "pizza", sizing: "pizza", timing: "cold_long", ingredients: PIZZA_INGS, steps: null, defaults: {} };
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const r2 = (n) => Math.round(n * 100) / 100;
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+function fmtDate(iso){ if (!iso) return ""; const [y,m,d] = iso.split("-").map(Number); return new Date(y, m-1, d).toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", year:"numeric" }); }
+const pctText = (n) => (Math.round(n * 100) / 100) + "%";
+const grams = (n) => n < 10 ? (Math.round(n * 10) / 10).toFixed(1) : Math.round(n).toLocaleString("en-US");
+function thickText(t){ return nearThick(t)[0]; }
+
+function stateFromType(t){
+  const d = t.defaults || {};
+  const st = { type_id: t.id, name: t.name, category: t.category || guessCat(t.name, t.sizing), sizing: t.sizing, ...BASE, ings: clone(t.ingredients || []), steps: t.steps ?? null, flour_fix: null, actual: {}, tips: clone(t.tips || {}), notes: t.notes || "", links: clone(t.links || []) };
+  if (t.sizing !== "pizza") st.count = 1;
+  for (const k of ["count", "size", "thickness", "piece_g", "flour_g", "yeast_type"]) if (d[k] != null) st[k] = d[k];
+  // base is the timing the recipe is written for; ferment is what is picked for today's bake
+  st.base = FERMENT[t.timing] ? t.timing : t.sizing === "pizza" ? "cold_long" : "same_day";
+  st.ferment = st.base;
+  return st;
+}
+let types = [LOCAL_PIZZA];
+let s = stateFromType(LOCAL_PIZZA);
+try { const saved = JSON.parse(localStorage.getItem("dough.calc2") || "null"); if (saved && Array.isArray(saved.ings) && saved.sizing === "pizza" && saved.name === "Pizza") s = { ...s, ...saved, type_id: null, flour_fix: null, actual: {}, tips: {}, base: "cold_long" }; } catch (_) {}
+let checked = new Set(), ranges = {}, editingSteps = false;
+let cat = "pizza", lastIn = {}, catsOpen = false;
+// sharing: the link being looked at, the author's reported bakes per link, and this person's display name
+let shareTok = new URLSearchParams(location.search).get("r") || "", shared = null, sharedGone = false, authorBakes = {}, profileName = "", shareNotice = "";
+const curType = () => types.find(x => x.id && x.id === s.type_id) || null;
+const following = () => { const ty = curType(); return ty && ty.follows_token ? ty : null; };
+const isCur = (x) => !s.sharedTok && x.id === s.type_id;   // the category on screen, and the recipe last opened in each one
+let session = null, bakes = [], reporting = null, rating = 0, histFilter = "";
+
+const ing = (st, key) => st.ings.find(g => g.key === key);
+const pctOf = (st, key) => ing(st, key)?.pct || 0;
+function compute(st){
+  const sum = 1 + st.ings.reduce((a, g) => a + (+g.pct || 0), 0) / 100;
+  if (st.sizing === "flour") return { piece: st.flour_g * sum, total: st.flour_g * sum, flour: st.flour_g, plan: st.flour_g };
+  const piece = st.sizing === "pizza" ? st.thickness * Math.PI * (st.size / 2) ** 2 : st.piece_g;
+  const plan = piece * st.count / sum;
+  // typing the flour you actually weighed re-scales the whole batch to it
+  if (st.flour_fix) return { piece: st.flour_fix * sum / st.count, total: st.flour_fix * sum, flour: st.flour_fix, plan };
+  return { piece, total: piece * st.count, flour: plan, plan };
+}
+// What went in the bowl: the planned grams unless a real number was typed over it.
+function amounts(st, c){
+  return st.ings.filter(g => g.pct > 0).map(g => {
+    const plan = c.flour * g.pct / 100, a = st.actual?.[g.key];
+    return { key: g.key, name: g.name, plan, g: a ?? plan, pct: a != null ? r2(a / c.flour * 100) : g.pct, typed: a != null };
+  });
+}
+function suggestedYeast(st){ return Math.round(FERMENT[st.ferment].ady * YEAST[st.yeast_type].f / 0.05) * 0.05; }
+function planOf(st){ return { count: st.count, size: st.size, thickness: st.thickness, piece_g: st.piece_g, flour_g: st.flour_g, yeast_type: st.yeast_type }; }
+
+// ---- steps --------------------------------------------------------------------
+// Steps belong to the person, per dough type. The built-in Pizza type shows these basic steps until they are edited.
+const usesBasic = (st) => st.steps == null && st.sizing === "pizza" && !!ing(st, "yeast");
+function waterNote(st){ return (st.base === "quick" || st.base === "same_day") ? "warm, about 105°F" : st.yeast_type === "active_dry" ? "cold, under 60°F, except a splash warmed for the yeast" : "cold, under 60°F"; }
+function basicSteps(st, c){
+  const warm = st.base === "quick" || st.base === "same_day", oil = pctOf(st, "oil") > 0, sugar = pctOf(st, "sugar") > 0;
+  const out = [];
+  if (st.yeast_type === "active_dry") out.push(warm ? "Stir the yeast into the warm water and give it 5 to 10 minutes to foam." : "Warm a splash of the water (about 60 g) to 105°F, stir in the yeast, and give it 5 to 10 minutes to foam. Keep the rest of the water cold.");
+  else if (st.yeast_type === "fresh") out.push("Crumble the yeast into the water and stir until it dissolves.");
+  else out.push("Whisk the yeast into the flour. No proofing needed.");
+  out.push((st.yeast_type === "active_dry" && !warm ? "Add the cold water, the flour" + (oil ? "," : "") : st.yeast_type === "instant" ? "Add the water to the flour" + (oil ? "," : "") : "Add the flour") + (oil ? (st.yeast_type === "instant" ? " along with the olive oil," : " and olive oil") : "") + " and mix for 2 minutes.");
+  out.push("Add the salt" + (sugar ? " and sugar" : "") + ", then mix about 10 more minutes until smooth.");
+  const balls = `${st.count} ball${st.count === 1 ? "" : "s"} of about ${Math.round(c.piece)} g`;
+  if (st.base === "quick"){
+    out.push("Cover and let it rise somewhere warm for about an hour, until doubled.");
+    out.push(`Divide into ${balls}, cover, and rest 30 to 45 minutes.`);
+    out.push("Shape and bake.");
+  } else if (st.base === "same_day"){
+    out.push("Cover and let it rise at room temperature for 2 to 3 hours.");
+    out.push(`Divide into ${balls}, cover, and rest 1 to 2 more hours.`);
+    out.push("Shape and bake.");
+  } else if (st.base === "cold_1"){
+    out.push("Cover and rest about an hour at room temperature.");
+    out.push(`Divide into ${balls} and seal the seams.`);
+    out.push("Refrigerate about 24 hours.");
+    out.push("Take it out 1 to 2 hours before baking so it comes to room temperature.");
+  } else {
+    out.push("Cover and rest 1 to 3 hours at room temperature.");
+    out.push(`Divide into ${balls} and seal the seams.`);
+    out.push("Refrigerate 2 to 4 days. Three is the sweet spot.");
+    out.push("Bring it to room temperature before shaping.");
+  }
+  return out;
+}
+const lines = (t) => String(t || "").split("\n").map(x => x.replace(/^\s*(\d+[.)]|[-*•])\s*/, "").trim()).filter(Boolean);
+function stepList(st, c){ return usesBasic(st) ? basicSteps(st, c) : lines(st.steps); }
+
+// ---- calculator: controls are rebuilt whenever the dough type changes ---------
+function sliderRow(attr, id, label, [min, max, step, d], typed){
+  return `<div class="ctl">
+    <div class="top"><span class="lab">${esc(label)}</span>${typed
+      ? `<span class="val"><input type="number" class="valin" id="n_${id}" data-num="${id}" min="1" max="20000" step="1" inputmode="numeric" aria-label="${esc(label)} in grams"> g</span>`
+      : `<span class="val" id="v_${id}"></span>`}</div>
+    <div class="sl"><button type="button" data-${attr}="${id}" data-d="${-d}" aria-label="Less ${esc(label)}">−</button><input type="range" id="r_${id}" data-${attr}-range="${id}" min="${min}" max="${max}" step="${step}" aria-label="${esc(label)}"><button type="button" data-${attr}="${id}" data-d="${d}" aria-label="More ${esc(label)}">+</button></div>
+    <div class="hint" id="h_${id}"></div>
+  </div>`;
+}
+function buildControls(){
+  const z = s.sizing;
+  if (z === "pizza") s.thickness = nearThick(s.thickness)[1];   // thickness lives on the five stops
+  $("#sizeCtl").innerHTML =
+    z === "pizza" ? sliderRow("step", "count", "Pizzas", PLAN.count) + sliderRow("step", "size", "Size", PLAN.size)
+      + `<div class="ctl"><div class="top"><span class="lab">Thickness</span></div><div class="seg five">${THICK.map(([n, v]) => `<button type="button" data-thick="${v}">${n}</button>`).join("")}</div></div>`
+    : z === "pieces" ? sliderRow("step", "count", "How many", [1, 24, 1, 1]) + sliderRow("step", "piece_g", "Weight of each", PLAN.piece_g, true)
+    : sliderRow("step", "flour_g", "Flour", PLAN.flour_g, true);
+  $("#fermentSeg").innerHTML = Object.entries(FERMENT).map(([k, f]) => `<button type="button" data-ferment="${k}">${f.label}<small>${f.sub}</small></button>`).join("");
+  $("#yeastSeg").innerHTML = Object.entries(YEAST).map(([k, y]) => `<button type="button" data-yeast="${k}">${y.label}</button>`).join("");
+  $("#yeastCtl").hidden = !ing(s, "yeast");
+  ranges = {};
+  for (const g of s.ings){
+    const r = RANGES[g.key];
+    // every slider goes down to 0 and leaves room above where the recipe sits now
+    if (r) ranges[g.key] = [r[0], Math.max(r[1], Math.ceil(g.pct * 1.5)), r[2], r[3]];
+    else { const max = g.pct <= 5 ? 10 : g.pct <= 20 ? 30 : g.pct <= 40 ? 60 : Math.max(110, Math.ceil(g.pct * 1.5)); const st = max > 30 ? 0.5 : 0.1; ranges[g.key] = [0, max, st, st]; }
+  }
+  // one block per ingredient: tick box, name, grams you can type over, percent, and its slider right underneath
+  const ingRow = (key, name, r) => `<div class="ingc" data-row="${esc(key)}">
+      <div class="itop"><button type="button" class="box" data-ing="${esc(key)}" role="checkbox" aria-checked="false" aria-label="${esc(name)} is in the bowl">✓</button>
+        <span class="nm">${esc(name)}<small id="sub_${esc(key)}"></small></span>
+        <span class="g"><input type="number" class="gin" id="g_${esc(key)}" data-actual="${esc(key)}" min="0" max="50000" step="1" inputmode="decimal" aria-label="${esc(name)}, grams"><small>g</small></span>
+        <span class="p" id="v_${esc(key)}"></span></div>
+      ${r ? `<div class="sl"><button type="button" data-pct="${esc(key)}" data-d="${-r[3]}" aria-label="Less ${esc(name)}">−</button><input type="range" id="r_${esc(key)}" data-pct-range="${esc(key)}" min="${r[0]}" max="${r[1]}" step="${r[2]}" aria-label="${esc(name)} percent"><button type="button" data-pct="${esc(key)}" data-d="${r[3]}" aria-label="More ${esc(name)}">+</button></div><div class="hint" id="h_${esc(key)}"></div>` : ""}
+    </div>`;
+  $("#ratios").innerHTML = ingRow("flour", "Flour", null) + (s.ings.length
+    ? s.ings.map(g => ingRow(g.key, g.name, ranges[g.key])).join("")
+    : `<p class="note">This recipe has no other ingredients yet. Tap "Edit" to add them.</p>`);
+}
+const inCat = (k) => types.filter(x => (x.category || guessCat(x.name, x.sizing)) === k);
+function renderTypes(){
+  // "orphan": what is on screen came from an old bake whose recipe was deleted, so it is in no list
+  const mine = inCat(cat), orphan = s.category === cat && (!!s.sharedTok || !types.some(x => x.id === s.type_id));
+  const cur = s.sharedTok ? null : curType(), fol = cur && cur.follows_token ? cur : null;
+  const empty = !mine.length && !orphan;
+  $("#typeSmall").textContent = catLabel(cat);
+  // wide screens show every category; phones show the current one and unfold the rest on a tap
+  $("#typeBar").innerHTML = `<button type="button" class="catbtn" data-cats aria-expanded="${catsOpen}"><span>${esc(catLabel(cat))}</span><small>${catsOpen ? "Close" : "Change category"}</small></button>`
+    + `<div class="cats${catsOpen ? " open" : ""}" role="tablist">${CATS.map(([k, l]) => { const n = inCat(k).length; return `<button type="button" role="tab" data-cat="${k}" class="${k === cat ? "on" : ""}">${l}${session && n ? `<small>${n}</small>` : ""}</button>`; }).join("")}</div>`
+    + (empty ? "" : `<div class="recipe">
+        <div class="rlist" role="group" aria-label="${esc(catLabel(cat))} recipes">${mine.map(x => `<button type="button" data-recipe="${x.id || ""}" class="${isCur(x) ? "on" : ""}" aria-pressed="${isCur(x)}">${esc(x.name)}${x.follows_token ? `<small>by ${esc(x.author_name || "someone")}</small>` : ""}</button>`).join("")}${mine.some(isCur) ? "" : `<button type="button" class="on" aria-pressed="true" disabled>${esc(s.name)} ${s.sharedTok ? `<small>shared by ${esc(shared?.author || "someone")}</small>` : "(not saved as a recipe)"}</button>`}</div>
+        <div class="ract">${fol ? `<button type="button" class="btn" data-followmenu>Following ${esc(fol.author_name || "")}</button>` : cur ? `<button type="button" class="btn" data-edittype>Edit</button><button type="button" class="btn" data-share>${cur.share_token ? "Shared ✓" : "Share"}</button>` : ""}<button type="button" class="btn" data-newtype>＋ New recipe</button>${aiOK ? `<button type="button" class="btn ai" data-ai>Ask AI</button>` : ""}</div>
+      </div>`);
+  $("#calcBody").hidden = empty;
+  renderShared();
+  const ec = $("#emptyCat"); ec.hidden = !empty;
+  if (empty) ec.innerHTML = session
+    ? `<p>You don't have a ${esc(catLabel(cat))} recipe yet.</p><div class="acts">${aiOK ? `<button type="button" class="btn primary" data-ai>Ask AI for a starting point</button>` : ""}<button type="button" class="btn${aiOK ? "" : " primary"}" data-newtype>Start one from scratch</button></div>`
+    : `<p>Sign in to make your own ${esc(catLabel(cat))} recipes.</p><div class="acts"><button type="button" class="btn primary" data-open-auth>Sign in</button></div>`;
+}
+// ---- sharing ---------------------------------------------------------------------
+const shareURL = (tok) => location.origin + location.pathname + "?r=" + tok;
+function newToken(){ return [...crypto.getRandomValues(new Uint8Array(18))].map(b => (b % 36).toString(36)).join(""); }
+function clearShareLink(){ shareTok = ""; shared = null; try { history.replaceState(null, "", location.pathname); } catch (_) {} }
+const fromShared = (r) => ({ name: r.name, category: r.category, sizing: r.sizing, timing: r.timing, ingredients: r.ingredients || [], steps: r.steps ?? null, notes: r.notes || "", links: r.links || [], tips: r.tips || {} });
+// Called at the end of load(): show the recipe a share link points at, or jump to it if it is already theirs.
+async function applyShared(){
+  if (!shareTok) return;
+  if (!shared && !sharedGone){
+    const { data } = await sb.rpc("dough_shared", { p_token: shareTok });
+    if (data) shared = data; else sharedGone = true;
+  } else if (shared && session){ const { data } = await sb.rpc("dough_shared", { p_token: shareTok }); if (data) shared = data; }   // re-ask once signed in: is it mine?
+  if (!shared) return;
+  authorBakes[shareTok] = { author: shared.author, bakes: shared.bakes || [] };
+  const own = shared.own_id && types.find(x => x.id === shared.own_id), have = types.find(x => x.follows_token === shareTok);
+  if (own || have){ s = stateFromType(own || have); cat = s.category; clearShareLink(); return; }
+  s = stateFromType({ id: null, defaults: {}, ...fromShared(shared.recipe) }); s.sharedTok = shareTok; cat = s.category;
+}
+function renderShared(){
+  const bar = $("#sharedBar");
+  if (shareNotice){ bar.innerHTML = `<p style="margin:0">${esc(shareNotice)} <button type="button" class="btn link" data-sharedismiss>OK</button></p>`; bar.hidden = false; return; }
+  if (shareTok && sharedGone){ bar.innerHTML = `<h2>That link isn't active</h2><p>The person who shared it has stopped sharing, or the link is incomplete.</p><button type="button" class="btn" data-sharedismiss>OK</button>`; bar.hidden = false; return; }
+  if (!shared || !s.sharedTok){ bar.hidden = true; return; }
+  const a = esc(shared.author), n = esc(shared.recipe.name);
+  bar.innerHTML = `<h2>${n}</h2><p>Shared by ${a}. Use the calculator below to size a batch.${session ? " To keep it, pick one:" : ""}</p>`
+    + (session ? `<div class="opts">
+        <button type="button" class="opt" data-accept="follow"><b>Follow ${a}'s recipe</b><span>It stays ${a}'s. When ${a} changes it, yours changes too. You can size it and log your own bakes, but not edit it.</span></button>
+        <button type="button" class="opt" data-accept="copy"><b>Make my own copy</b><span>It becomes yours to change however you like. You will not get ${a}'s later changes.</span></button>
+      </div><p class="note" style="margin:10px 0 0">You can turn a followed recipe into your own copy later. <button type="button" class="btn link" data-sharedismiss>Not now</button></p>`
+      : `<div class="acts"><button type="button" class="btn primary" data-open-auth>Sign in to keep this recipe</button><button type="button" class="btn link" data-sharedismiss>Just looking</button></div>`);
+  bar.hidden = false;
+}
+async function acceptShared(how){
+  if (!shared || !session) return;
+  const r = fromShared(shared.recipe), tok = shareTok, author = shared.author;
+  let name = r.name, n = 2; const taken = (x) => types.some(y => y.name.toLowerCase() === x.toLowerCase());
+  if (taken(name)) name = (r.name + " (" + author + ")").slice(0, 40);
+  while (taken(name)) name = (r.name.slice(0, 34) + " " + n++);
+  const row = { ...r, name, defaults: {} };
+  if (how === "follow"){ row.follows_token = tok; row.author_name = author; } else row.copied_from = author;
+  const { data, error } = await sb.from("dough_types").insert(row).select().single();
+  if (error){ shareNotice = "That didn't save: " + error.message; renderShared(); return; }
+  clearShareLink(); if (how === "follow") authorBakes[tok] = authorBakes[tok] || { author, bakes: [] };
+  await loadTypes(); switchType(types.find(x => x.id === data.id) || data);
+}
+// Recipes this person follows mirror the author's current version. If the author stopped sharing, it becomes a plain copy.
+async function refreshFollowed(rows){
+  await Promise.all(rows.filter(x => x.follows_token).map(async x => {
+    const { data, error } = await sb.rpc("dough_shared", { p_token: x.follows_token });
+    if (error) return;   // offline or a hiccup: keep what we have
+    if (!data){
+      await sb.from("dough_types").update({ follows_token: null, copied_from: x.author_name }).eq("id", x.id);
+      shareNotice = `${x.author_name || "The author"} stopped sharing "${x.name}". It is now your own copy, and you can edit it.`;
+      x.copied_from = x.author_name; x.follows_token = null; return;
+    }
+    authorBakes[x.follows_token] = { author: data.author, bakes: data.bakes || [] };
+    const r = fromShared(data.recipe), next = { category: r.category, sizing: r.sizing, timing: r.timing, ingredients: r.ingredients, steps: r.steps, notes: r.notes, links: r.links, tips: r.tips, author_name: data.author };
+    if (Object.keys(next).some(k => JSON.stringify(next[k]) !== JSON.stringify(x[k]))){ await sb.from("dough_types").update(next).eq("id", x.id); Object.assign(x, next); }
+  }));
+}
+function renderAuthor(){
+  const card = $("#authorCard"), fol = following(), tok = s.sharedTok || (fol && fol.follows_token), info = tok && authorBakes[tok];
+  if (!info || !info.bakes.length){ card.hidden = true; return; }
+  card.innerHTML = `<h2>${esc(info.author)}'s bakes</h2>` + info.bakes.map(b => `<div class="abake">
+      <div class="when">${fmtDate(b.made_on)} · ${esc(bakeSize({ ...b, type_name: "" }))} · ${esc(FERMENT[b.ferment]?.label || "")}${b.flour_name ? " · " + esc(b.flour_name) : ""}</div>
+      ${b.rating ? `<div class="stars" aria-label="${b.rating} of 5 stars">${stars(b.rating)}</div>` : ""}
+      ${b.plan_notes ? `<p><b>Notes</b>${esc(b.plan_notes)}</p>` : ""}${b.went_well ? `<p><b>Went well</b>${esc(b.went_well)}</p>` : ""}${b.went_poorly ? `<p><b>Went poorly</b>${esc(b.went_poorly)}</p>` : ""}${b.next_time ? `<p><b>Next time, try</b>${esc(b.next_time)}</p>` : ""}
+      ${bakeLog(b).length ? `<ul>${bakeLog(b).map(e => `<li>${esc(fmtStamp(e.at))}: ${esc(e.text)}</li>`).join("")}</ul>` : ""}
+      ${bakePhotos(b).length ? `<div class="photos">${bakePhotos(b).map((ph, i) => `<button type="button" class="ph" data-aphoto="${esc(photoURL(ph))}" aria-label="Open photo ${i + 1}"><img src="${esc(photoURL(ph))}" alt="Photo ${i + 1} of this bake" loading="lazy"></button>`).join("")}</div>` : ""}
+    </div>`).join("");
+  card.hidden = false;
+}
+function setCat(k){
+  cat = k;
+  const mine = inCat(k), t = mine.find(x => x.id === lastIn[k]) || mine[0];
+  if (t && t.id !== s.type_id) switchType(t); else renderTypes();
+}
+
+function render(){
+  const c = compute(s);
+  for (const id of ["count", "size", "thickness", "piece_g", "flour_g"]){
+    const r = $("#r_" + id); if (!r) continue;
+    r.value = s[id];
+    const n = $("#n_" + id); if (n && document.activeElement !== n) n.value = s[id];
+    const v = $("#v_" + id); if (v) v.textContent = id === "size" ? s.size + "″" : id === "thickness" ? thickText(s.thickness) : s[id];
+  }
+  document.querySelectorAll("[data-thick]").forEach(b => b.classList.toggle("on", Math.abs(+b.dataset.thick - s.thickness) < 0.005));
+  document.querySelectorAll("[data-ferment]").forEach(b => { b.classList.toggle("on", b.dataset.ferment === s.ferment); b.classList.toggle("base", b.dataset.ferment === s.base); });
+  $("#fermentNote").innerHTML = s.ferment === s.base ? `This recipe is written for <b>${esc(FERMENT[s.base].label)}</b>. Pick another to get suggestions for it.`
+    : `The recipe is written for <b>${esc(FERMENT[s.base].label)}</b>. Suggestions for ${esc(FERMENT[s.ferment].label)} are under the steps.`;
+  document.querySelectorAll("[data-yeast]").forEach(b => b.classList.toggle("on", b.dataset.yeast === s.yeast_type));
+  for (const g of s.ings){ const r = document.getElementById("r_" + g.key); if (r) r.value = g.pct; }
+
+  const hy = $("#h_yeast");
+  if (hy){
+    const sug = suggestedYeast(s), y = pctOf(s, "yeast"), plan = FERMENT[s.ferment].label.toLowerCase();
+    hy.innerHTML = s.sizing !== "pizza" ? YEAST[s.yeast_type].label + "."
+      : Math.abs(sug - y) < 0.001 ? `${YEAST[s.yeast_type].label}. A starting point for "${plan}".`
+      : `${YEAST[s.yeast_type].label}. The starting point for "${plan}" is ${pctText(sug)}. <button type="button" class="btn link" id="useSug">Use it</button>`;
+  }
+  const hw = $("#h_water"); if (hw) hw.textContent = "Hydration. More water is stickier to handle and bakes up airier.";
+
+  $("#oBallBox").hidden = s.sizing === "flour";
+  $("#oBallLab").textContent = s.sizing === "pizza" ? "g per ball" : "g each";
+  const basic = usesBasic(s);
+  const am = amounts(s, c), was = (g) => "typed in, the plan was " + grams(g) + " g";
+  const setRow = (key, sub, g, pct, typed) => {
+    const row = document.querySelector(`.ingc[data-row="${CSS.escape(key)}"]`); if (!row) return;
+    row.classList.toggle("done", checked.has(key)); row.classList.toggle("typed", typed);
+    row.querySelector(".box").setAttribute("aria-checked", checked.has(key));
+    document.getElementById("sub_" + key).textContent = sub;
+    const gi = document.getElementById("g_" + key);
+    if (document.activeElement !== gi){ gi.value = g < 10 ? (Math.round(g * 10) / 10).toFixed(1) : Math.round(g); gi.step = g < 10 ? 0.1 : 1; }
+    document.getElementById("v_" + key).textContent = pctText(pct);
+  };
+  setRow("flour", s.flour_fix ? was(c.plan) : $("#flourName").value.trim(), c.flour, 100, !!s.flour_fix);
+  for (const g of s.ings){
+    const a = s.actual?.[g.key], plan = c.flour * g.pct / 100;
+    setRow(g.key, a != null ? was(plan) : g.key === "yeast" ? YEAST[s.yeast_type].label.toLowerCase() : g.key === "water" && basic ? waterNote(s) : "", a ?? plan, a != null ? r2(a / c.flour * 100) : g.pct, a != null);
+  }
+  const totalNow = c.flour + am.reduce((x, r) => x + r.g, 0);
+  $("#oBall").textContent = grams(s.sizing === "flour" ? totalNow : totalNow / s.count);
+  $("#oTotal").textContent = grams(totalNow);
+  $("#unType").hidden = !(s.flour_fix || Object.keys(s.actual || {}).length);
+  renderDiff();
+
+  const list = stepList(s, c);
+  $("#steps").hidden = editingSteps || !list.length;
+  $("#steps").innerHTML = list.map(t => `<li>${esc(t)}</li>`).join("");
+  $("#stepsEmpty").hidden = editingSteps || !!list.length;
+  $("#stepsEdit").hidden = !editingSteps;
+  $("#stepsNote").textContent = editingSteps ? "One step per line. They are saved with the bake and become this recipe's steps next time."
+    : basic ? "Basic steps to get you started. Edit them to match how you actually make it." : "";
+  $("#stepsNote").hidden = !$("#stepsNote").textContent;
+  $("#editSteps").textContent = editingSteps ? "Done" : list.length ? "Edit steps" : "Add steps";
+  const fol = following(), locked = !!fol || !!s.sharedTok, who = fol ? fol.author_name : shared?.author;
+  $("#editSteps").hidden = locked;
+  if (locked){ $("#stepsNote").textContent = `These are ${who || "the author"}'s steps. To change them, make your own copy.`; $("#stepsNote").hidden = false; }
+  $("#basicSteps").hidden = locked || !(s.sizing === "pizza" && s.steps != null && ing(s, "yeast"));
+
+  const hasRecipe = !s.sharedTok && !!session && !!curType(), nt = $("#recipeNotes"), nkey = s.sharedTok ? "shared:" + s.sharedTok : s.type_id;
+  $("#notesCard").hidden = !(hasRecipe || (s.sharedTok && (s.notes || (s.links || []).length)));
+  { const lk = $("#recipeLinks"), sig = String(nkey) + "|" + (!locked && hasRecipe) + "|" + JSON.stringify(s.links || []);
+    if (lk.dataset.for !== sig){ lk.dataset.for = sig; renderLinks(!locked && hasRecipe); } }
+  nt.readOnly = locked;
+  if (document.activeElement !== nt && (nt.dataset.for !== String(nkey) || locked)){
+    nt.value = s.notes || ""; nt.dataset.for = String(nkey);
+    const ct = curType();
+    $("#notesState").textContent = locked ? `${who || "The author"}'s notes.` : ct && ct.copied_from ? `Copied from ${ct.copied_from}'s recipe.` : "";
+  }
+  renderAuthor();
+
+  const ab = $("#adaptBox");
+  if (s.ferment === s.base) ab.hidden = true;
+  else {
+    const toL = FERMENT[s.ferment].label, baseL = FERMENT[s.base].label, faster = FKEYS.indexOf(s.ferment) < FKEYS.indexOf(s.base);
+    const tip = s.tips[s.ferment], fresh = tip && tip.sig === tipSig(), y = ing(s, "yeast");
+    const saved = !locked && !!curType();
+    let body;
+    if (tipsBusy === s.ferment) body = `<p class="wait">Working out how to ${faster ? "speed this up" : "slow this down"}. About 15 seconds.</p>`;
+    else if (fresh) body = `<ul class="tips">${(tip.tips || []).map(x => `<li><b>${esc(x.title)}</b>${esc(x.detail)}</li>`).join("")}</ul>`
+      + (y && tip.yeast_pct > 0 && Math.abs(tip.yeast_pct - y.pct) > 0.001 ? `<p><b>Yeast:</b> try ${pctText(tip.yeast_pct)} for this bake. You have ${pctText(y.pct)}. <button type="button" class="btn link" id="tipYeast">Use ${pctText(tip.yeast_pct)}</button></p>` : "")
+      + (tip.note ? `<p class="tnote">${esc(tip.note)}</p>` : "");
+    else body = `<p>${faster ? "To go faster, bakers usually use more yeast, warmer liquid (about 105°F), and a warm spot for the rises. You give up some flavor."
+        : "To go slower, bakers usually use less yeast and cooler liquid, and let the dough rest in the refrigerator. Take it out an hour or two before shaping or baking."}</p>`
+      + (aiOK && list.length && !s.sharedTok ? `<div class="acts"><button type="button" class="btn primary" id="tipGo">Get suggestions for this recipe</button></div>` : "");
+    ab.innerHTML = `<h3>Suggestions based on your timing</h3><p class="tsub">Written for ${esc(baseL)}, baking ${esc(toL)}. Your recipe and steps stay as they are.</p>` + body
+      + (saved && tipsBusy !== s.ferment ? `<p class="tfoot"><button type="button" class="btn link" id="tipBase">Make ${esc(toL)} this recipe's timing</button></p>` : "");
+    ab.hidden = false;
+  }
+
+  $("#lock").textContent = session ? "Lock it in" : "Sign in to lock it in";
+  if (!s.sharedTok) try { localStorage.setItem("dough.calc2", JSON.stringify(s)); } catch (_) {}
+  if (document.querySelector("#last .sugg .chg")) renderLast();   // keep the Apply buttons in step with the sliders
+}
+
+function setPct(k, v){ const g = ing(s, k), [min, max] = ranges[k]; g.pct = clamp(r2(v), min, max); if (s.actual) delete s.actual[k]; }
+// ---- timing: the recipe is written for one timing; another pick for today gets suggestions, not a rewrite
+const FKEYS = Object.keys(FERMENT);
+let tipsBusy = "";
+function tipSig(){   // suggestions are stale once the steps, the ingredient list, or the recipe's timing change
+  const str = [s.base, s.yeast_type, s.ings.map(g => g.name).join(","), stepList(s, compute(s)).join("\n")].join("|");
+  let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return String(h);
+}
+function setFerment(k){
+  s.ferment = k; $("#adaptErr").hidden = true;
+  // back on the recipe's own timing: undo a yeast amount borrowed from a suggestion
+  if (k === s.base && s.yeastWas != null){ const y = ing(s, "yeast"); if (y) y.pct = s.yeastWas; s.yeastWas = null; buildControls(); }
+  render();
+  const tip = s.tips[k];
+  if (k !== s.base && aiOK && session && !s.sharedTok && stepList(s, compute(s)).length && !(tip && tip.sig === tipSig())) fetchTips(k);
+}
+async function fetchTips(k){
+  if (tipsBusy) return;
+  const from = FERMENT[s.base], to = FERMENT[k], typeId = s.type_id, sig = tipSig();
+  tipsBusy = k; $("#adaptErr").hidden = true; render();
+  const { data, error } = await sb.functions.invoke("dough-adapt", { body: { from: from.label + ", " + from.sub, to: to.label + ", " + to.sub, context: aiContext() } });
+  tipsBusy = "";
+  if (error || !data?.tips){
+    let msg = data?.error || "";
+    if (!msg && error?.context?.json){ try { msg = (await error.context.json()).error || ""; } catch (_) {} }
+    $("#adaptErr").textContent = msg || "The suggestions didn't come through. Try again in a moment."; $("#adaptErr").hidden = false;
+  } else if (typeId === s.type_id){
+    s.tips[k] = { sig, tips: data.tips.tips || [], yeast_pct: +data.tips.yeast_pct || 0, note: data.tips.note || "" };
+    if (typeId && !following()) sb.from("dough_types").update({ tips: s.tips }).eq("id", typeId).then(() => { const ty = types.find(x => x.id === typeId); if (ty) ty.tips = clone(s.tips); });   // paid for once, kept
+  }
+  render();
+}
+function replan(){ s.flour_fix = null; s.actual = {}; }   // a new plan throws away numbers typed against the old one
+function switchType(t, st){
+  s = st || stateFromType(t);
+  if (!s.category) s.category = guessCat(s.name, s.sizing);
+  cat = s.category; lastIn[cat] = s.type_id;
+  checked.clear(); editingSteps = false; $("#lockOk").hidden = $("#lockErr").hidden = true;
+  buildControls(); renderTypes(); renderBakes();
+}
+function wire(){
+  document.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.stepRange){ s[t.dataset.stepRange] = +t.value; replan(); render(); }
+    else if (t.dataset.pctRange){ setPct(t.dataset.pctRange, +t.value); render(); }
+    else if (t.dataset.num){ s[t.dataset.num] = clamp(Math.round(+t.value) || 1, 1, 20000); replan(); render(); }
+    else if (t.id === "stepsEdit"){ s.steps = t.value; try { localStorage.setItem("dough.calc2", JSON.stringify(s)); } catch (_) {} }
+  });
+  document.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const d = b.dataset;
+    if (d.step){ const r = $("#r_" + d.step); s[d.step] = clamp(r2(s[d.step] + +d.d), +r.min, Math.max(+r.max, s[d.step])); replan(); render(); }
+    else if (d.thick){ s.thickness = +d.thick; replan(); render(); }
+    else if (d.ferment){ if (d.ferment !== s.ferment) setFerment(d.ferment); }
+    else if (d.yeast){
+      const from = YEAST[s.yeast_type].f, to = YEAST[d.yeast].f;
+      s.yeast_type = d.yeast; if (ing(s, "yeast")) setPct("yeast", Math.round(pctOf(s, "yeast") * to / from / 0.05) * 0.05); render();
+    }
+    else if (d.pct){ setPct(d.pct, pctOf(s, d.pct) + +d.d); render(); }
+    else if (b.id === "useSug"){ setPct("yeast", suggestedYeast(s)); render(); }
+    else if (d.ing){ checked.has(d.ing) ? checked.delete(d.ing) : checked.add(d.ing); keepAwake(); render(); }
+    else if (d.accept){ b.disabled = true; acceptShared(d.accept); }
+    else if (d.sharedismiss !== undefined){
+      shareNotice = ""; const was = !!s.sharedTok; clearShareLink(); sharedGone = false;
+      if (was){ const t0 = types[0]; if (t0) switchType(t0); } else renderTypes();
+    }
+    else if (d.share !== undefined) openShare();
+    else if (d.followmenu !== undefined) openFollow();
+    else if (d.cats !== undefined){ catsOpen = !catsOpen; renderTypes(); }
+    else if (d.cat){ catsOpen = false; if (d.cat !== cat) setCat(d.cat); else renderTypes(); }
+    else if (d.recipe !== undefined){ const t = types.find(x => (x.id || "") === d.recipe); if (t && t.id !== s.type_id) switchType(t); }
+    else if (d.ai !== undefined) openAI();
+    else if (d.newtype !== undefined) openType(null);
+    else if (d.edittype !== undefined) openType(types.find(x => x.id === s.type_id) || null, true);
+    else if (d.hist !== undefined){ histFilter = d.hist; renderBakes(); }
+  });
+  $("#unType").addEventListener("click", () => { replan(); render(); });
+  $("#ratios").addEventListener("focusin", e => { if (e.target.dataset.actual) e.target.select(); });
+  $("#ratios").addEventListener("change", e => {
+    const k = e.target.dataset.actual; if (!k) return;
+    const v = e.target.value.trim() === "" ? null : Math.max(0, +e.target.value);
+    if (k === "flour"){
+      if (s.sizing === "flour"){ if (v) s.flour_g = clamp(Math.round(v), 1, 20000); }
+      else s.flour_fix = v || null;
+      s.actual = {};
+    } else if (v == null) delete s.actual[k];
+    else s.actual[k] = v;
+    render();
+  });
+  $("#ratios").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.actual) e.target.blur(); });
+  $("#resetPct").addEventListener("click", () => { const t = types.find(x => x.id === s.type_id); if (t){ s.ings = clone(t.ingredients); buildControls(); render(); } });
+  $("#editSteps").addEventListener("click", () => {
+    if (!editingSteps){ const cur = stepList(s, compute(s)).join("\n"); s.steps = cur; $("#stepsEdit").value = cur; editingSteps = true; render(); $("#stepsEdit").focus(); }
+    else { editingSteps = false; if (!lines(s.steps).length) s.steps = null; render(); }
+  });
+  $("#adaptBox").addEventListener("click", async e => {
+    const id = e.target.closest("button")?.id;
+    if (id === "tipGo") fetchTips(s.ferment);
+    else if (id === "tipYeast"){ const tip = s.tips[s.ferment], y = ing(s, "yeast"); if (tip && y){ if (s.yeastWas == null) s.yeastWas = y.pct; y.pct = r2(Math.min(10, tip.yeast_pct)); if (s.actual) delete s.actual.yeast; buildControls(); render(); } }
+    else if (id === "tipBase"){
+      const ty = types.find(x => x.id && x.id === s.type_id); if (!ty) return;
+      const { error } = await sb.from("dough_types").update({ timing: s.ferment }).eq("id", ty.id);
+      if (error){ $("#adaptErr").textContent = "That didn't save: " + error.message; $("#adaptErr").hidden = false; return; }
+      ty.timing = s.base = s.ferment; s.yeastWas = null; render();
+    }
+  });
+  $("#recipeNotes").addEventListener("input", () => { $("#notesState").textContent = "Not saved yet. It saves when you tap out of the box."; });
+  $("#recipeNotes").addEventListener("change", async e => {
+    const id = e.target.dataset.for, text = e.target.value.trim(); if (!id || e.target.readOnly || id.startsWith("shared:")) return;
+    const { error } = await sb.from("dough_types").update({ notes: text }).eq("id", id);
+    const ty = types.find(x => x.id === id); if (!error && ty) ty.notes = text;
+    if (!error && s.type_id === id) s.notes = text;
+    if (s.type_id === id) $("#notesState").textContent = error ? "That didn't save: " + error.message : "Saved to this recipe.";
+  });
+  $("#basicSteps").addEventListener("click", () => { if (confirm("Replace your steps with the basic ones?")){ s.steps = null; editingSteps = false; render(); } });
+  $("#flourName").addEventListener("input", () => { try { localStorage.setItem("dough.flour", $("#flourName").value); } catch (_) {} render(); });
+  $("#tabCalc").addEventListener("click", () => showTab("calc"));
+  $("#tabHist").addEventListener("click", () => showTab("hist"));
+  $("#lock").addEventListener("click", lockIn);
+}
+function showTab(t){
+  $("#calc").hidden = t !== "calc"; $("#hist").hidden = t !== "hist";
+  $("#tabCalc").classList.toggle("on", t === "calc"); $("#tabHist").classList.toggle("on", t === "hist");
+  window.scrollTo(0, 0);
+}
+// Keep the phone awake once weighing has started.
+let wake = null;
+async function keepAwake(){ try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch (_) {} }
+
+// ---- dough types ---------------------------------------------------------------
+let editingType = null, tIngs = [];
+function openType(t, wantEdit){
+  if (!session){ openAuth("in"); return; }
+  if (wantEdit && !t) return;
+  editingType = t;
+  $("#typeTitle").textContent = t ? "Edit recipe" : "New " + catLabel(cat) + " recipe";
+  $("#tName").value = t ? t.name : "";
+  $("#tCat").innerHTML = CATS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+  $("#tCat").value = t ? (t.category || guessCat(t.name, t.sizing)) : cat;
+  $("#tSizing").innerHTML = Object.entries(SIZING).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  $("#tSizing").value = t ? t.sizing : CATS.find(c => c[0] === cat)[2];
+  $("#tTiming").innerHTML = Object.entries(FERMENT).map(([k, f]) => `<option value="${k}">${f.label} (${f.sub})</option>`).join("");
+  $("#tTiming").value = t ? (FERMENT[t.timing] ? t.timing : "same_day") : cat === "pizza" ? "cold_long" : "same_day";
+  tIngs = t ? clone(t.ingredients) : [{ name: "Water", pct: "" }, { name: "Yeast", pct: "" }, { name: "Salt", pct: "" }];
+  $("#tDelete").hidden = !t;
+  $("#typeErr").hidden = true; drawTIngs(); $("#typeDlg").showModal();
+}
+function drawTIngs(){
+  $("#tIngs").innerHTML = tIngs.map((g, i) => `<div class="irow">
+    <span class="mv"><button type="button" data-mv="${i}" data-by="-1" aria-label="Move ${esc(g.name || "ingredient")} up"${i === 0 ? " disabled" : ""}>▲</button><button type="button" data-mv="${i}" data-by="1" aria-label="Move ${esc(g.name || "ingredient")} down"${i === tIngs.length - 1 ? " disabled" : ""}>▼</button></span>
+    <input type="text" data-i="${i}" data-f="name" value="${esc(g.name)}" maxlength="40" placeholder="Ingredient" aria-label="Ingredient name">
+    <input type="number" data-i="${i}" data-f="pct" value="${esc(g.pct)}" min="0" max="300" step="0.01" inputmode="decimal" placeholder="0" aria-label="Percent of flour"><span>%</span>
+    <button type="button" class="btn" data-rm="${i}" aria-label="Remove ${esc(g.name || "ingredient")}">✕</button></div>`).join("");
+}
+$("#tIngs").addEventListener("input", e => { const t = e.target; if (t.dataset.i) tIngs[+t.dataset.i][t.dataset.f] = t.value; });
+$("#tIngs").addEventListener("click", e => {
+  const b = e.target.closest("[data-rm],[data-mv]"); if (!b) return;
+  if (b.dataset.rm !== undefined) tIngs.splice(+b.dataset.rm, 1);
+  else {
+    const i = +b.dataset.mv, j = i + +b.dataset.by; if (j < 0 || j >= tIngs.length) return;
+    [tIngs[i], tIngs[j]] = [tIngs[j], tIngs[i]];
+  }
+  drawTIngs();
+  if (b.dataset.mv !== undefined){ const again = $("#tIngs").querySelector(`[data-mv="${+b.dataset.mv + +b.dataset.by}"][data-by="${b.dataset.by}"]`); (again && !again.disabled ? again : $("#tIngs").querySelector(`[data-mv="${+b.dataset.mv + +b.dataset.by}"]:not([disabled])`))?.focus(); }
+});
+$("#tAdd").addEventListener("click", () => { tIngs.push({ name: "", pct: "" }); drawTIngs(); $("#tIngs").querySelector(".irow:last-child input").focus(); });
+$("#typeCancel").addEventListener("click", () => $("#typeDlg").close());
+$("#tCat").addEventListener("change", e => { if (!editingType) $("#tSizing").value = CATS.find(c => c[0] === e.target.value)[2]; });
+function keyFor(name, used){
+  const n = name.toLowerCase().trim();
+  let k = /yeast/.test(n) ? "yeast" : n === "water" ? "water" : n === "salt" ? "salt" : n === "sugar" ? "sugar" : /^(olive )?oil$/.test(n) ? "oil" : (n.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "item");
+  let out = k, i = 2; while (used.has(out)) out = k + "_" + i++;
+  used.add(out); return out;
+}
+$("#typeForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fail = (m) => { $("#typeErr").textContent = m; $("#typeErr").hidden = false; };
+  const name = $("#tName").value.trim(); if (!name) return fail("Give it a name.");
+  if (types.some(t => t.id !== editingType?.id && t.name.toLowerCase() === name.toLowerCase())) return fail("You already have a recipe with that name.");
+  const used = new Set(["flour"]), ingredients = [];
+  for (const g of tIngs){
+    const nm = String(g.name || "").trim(), p = parseFloat(g.pct);
+    if (!nm && (g.pct === "" || g.pct == null)) continue;
+    if (!nm) return fail("One ingredient is missing its name.");
+    if (/^flour$/i.test(nm)) return fail("Leave flour off the list. It is always 100%.");
+    if (!(p > 0) || p > 300) return fail(`Give ${nm} a percent of the flour weight, above 0.`);
+    ingredients.push({ key: keyFor(nm, used), name: nm, pct: r2(p) });
+  }
+  if (!ingredients.length) return fail("Add at least one ingredient besides flour.");
+  const row = { name, category: $("#tCat").value, sizing: $("#tSizing").value, timing: $("#tTiming").value, ingredients };
+  $("#typeSave").disabled = true;
+  const q = editingType ? sb.from("dough_types").update(row).eq("id", editingType.id) : sb.from("dough_types").insert(row);
+  const { data, error } = await q.select().single();
+  $("#typeSave").disabled = false;
+  if (error) return fail("That didn't save: " + error.message);
+  $("#typeDlg").close();
+  await loadTypes();
+  // keep the plan on screen when the same type was edited without changing how it is sized
+  const keep = editingType && editingType.id === s.type_id && data.sizing === s.sizing;
+  switchType(data, keep ? { ...s, name: data.name, category: data.category, base: data.timing, ings: clone(data.ingredients), actual: {} } : null);
+});
+$("#tDelete").addEventListener("click", async () => {
+  if (!editingType || !confirm(`Delete the recipe "${editingType.name}"? Bakes you already logged stay in your history.`)) return;
+  const { error } = await sb.from("dough_types").delete().eq("id", editingType.id);
+  if (error){ $("#typeErr").textContent = "Couldn't delete it: " + error.message; $("#typeErr").hidden = false; return; }
+  $("#typeDlg").close(); await loadTypes();
+  const next = inCat(cat)[0];
+  if (next) switchType(next); else { lastIn[cat] = null; if (types[0]) { const keepCat = cat; s = stateFromType(types[0]); buildControls(); cat = keepCat; } renderTypes(); renderBakes(); }
+});
+async function loadTypes(){
+  if (!session){ types = [LOCAL_PIZZA]; return; }
+  let { data, error } = await sb.from("dough_types").select("*").order("created_at");
+  if (error){ types = [LOCAL_PIZZA]; return; }
+  if (!data.length){
+    // first visit: everyone starts with the Pizza type, and earlier bakes are attached to it
+    const r = await sb.from("dough_types").insert({ name: "Pizza", category: "pizza", sizing: "pizza", timing: "cold_long", ingredients: PIZZA_INGS }).select();
+    data = r.data || [];
+    if (data[0]) await sb.from("dough_bakes").update({ type_id: data[0].id }).is("type_id", null);
+  }
+  await refreshFollowed(data);
+  types = data.length ? data : [LOCAL_PIZZA];
+}
+
+// ---- ask AI --------------------------------------------------------------------
+// Chat with Claude through the dough-ai Edge Function. It can look at a source the person names and
+// comes back with a proposal card that fills a new type or the calculator. Nothing is saved until they say so.
+let aiOK = false, aiMsgs = [], aiBusy = false;   // aiMsgs: [{role, text, proposal?}]
+async function loadAI(){
+  aiOK = false;
+  if (session){ const { data } = await sb.from("dough_ai_access").select("user_id").maybeSingle(); aiOK = !!data; }
+  $("#tAskAI").hidden = !aiOK;
+}
+function aiContext(){
+  const c = compute(s);
+  return {
+    current_type: { name: s.name, sizing: s.sizing },
+    plan: s.sizing === "pizza" ? { pizzas: s.count, size_inches: s.size, thickness: thickText(s.thickness), grams_per_ball: Math.round(c.piece) }
+        : s.sizing === "pieces" ? { pieces: s.count, grams_each: s.piece_g } : { flour_grams: s.flour_g },
+    flour_grams: Math.round(c.flour), flour: $("#flourName").value.trim(),
+    ingredients_percent_of_flour: s.ings.map(g => ({ name: g.name, pct: g.pct })),
+    yeast_type: ing(s, "yeast") ? s.yeast_type : "none",
+    recipe_written_for: FERMENT[s.base].label + ", " + FERMENT[s.base].sub,
+    timing_today: FERMENT[s.ferment].label + ", " + FERMENT[s.ferment].sub,
+    steps: stepList(s, c),
+    recipe_notes: s.notes || "",
+    recent_bakes_of_this_type: bakes.filter(b => sameType(b, s)).slice(0, 4).map(b => ({ made_on: b.made_on, size: bakeSize(b), rating_of_5: b.rating, flour: b.flour_name,
+      ingredients: bakeIngs(b).map(g => ({ name: g.name, pct: g.pct })), notes: b.plan_notes, changed_from_the_bake_before: Array.isArray(b.changes) ? b.changes : [], kept_in_recipe: b.kept ?? null, updates_along_the_way: bakeLog(b).map(e => fmtStamp(e.at) + ": " + e.text), went_well: b.went_well, went_poorly: b.went_poorly, next_time: b.next_time })),
+    category: catLabel(cat),
+    my_recipes: types.map(t => catLabel(t.category) + ": " + t.name),
+  };
+}
+const safeUrl = (u) => /^https?:\/\//i.test(String(u || "")) ? String(u) : "";
+function propCard(p, i){
+  const ings = (p.ingredients || []).filter(g => g && g.name && g.pct > 0 && !/^flour$/i.test(String(g.name).trim())), st = (p.steps || []).filter(Boolean), src = (p.sources || []).filter(x => safeUrl(x.url));
+  const size = p.sizing === "pieces" && p.piece_g > 0 ? `${p.count} × ${grams(p.piece_g)} g to start` : p.flour_g > 0 ? `${grams(p.flour_g)} g flour to start` : "";
+  return `<div class="prop">
+    <h3>${esc(p.name || "Proposal")}</h3><div class="when">${esc([SIZING[p.sizing] || "", size].filter(Boolean).join(" · "))}</div>
+    <table><tr><td>Flour</td><td>100%</td></tr>${ings.map(g => `<tr><td>${esc(g.name)}${/^yeast$/i.test(String(g.name).trim()) && YEAST[p.yeast_type] ? ", " + YEAST[p.yeast_type].label.toLowerCase() : ""}</td><td>${pctText(g.pct)}</td></tr>`).join("")}</table>
+    ${st.length ? `<details><summary>Steps (${st.length})</summary><ol class="steps">${st.map(x => `<li>${esc(x)}</li>`).join("")}</ol></details>` : ""}
+    ${src.length ? `<p class="src">Looked at: ${src.map(x => `<a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title || x.url)}</a>`).join(", ")}</p>` : ""}
+    <div class="acts"><button type="button" class="btn primary" data-ai-new="${i}">Save as a new recipe</button>${$("#calcBody").hidden ? "" : `<button type="button" class="btn" data-ai-apply="${i}">Use in ${esc(s.name)}</button>`}</div>
+  </div>`;
+}
+function renderAI(){
+  const log = $("#aiLog");
+  log.innerHTML = (aiMsgs.length ? "" : `<div class="msg hint">Tell me what you want to make, when you need it, and anyone you like to learn from. For example: "A soft sandwich loaf for tomorrow, in the style of ChainBaker." I'll come back with ratios and steps you can drop straight into the calculator and then change. I can also look at your past bakes of ${esc(s.name)} and suggest what to try next.</div>`)
+    + aiMsgs.map((m, i) => `<div class="msg ${m.role === "user" ? "user" : "ai"}">${esc(m.text)}</div>${m.proposal ? propCard(m.proposal, i) : ""}`).join("")
+    + (aiBusy ? `<div class="msg ai wait">Thinking. This can take a minute when I look things up.</div>` : "");
+  log.scrollTop = log.scrollHeight;
+  $("#aiSend").disabled = aiBusy; $("#aiReset").hidden = !aiMsgs.length;
+}
+function openAI(){
+  if (!session){ openAuth("in"); return; }
+  if ($("#typeDlg").open) $("#typeDlg").close();
+  $("#aiErr").hidden = true; renderAI(); $("#aiDlg").showModal(); $("#aiInput").focus();
+}
+$("#aiClose").addEventListener("click", () => $("#aiDlg").close());
+$("#aiReset").addEventListener("click", () => { if (!aiBusy){ aiMsgs = []; renderAI(); } });
+$("#aiInput").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#aiForm").requestSubmit(); });
+$("#aiForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = $("#aiInput").value.trim(); if (!text || aiBusy) return;
+  $("#aiErr").hidden = true;
+  aiMsgs.push({ role: "user", text }); $("#aiInput").value = ""; aiBusy = true; renderAI();
+  // earlier proposals travel as text so the conversation stays coherent
+  const messages = aiMsgs.map(m => ({ role: m.role, text: m.text + (m.proposal ? "\n[I proposed this formula: " + JSON.stringify({ name: m.proposal.name, sizing: m.proposal.sizing, yeast_type: m.proposal.yeast_type, ingredients: m.proposal.ingredients, steps: m.proposal.steps }) + "]" : "") }));
+  const { data, error } = await sb.functions.invoke("dough-ai", { body: { messages, context: aiContext() } });
+  aiBusy = false;
+  if (error || !data || data.error){
+    let msg = data?.error || "";
+    if (!msg && error?.context?.json) { try { msg = (await error.context.json()).error || ""; } catch (_) {} }
+    aiMsgs.pop(); $("#aiInput").value = text;
+    $("#aiErr").textContent = msg || "That didn't go through. Try again in a moment."; $("#aiErr").hidden = false;
+  } else aiMsgs.push({ role: "assistant", text: data.reply || (data.proposal ? data.proposal.summary : "") || "I don't have anything to add.", proposal: data.proposal || null });
+  renderAI();
+});
+function keyedIngs(list){
+  const used = new Set(["flour"]);
+  return (list || []).filter(g => g && String(g.name || "").trim() && g.pct > 0 && !/^flour$/i.test(String(g.name).trim()))
+    .map(g => ({ key: keyFor(String(g.name), used), name: String(g.name).trim().slice(0, 40), pct: r2(Math.min(300, g.pct)) }));
+}
+$("#aiLog").addEventListener("click", async e => {
+  const b = e.target.closest("[data-ai-new],[data-ai-apply]"); if (!b) return;
+  const p = aiMsgs[+(b.dataset.aiNew ?? b.dataset.aiApply)]?.proposal; if (!p) return;
+  const ings = keyedIngs(p.ingredients), stepsText = (p.steps || []).map(x => String(x).trim()).filter(Boolean).join("\n") || null;
+  const yt = YEAST[p.yeast_type] ? p.yeast_type : null;
+  if (b.dataset.aiApply !== undefined){
+    s.ings = ings; s.steps = stepsText; if (yt) s.yeast_type = yt;
+    replan(); editingSteps = false; checked.clear(); buildControls(); render();
+    $("#aiDlg").close(); showTab("calc"); return;
+  }
+  let name = String(p.name || "New dough").trim().slice(0, 36) || "New dough", n = 2;
+  const base = name; while (types.some(t => t.name.toLowerCase() === name.toLowerCase())) name = base + " " + n++;
+  const sizing = SIZING[p.sizing] ? p.sizing : "pieces", d = {};
+  if (yt) d.yeast_type = yt;
+  if (sizing !== "flour" && p.count >= 1) d.count = clamp(Math.round(p.count), 1, sizing === "pizza" ? 12 : 24);
+  if (sizing === "pieces" && p.piece_g > 0) d.piece_g = clamp(Math.round(p.piece_g), 1, 20000);
+  if (sizing === "flour" && p.flour_g > 0) d.flour_g = clamp(Math.round(p.flour_g), 1, 20000);
+  b.disabled = true;
+  const { data, error } = await sb.from("dough_types").insert({ name, category: guessCat(name, sizing, cat === "pizza" ? "bread" : cat), sizing,
+    timing: /2 to 4 days|48 hours|72 hours|two days|three days/i.test(name + " " + (stepsText || "")) ? "cold_long" : /overnight|next morning|refrigerat|fridge/i.test(name + " " + (stepsText || "")) ? "cold_1" : "same_day", ingredients: ings, steps: stepsText, defaults: d }).select().single();
+  b.disabled = false;
+  if (error){ $("#aiErr").textContent = "That didn't save: " + error.message; $("#aiErr").hidden = false; return; }
+  await loadTypes(); switchType(data); $("#aiDlg").close(); showTab("calc");
+});
+
+// ---- share dialog (author) and follow dialog (receiver) --------------------------
+function drawShare(){
+  const ty = curType(); if (!ty) return;
+  $("#shareTitle").textContent = "Share " + ty.name;
+  const on = !!ty.share_token;
+  $("#shareOn").hidden = !on; $("#shareGo").textContent = on ? "Save name" : "Create the link";
+  if (on) $("#shareLink").value = shareURL(ty.share_token);
+  $("#shareNative").hidden = !on || !navigator.share;
+}
+function openShare(){
+  if (!curType()) return;
+  $("#shareName").value = profileName; $("#shareErr").hidden = $("#shareOk").hidden = true;
+  drawShare(); $("#shareDlg").showModal();
+}
+$("#shareClose").addEventListener("click", () => $("#shareDlg").close());
+$("#shareForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const ty = curType(), name = $("#shareName").value.trim(); if (!ty) return;
+  const fail = (m) => { $("#shareErr").textContent = m; $("#shareErr").hidden = false; };
+  $("#shareErr").hidden = $("#shareOk").hidden = true;
+  if (!name) return fail("Add the name people will see.");
+  $("#shareGo").disabled = true;
+  const p = await sb.from("dough_profiles").upsert({ user_id: session.user.id, display_name: name, updated_at: new Date().toISOString() });
+  if (p.error){ $("#shareGo").disabled = false; return fail("Couldn't save your name: " + p.error.message); }
+  profileName = name;
+  if (!ty.share_token){
+    const tok = newToken(), r = await sb.from("dough_types").update({ share_token: tok }).eq("id", ty.id);
+    if (r.error){ $("#shareGo").disabled = false; return fail("Couldn't create the link: " + r.error.message); }
+    ty.share_token = tok;
+  }
+  $("#shareGo").disabled = false; $("#shareOk").textContent = "Your link is ready."; $("#shareOk").hidden = false;
+  drawShare(); renderTypes();
+});
+$("#shareCopy").addEventListener("click", async () => {
+  const el = $("#shareLink");
+  try { await navigator.clipboard.writeText(el.value); } catch (_) { el.select(); document.execCommand && document.execCommand("copy"); }
+  $("#shareOk").textContent = "Copied. Paste it into a text or email."; $("#shareOk").hidden = false;
+});
+$("#shareNative").addEventListener("click", () => { const ty = curType(); if (ty) navigator.share({ title: ty.name, text: `${profileName || "I"} shared a recipe with you: ${ty.name}`, url: $("#shareLink").value }).catch(() => {}); });
+$("#shareStop").addEventListener("click", async () => {
+  const ty = curType(); if (!ty || !confirm(`Stop sharing "${ty.name}"? The link will stop working. People following it keep it as their own copy.`)) return;
+  const { error } = await sb.from("dough_types").update({ share_token: null }).eq("id", ty.id);
+  if (error){ $("#shareErr").textContent = "Couldn't stop sharing: " + error.message; $("#shareErr").hidden = false; return; }
+  ty.share_token = null; $("#shareOk").textContent = "Sharing is off for this recipe."; $("#shareOk").hidden = false; drawShare(); renderTypes();
+});
+function openFollow(){
+  const ty = following(); if (!ty) return;
+  const a = ty.author_name || "the author";
+  $("#followTitle").textContent = "Following " + a;
+  $("#followSub").textContent = `"${ty.name}" is ${a}'s recipe. It updates whenever ${a} changes it, and you can size it and log bakes but not edit it.`;
+  $("#followCopySub").textContent = `It becomes yours to edit. You will stop getting ${a}'s changes.`;
+  $("#followErr").hidden = true; $("#followDlg").showModal();
+}
+$("#followClose").addEventListener("click", () => $("#followDlg").close());
+$("#followCopy").addEventListener("click", async () => {
+  const ty = following(); if (!ty) return;
+  const { error } = await sb.from("dough_types").update({ follows_token: null, copied_from: ty.author_name }).eq("id", ty.id);
+  if (error){ $("#followErr").textContent = "That didn't save: " + error.message; $("#followErr").hidden = false; return; }
+  ty.copied_from = ty.author_name; ty.follows_token = null; $("#followDlg").close(); $("#recipeNotes").dataset.for = ""; renderTypes(); render();
+});
+$("#followDrop").addEventListener("click", async () => {
+  const ty = following(); if (!ty || !confirm(`Remove "${ty.name}" from your recipes?`)) return;
+  const { error } = await sb.from("dough_types").delete().eq("id", ty.id);
+  if (error){ $("#followErr").textContent = "Couldn't remove it: " + error.message; $("#followErr").hidden = false; return; }
+  $("#followDlg").close(); await loadTypes();
+  const next = inCat(cat)[0] || types[0]; if (next) switchType(next);
+});
+
+// ---- flour picker ------------------------------------------------------------
+// The list is every flour this person has locked in before, newest first. Typing is only for a new one.
+let addingFlour = false;
+function renderFlours(){
+  const pick = $("#flourPick"), inp = $("#flourName");
+  const list = [...new Set(bakes.map(b => (b.flour_name || "").trim()).filter(Boolean))];
+  if (!list.length){ pick.hidden = true; inp.hidden = false; inp.placeholder = "King Arthur Bread Flour, 12.7%"; $("#flourLab").htmlFor = "flourName"; render(); return; }
+  if (!addingFlour && !list.includes(inp.value.trim())) inp.value = list[0];
+  pick.innerHTML = list.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join("") + `<option value="__new">Add a new flour…</option>`;
+  pick.value = addingFlour ? "__new" : inp.value.trim();
+  pick.hidden = false; inp.hidden = !addingFlour; inp.placeholder = "Brand, type, and protein %"; $("#flourLab").htmlFor = "flourPick";
+  render();
+}
+$("#flourPick").addEventListener("change", e => {
+  const inp = $("#flourName");
+  addingFlour = e.target.value === "__new";
+  inp.value = addingFlour ? "" : e.target.value;
+  try { localStorage.setItem("dough.flour", inp.value); } catch (_) {}
+  renderFlours();
+  if (addingFlour) inp.focus();
+});
+
+// ---- the Last time card: the whole report, right where the next batch starts ----------
+let lastOpen = true, suggBusy = "";
+function renderLast(){
+  const el = $("#last"), b = lastBake();
+  if (!b){ el.hidden = true; el.innerHTML = ""; return; }
+  const log = bakeLog(b), ph = bakePhotos(b), ch = Array.isArray(b.changes) ? b.changes.filter(Boolean) : [];
+  const canAI = aiOK && session && !following() && !!b.reported_at, sg = b.suggest;
+  el.innerHTML = `<summary><span><h3>Last time</h3><span class="when">${fmtDate(b.made_on)} · ${esc(bakeSize(b))} · ${esc(FERMENT[b.ferment].label)}</span></span>
+      ${b.rating ? `<span class="stars" aria-label="${b.rating} of 5 stars">${stars(b.rating)}</span>` : `<span class="pend">Awaiting report</span>`}</summary>
+    <div class="lbody">
+      ${ch.length ? `<p><b>What I changed that time</b>${esc(ch.join(". "))}.${b.kept === true ? " Kept in the recipe." : b.kept === false ? " Not kept in the recipe." : ""}</p>` : ""}
+      ${b.plan_notes ? `<p><b>Notes</b>${esc(b.plan_notes)}</p>` : ""}
+      ${b.went_well ? `<p><b>Went well</b>${esc(b.went_well)}</p>` : ""}
+      ${b.went_poorly ? `<p><b>Went poorly</b>${esc(b.went_poorly)}</p>` : ""}
+      ${b.next_time ? `<p><b>Next time, try</b>${esc(b.next_time)}</p>` : ""}
+      ${!b.reported_at ? `<p>No report on this one yet. Rate it and the next batch can build on it.</p>` : ""}
+      ${log.length ? `<p><b>Along the way</b></p><ul class="lg">${log.map(e => `<li>${esc(fmtStamp(e.at))}: ${esc(e.text)}</li>`).join("")}</ul>` : ""}
+      ${ph.length ? `<div class="photos">${ph.map((x, i) => `<button type="button" class="ph" data-photo="${b.id}" data-i="${i}" aria-label="Open photo ${i + 1}"><img src="${esc(photoURL(x))}" alt="Photo ${i + 1} of that bake" loading="lazy"></button>`).join("")}</div>` : ""}
+      <div class="acts">
+        <button type="button" class="btn${b.reported_at ? "" : " primary"}" data-report="${b.id}">${b.reported_at ? "Edit report" : "How did it go?"}</button>
+        <button type="button" class="btn" data-again="${b.id}">Use that bake's numbers</button>
+        ${canAI && !sg && suggBusy !== b.id ? `<button type="button" class="btn primary" data-suggest="${b.id}">Suggest changes for this batch</button>` : ""}
+      </div>
+      ${suggBusy === b.id ? `<div class="sugg"><p style="margin:0;font-style:italic;color:var(--ink-2)">Reading your report. About 15 seconds.</p></div>` : sg ? suggHTML(b, sg, canAI) : ""}
+      <div class="err" id="suggErr" hidden></div>
+    </div>`;
+  el.open = lastOpen; el.hidden = false;
+}
+function suggHTML(b, sg, canAI){
+  const chg = (sg.changes || []).map((c, i) => {
+    const g = s.ings.find(x => x.name.toLowerCase() === String(c.ingredient || "").toLowerCase());
+    if (!g || !(c.to_pct >= 0)) return "";
+    const done = Math.abs(g.pct - c.to_pct) < 0.004;
+    return `<div class="chg"><div><b>${esc(g.name)}: ${done ? "now " + pctText(c.to_pct) : pctText(g.pct) + " to " + pctText(c.to_pct)}</b><span>${esc(c.why || "")}</span></div>
+      <button type="button" class="btn${done ? "" : " primary"}" data-apply="${b.id}" data-i="${i}"${done ? " disabled" : ""}>${done ? "Applied" : "Apply"}</button></div>`;
+  }).join("");
+  const tips = (sg.tips || []).filter(x => x && x.title);
+  return `<div class="sugg"><h4>Suggested for this batch</h4><p style="margin:0 0 4px">${esc(sg.summary || "")}</p>
+    ${chg || `<p style="margin:6px 0 0;color:var(--ink-2)">No ratio changes suggested.</p>`}
+    ${tips.length ? `<ul>${tips.map(x => `<li><b>${esc(x.title)}.</b> ${esc(x.detail || "")}</li>`).join("")}</ul>` : ""}
+    ${canAI ? `<p class="note" style="margin:8px 0 0">Starting points, not guarantees. <button type="button" class="btn link" data-suggest="${b.id}">Ask again</button></p>` : ""}</div>`;
+}
+$("#last").addEventListener("toggle", () => { lastOpen = $("#last").open; });
+$("#last").addEventListener("click", async e => {
+  const sg = e.target.closest("[data-suggest]"), ap = e.target.closest("[data-apply]");
+  if (ap){
+    const b = bakes.find(x => x.id === ap.dataset.apply), c = b?.suggest?.changes?.[+ap.dataset.i]; if (!c) return;
+    const g = s.ings.find(x => x.name.toLowerCase() === String(c.ingredient).toLowerCase()); if (!g) return;
+    g.pct = r2(Math.max(0, Math.min(300, c.to_pct))); if (s.actual) delete s.actual[g.key];
+    buildControls(); render(); renderLast(); return;
+  }
+  if (!sg || suggBusy) return;
+  const b = bakes.find(x => x.id === sg.dataset.suggest); if (!b) return;
+  suggBusy = b.id; renderLast();
+  const { data, error } = await sb.functions.invoke("dough-tweak", { body: { context: aiContext() } });
+  suggBusy = "";
+  if (error || !data?.suggest){
+    let msg = data?.error || "";
+    if (!msg && error?.context?.json){ try { msg = (await error.context.json()).error || ""; } catch (_) {} }
+    renderLast(); $("#suggErr").textContent = msg || "The suggestions didn't come through. Try again in a moment."; $("#suggErr").hidden = false; return;
+  }
+  b.suggest = data.suggest; sb.from("dough_bakes").update({ suggest: data.suggest }).eq("id", b.id).then(() => {});   // paid for once, kept with the bake
+  renderLast();
+});
+
+// ---- what is different from last time ---------------------------------------------
+// Compared plan to plan (what was intended), so an overpour last time does not read as a change now.
+const lastBake = () => s.sharedTok ? null : (bakes.find(b => sameType(b, s)) || null);
+const planned = (g) => g.plan_pct ?? g.pct;
+function ratioDiff(prev, now){
+  const out = [], pm = new Map(prev.map(g => [String(g.name).toLowerCase(), g]));
+  for (const g of now){
+    const k = String(g.name).toLowerCase(), p = pm.get(k); pm.delete(k);
+    if (!p){ if (g.pct > 0) out.push(`${g.name} added at ${pctText(g.pct)}`); }
+    else if (Math.abs(planned(p) - g.pct) > 0.004) out.push(`${g.name} ${pctText(planned(p))} to ${pctText(g.pct)}`);
+  }
+  for (const p of pm.values()) if (planned(p) > 0) out.push(`${p.name} removed`);
+  return out;
+}
+function diffFrom(b){
+  const out = ratioDiff(bakeIngs(b), s.ings);
+  if (ing(s, "yeast") && b.yeast_type !== s.yeast_type) out.push(`Yeast ${YEAST[b.yeast_type].label.toLowerCase()} to ${YEAST[s.yeast_type].label.toLowerCase()}`);
+  if (b.ferment !== s.ferment) out.push(`Timing ${FERMENT[b.ferment].label} to ${FERMENT[s.ferment].label}`);
+  if (s.sizing === "pizza" && b.sizing === "pizza" && thickText(+b.thickness) !== thickText(s.thickness)) out.push(`Thickness ${thickText(+b.thickness).toLowerCase()} to ${thickText(s.thickness).toLowerCase()}`);
+  const f = $("#flourName").value.trim(); if (f && b.flour_name && f !== b.flour_name) out.push(`Flour ${b.flour_name} to ${f}`);
+  return out;
+}
+function renderDiff(){
+  const box = $("#diffBox"), b = lastBake(); if (!b){ box.hidden = true; return; }
+  const d = diffFrom(b);
+  box.innerHTML = d.length ? `<b>Different from last time (${fmtDate(b.made_on)})</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`
+    : `<b>Same as last time (${fmtDate(b.made_on)})</b>Nothing changed yet. Changing one thing per bake is the clearest way to see what it does.`;
+  box.hidden = false;
+}
+
+// ---- lock in -----------------------------------------------------------------
+async function lockIn(){
+  $("#lockErr").hidden = $("#lockOk").hidden = true;
+  if (!session){ openAuth("in"); return; }
+  if (editingSteps){ editingSteps = false; if (!lines(s.steps).length) s.steps = null; }
+  const c = compute(s), b = $("#lock"), pizza = s.sizing === "pizza", am = amounts(s, c), total = c.flour + am.reduce((x, r) => x + r.g, 0);
+  b.disabled = true;
+  const { error } = await sb.from("dough_bakes").insert({
+    dough_type: s.name.toLowerCase(), type_id: s.type_id, type_name: s.name, category: s.category || cat, sizing: s.sizing,
+    made_on: $("#madeOn").value || todayISO(),
+    bake_on: $("#bakeOn").value || null,
+    count: s.sizing === "flour" ? 1 : s.count, size_in: pizza ? s.size : null, thickness: pizza ? s.thickness : null,
+    ball_g: Math.round(total / (s.sizing === "flour" ? 1 : s.count)), flour_g: Math.round(c.flour),
+    ingredients: s.ings.map(g => { const a = am.find(r => r.key === g.key); return a && a.typed ? { ...g, pct: a.pct, plan_pct: g.pct } : g; }), yeast_type: s.yeast_type, ferment: s.ferment,
+    steps: stepList(s, c).join("\n"),
+    changes: lastBake() ? diffFrom(lastBake()) : [],
+    flour_name: $("#flourName").value.trim(), plan_notes: $("#planNotes").value.trim(),
+  });
+  if (error){ b.disabled = false; $("#lockErr").textContent = "That didn't save: " + error.message; $("#lockErr").hidden = false; return; }
+  // The batch size and steps carry forward. The ratios do NOT: a change has to earn its place,
+  // so the recipe only takes this bake's ratios when the person says "keep" in the report.
+  if (s.type_id && following()) await sb.from("dough_types").update({ defaults: planOf(s) }).eq("id", s.type_id);
+  else if (s.type_id) await sb.from("dough_types").update({ steps: s.steps, defaults: planOf(s) }).eq("id", s.type_id);
+  b.disabled = false;
+  $("#lockOk").textContent = "Locked in. It's in My bakes, waiting for your report. If you changed any ratios, the report will ask whether to keep them in the recipe."; $("#lockOk").hidden = false;
+  $("#planNotes").value = ""; checked.clear(); addingFlour = false; replan();
+  await load();
+}
+
+// ---- history -----------------------------------------------------------------
+async function load(){
+  await loadTypes(); await loadAI();
+  if (s.sharedTok || !types.some(t => t.id === s.type_id)){
+    const t = s.sharedTok ? null : types.find(x => x.name === s.name && x.sizing === s.sizing);
+    s = t ? { ...s, type_id: t.id, category: t.category || s.category } : stateFromType(types[0]);
+    cat = s.category || "pizza";
+  }
+  if (!session){ bakes = []; addingFlour = false; }
+  else {
+    const { data, error } = await sb.from("dough_bakes").select("*").order("made_on", { ascending: false }).order("created_at", { ascending: false });
+    if (error){ $("#bakes").innerHTML = `<div class="err">Couldn't load your bakes: ${esc(error.message)}</div>`; return; }
+    bakes = data || [];
+  }
+  if (session && !profileName){ const { data: pr } = await sb.from("dough_profiles").select("display_name").maybeSingle(); profileName = pr?.display_name || ""; }
+  if (!session) profileName = "";
+  await applyShared();
+  buildControls(); renderTypes(); renderBakes();
+}
+const bakeIngs = (b) => Array.isArray(b.ingredients) ? b.ingredients : PIZZA_INGS.filter(g => b.pct && b.pct[g.key] != null).map(g => ({ ...g, pct: +b.pct[g.key] }));
+function bakeSize(b){
+  return b.sizing === "pizza" ? `${b.count} × ${+b.size_in}″ ${thickText(+b.thickness).toLowerCase()}`
+    : b.sizing === "pieces" ? `${b.count} × ${grams(+b.ball_g)} g` : `${grams(+b.flour_g)} g flour`;
+}
+const bakeLog = (b) => (Array.isArray(b.log) ? b.log : []).filter(e => e && e.text);
+function fmtStamp(iso){ const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+function nowLocal(){ const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
+async function saveLog(b, log){
+  log.sort((x, y) => String(x.at).localeCompare(String(y.at)));
+  const { error } = await sb.from("dough_bakes").update({ log }).eq("id", b.id);
+  if (error){ alert("That didn't save: " + error.message); return; }
+  b.log = log; renderBakes();
+}
+const bakeTitle = (b) => `${b.type_name}: ${bakeSize(b)}`;
+const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+const sameType = (b, st) => b.type_id ? b.type_id === st.type_id : b.type_name === st.name;
+function renderBakes(){
+  $("#tabHist").textContent = bakes.length ? `My bakes (${bakes.length})` : "My bakes";
+  renderFlours();
+  renderLast();
+
+  if (!session){ $("#histFilter").hidden = true; $("#bakes").innerHTML = `<div class="card empty"><p>Sign in to see your bakes and how each one turned out.</p><button class="btn primary" data-open-auth>Sign in</button></div>`; return; }
+  if (!bakes.length){ $("#histFilter").hidden = true; $("#bakes").innerHTML = `<div class="card empty"><p>Nothing here yet. Set up a dough in the calculator and tap "Lock it in".</p></div>`; return; }
+  const bcat = (b) => b.category || guessCat(b.type_name, b.sizing);
+  const names = CATS.map(c => c[0]).filter(k => bakes.some(b => bcat(b) === k));
+  if (!names.includes(histFilter)) histFilter = "";
+  $("#histFilter").hidden = names.length < 2;
+  $("#histFilter").innerHTML = [["", "All"]].concat(names.map(n => [n, catLabel(n)])).map(([v, l]) => `<button type="button" data-hist="${esc(v)}" class="${v === histFilter ? "on" : ""}">${esc(l)}</button>`).join("");
+  $("#bakes").innerHTML = bakes.filter(b => !histFilter || bcat(b) === histFilter).map(b => {
+    const f = +b.flour_g;
+    const rows = [["Flour", f, 100]].concat(bakeIngs(b).filter(g => g.pct > 0).map(g => [g.key === "yeast" ? g.name + ", " + YEAST[b.yeast_type].label.toLowerCase() : g.name, f * g.pct / 100, g.pct]));
+    const facts = [b.sizing === "pizza" ? `${grams(+b.ball_g)} g per ball` : "", FERMENT[b.ferment].label + ", " + FERMENT[b.ferment].sub, b.flour_name].filter(Boolean).join(" · ");
+    const st = lines(b.steps), log = bakeLog(b);
+    return `<div class="card bake">
+      <div class="head">
+        <div><h3>${esc(bakeTitle(b))}</h3><div class="when">Made ${fmtDate(b.made_on)}${b.bake_on ? ", baked " + fmtDate(b.bake_on) : ""}</div></div>
+        ${b.rating ? `<span class="stars" aria-label="${b.rating} of 5 stars">${stars(b.rating)}</span>` : `<span class="pend">Awaiting report</span>`}
+      </div>
+      <p class="facts">${esc(facts)}</p>
+      ${Array.isArray(b.changes) && b.changes.length ? `<p class="facts"><b>Changed from the bake before:</b> ${esc(b.changes.join(". "))}.${b.kept === true ? " Kept in the recipe." : b.kept === false ? " Not kept in the recipe." : ""}</p>` : ""}
+      <table>${rows.map(([n, g, pc]) => `<tr><td>${esc(n)}</td><td>${grams(g)} g</td><td>${pctText(pc)}</td></tr>`).join("")}</table>
+      ${st.length ? `<details><summary>Steps (${st.length})</summary><ol class="steps">${st.map(x => `<li>${esc(x)}</li>`).join("")}</ol></details>` : ""}
+      <div class="photos">
+        ${bakePhotos(b).map((ph, i) => `<button type="button" class="ph" data-photo="${b.id}" data-i="${i}" aria-label="Open photo ${i + 1}"><img src="${esc(photoURL(ph))}" alt="Photo ${i + 1} of this bake" loading="lazy"></button>`).join("")}
+        ${uploading === b.id ? `<span class="wait">Adding photos…</span>` : bakePhotos(b).length < MAX_PHOTOS ? `<label class="btn" style="cursor:pointer">＋ Add photos<input type="file" accept="image/*" multiple hidden data-photoadd="${b.id}"></label>` : ""}
+      </div>
+      <div class="log">
+        <b class="lh">Along the way</b>
+        ${log.length ? `<ul>${log.map((e, i) => `<li><span class="lt">${esc(fmtStamp(e.at))}</span><span class="lx">${esc(e.text)}</span><button type="button" data-logdel="${b.id}" data-i="${i}" aria-label="Remove this update">✕</button></li>`).join("")}</ul>` : ""}
+        <form class="logform" data-logadd="${b.id}">
+          <input type="text" name="text" maxlength="500" placeholder="${log.length ? "Add another update" : "What just happened? Out of the fridge, final rise started"}" aria-label="Update">
+          <input type="datetime-local" name="at" value="${nowLocal()}" aria-label="When">
+          <button class="btn">Add</button>
+        </form>
+      </div>
+      <div class="rep">
+        ${b.plan_notes ? `<p><b>Notes</b>${esc(b.plan_notes)}</p>` : ""}
+        ${b.went_well ? `<p><b>Went well</b>${esc(b.went_well)}</p>` : ""}
+        ${b.went_poorly ? `<p><b>Went poorly</b>${esc(b.went_poorly)}</p>` : ""}
+        ${b.next_time ? `<p><b>Next time, try</b>${esc(b.next_time)}</p>` : ""}
+      </div>
+      <div class="acts">
+        <button class="btn primary" data-again="${b.id}">Make it again</button>
+        <button class="btn" data-report="${b.id}">${b.reported_at ? "Edit report" : "How did it go?"}</button>
+        <button class="btn" data-del="${b.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+document.addEventListener("click", async e => {
+  const t = e.target.closest("[data-again],[data-report],[data-del],[data-open-auth]"); if (!t) return;
+  if (t.hasAttribute("data-open-auth")){ openAuth("in"); return; }
+  const b = bakes.find(x => x.id === (t.dataset.again || t.dataset.report || t.dataset.del)); if (!b) return;
+  if (t.dataset.again){
+    const ty = types.find(x => x.id && x.id === b.type_id) || types.find(x => x.name === b.type_name && x.sizing === b.sizing);
+    const st = { ...BASE, type_id: ty ? ty.id : null, name: ty ? ty.name : b.type_name, category: ty?.category || b.category || guessCat(b.type_name, b.sizing), sizing: b.sizing, count: b.count, piece_g: +b.ball_g, flour_g: +b.flour_g,
+      ings: clone(bakeIngs(b)).map(({ plan_pct, ...g }) => g), yeast_type: b.yeast_type, ferment: b.ferment, steps: b.steps && b.steps.trim() ? b.steps : null, flour_fix: null, actual: {}, tips: clone(ty?.tips || {}), notes: ty?.notes || "", links: clone(ty?.links || []), base: FERMENT[ty?.timing] ? ty.timing : b.ferment };
+    if (b.sizing === "pizza"){ st.size = +b.size_in; st.thickness = +b.thickness; }
+    $("#flourName").value = b.flour_name || $("#flourName").value; addingFlour = false;
+    switchType(ty, st); showTab("calc");
+  } else if (t.dataset.report){
+    reporting = b; rating = b.rating || 0; keepTouched = b.kept != null;
+    drawKeep(b.kept != null ? b.kept : rating ? rating >= 4 : null);
+    $("#repSub").textContent = bakeTitle(b) + ", made " + fmtDate(b.made_on);
+    $("#wentWell").value = b.went_well; $("#wentPoorly").value = b.went_poorly; $("#nextTime").value = b.next_time;
+    $("#repErr").hidden = true; drawRate(); $("#repDlg").showModal();
+  } else if (t.dataset.del){
+    if (!confirm("Delete this bake and its report? This can't be undone.")) return;
+    const { error } = await sb.from("dough_bakes").delete().eq("id", b.id);
+    if (error) alert("Couldn't delete it: " + error.message); else load();
+  }
+});
+// updates along the way: add one (form submit) or remove one
+$("#bakes").addEventListener("submit", e => {
+  const f = e.target.closest("[data-logadd]"); if (!f) return;
+  e.preventDefault();
+  const b = bakes.find(x => x.id === f.dataset.logadd), text = f.elements.text.value.trim(); if (!b || !text) return;
+  const when = new Date(f.elements.at.value);
+  saveLog(b, bakeLog(b).concat([{ at: (isNaN(when) ? new Date() : when).toISOString(), text }]));
+});
+$("#bakes").addEventListener("click", e => {
+  const x = e.target.closest("[data-logdel]"); if (!x) return;
+  const b = bakes.find(y => y.id === x.dataset.logdel); if (!b) return;
+  const log = bakeLog(b), entry = log[+x.dataset.i];
+  if (entry && confirm(`Remove this update?\n\n"${entry.text}"`)) saveLog(b, log.filter((_, i) => i !== +x.dataset.i));
+});
+// ---- photos on a bake --------------------------------------------------------------
+const PHOTO_BASE = SUPABASE_URL + "/storage/v1/object/public/dough-photos/", MAX_PHOTOS = 12;
+const bakePhotos = (b) => (Array.isArray(b.photos) ? b.photos : []).filter(x => typeof x === "string" && x);
+const photoURL = (path) => PHOTO_BASE + path.split("/").map(encodeURIComponent).join("/");
+let uploading = "";
+// Shrink in the browser to a 1600px JPEG so phone photos upload fast and take little room.
+async function shrink(file){
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (_) {
+    src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error("unreadable")); im.src = URL.createObjectURL(file); });
+  }
+  const w0 = src.width || src.naturalWidth, h0 = src.height || src.naturalHeight, k = Math.min(1, 1600 / Math.max(w0, h0));
+  const c = document.createElement("canvas"); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+  c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+  return await new Promise((ok, no) => c.toBlob(bl => bl ? ok(bl) : no(new Error("could not convert")), "image/jpeg", 0.85));
+}
+$("#bakes").addEventListener("change", async e => {
+  const inp = e.target.closest("[data-photoadd]"); if (!inp || !session) return;
+  const b = bakes.find(x => x.id === inp.dataset.photoadd), files = [...inp.files]; if (!b || !files.length) return;
+  const room = MAX_PHOTOS - bakePhotos(b).length, failed = [];
+  uploading = b.id; renderBakes();
+  const added = [];
+  for (const f of files.slice(0, room)){
+    try {
+      const blob = await shrink(f), path = `${session.user.id}/${b.id}/${crypto.randomUUID()}.jpg`;
+      const { error } = await sb.storage.from("dough-photos").upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+      if (error) throw error;
+      added.push(path);
+    } catch (err){ failed.push(f.name); }
+  }
+  if (added.length){
+    const photos = bakePhotos(b).concat(added), { error } = await sb.from("dough_bakes").update({ photos }).eq("id", b.id);
+    if (error) failed.push("saving to the bake: " + error.message); else b.photos = photos;
+  }
+  uploading = ""; renderBakes();
+  if (files.length > room) alert(`A bake holds up to ${MAX_PHOTOS} photos, so only the first ${room} were added.`);
+  if (failed.length) alert("These didn't upload: " + failed.join(", ") + ". If it is an iPhone HEIC photo on a computer, try from the phone, or export it as JPEG first.");
+});
+let viewing = null;   // {bake, i} for one of my own photos, or null when looking at someone else's
+function openPhoto(url, mine){ viewing = mine || null; $("#photoBig").src = url; $("#photoDel").hidden = !mine; $("#photoDlg").showModal(); }
+document.addEventListener("click", e => {
+  const ph = e.target.closest("[data-photo],[data-aphoto]"); if (!ph) return;
+  if (ph.dataset.aphoto){ openPhoto(ph.dataset.aphoto, null); return; }
+  const b = bakes.find(x => x.id === ph.dataset.photo), path = b && bakePhotos(b)[+ph.dataset.i]; if (path) openPhoto(photoURL(path), { bake: b, i: +ph.dataset.i });
+});
+$("#photoClose").addEventListener("click", () => $("#photoDlg").close());
+$("#photoDlg").addEventListener("click", e => { if (e.target === $("#photoDlg")) $("#photoDlg").close(); });
+$("#photoDel").addEventListener("click", async () => {
+  if (!viewing || !confirm("Remove this photo from the bake?")) return;
+  const b = viewing.bake, all = bakePhotos(b), path = all[viewing.i], photos = all.filter((_, i) => i !== viewing.i);
+  const { error } = await sb.from("dough_bakes").update({ photos }).eq("id", b.id);
+  if (error){ alert("Couldn't remove it: " + error.message); return; }
+  b.photos = photos; sb.storage.from("dough-photos").remove([path]);   // the file itself; nothing depends on it now
+  $("#photoDlg").close(); renderBakes();
+});
+
+// ---- links on a recipe (the icing that goes with it, the video it came from) ---------
+const safeLink = (u) => { try { const x = new URL(/^https?:\/\//i.test(u) ? u : "https://" + u); return /^https?:$/.test(x.protocol) && x.hostname.includes(".") ? x.href : ""; } catch (_) { return ""; } };
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (_) { return ""; } };
+function renderLinks(canEdit){
+  const links = (s.links || []).filter(l => l && safeLink(l.url));
+  $("#recipeLinks").innerHTML = (links.length ? `<ul class="rlinks">${links.map((l, i) => `<li><a href="${esc(safeLink(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}<small>${esc(hostOf(l.url))}</small></a>${canEdit ? `<button type="button" data-linkdel="${i}" aria-label="Remove this link">✕</button>` : ""}</li>`).join("")}</ul>` : "")
+    + (canEdit ? `<form class="linkform" id="linkForm"><input type="text" name="label" maxlength="60" placeholder="What it is, like Icing" aria-label="Link name"><input type="text" name="url" maxlength="500" placeholder="Paste the link" aria-label="Link address" inputmode="url" autocapitalize="off"><button class="btn">Add link</button></form>` : "");
+}
+async function saveLinks(links){
+  const ty = curType(); if (!ty) return;
+  const { error } = await sb.from("dough_types").update({ links }).eq("id", ty.id);
+  if (error){ alert("That didn't save: " + error.message); return; }
+  ty.links = clone(links); s.links = links; $("#recipeLinks").dataset.for = ""; render();
+}
+$("#recipeLinks").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target, url = safeLink(f.elements.url.value.trim());
+  if (!url){ alert("That doesn't look like a web link. Paste the full address, like https://www.plantoeat.com/..."); return; }
+  saveLinks((s.links || []).concat([{ label: f.elements.label.value.trim() || hostOf(url), url }]));
+});
+$("#recipeLinks").addEventListener("click", e => { const x = e.target.closest("[data-linkdel]"); if (x && confirm("Remove this link?")) saveLinks((s.links || []).filter((_, i) => i !== +x.dataset.linkdel)); });
+
+function drawRate(){ $("#rate").innerHTML = [1,2,3,4,5].map(n => `<button type="button" data-rate="${n}" class="${n <= rating ? "on" : ""}" aria-label="${n} star${n === 1 ? "" : "s"}" aria-pressed="${n === rating}">★</button>`).join(""); }
+$("#rate").addEventListener("click", e => { const b = e.target.closest("[data-rate]"); if (b){ rating = +b.dataset.rate; drawRate(); if (!keepTouched) drawKeep(rating >= 4); } });
+// Did this bake's ratios differ from the recipe? Then the report decides whether the recipe takes them.
+let keepTouched = false;
+function keepPlan(b){
+  const ty = types.find(x => x.id && x.id === b.type_id); if (!ty || ty.follows_token) return null;
+  const offTiming = b.ferment !== ty.timing, recYeast = (ty.ingredients || []).find(g => g.key === "yeast");
+  // a yeast amount borrowed for a different timing is never written into the recipe
+  const next = bakeIngs(b).map(({ plan_pct, ...g }) => ({ ...g, pct: g.key === "yeast" && offTiming && recYeast ? recYeast.pct : (plan_pct ?? g.pct) }));
+  const lines = ratioDiff(ty.ingredients || [], next);
+  return lines.length ? { ty, next, lines } : null;
+}
+function drawKeep(sel){
+  const k = reporting && keepPlan(reporting), box = $("#repKeep");
+  if (!k){ box.hidden = true; box.innerHTML = ""; return; }
+  box.innerHTML = `<p><b>This bake used different ratios than the recipe:</b> ${esc(k.lines.join(". "))}.</p>
+    <label><input type="radio" name="keep" value="yes"${sel === true ? " checked" : ""}> <span><b>Keep them.</b> The recipe becomes what I baked.</span></label>
+    <label><input type="radio" name="keep" value="no"${sel === false ? " checked" : ""}> <span><b>Don't keep them.</b> The recipe stays as it was.</span></label>`;
+  box.hidden = false;
+}
+$("#repKeep").addEventListener("change", () => { keepTouched = true; });
+$("#repCancel").addEventListener("click", () => $("#repDlg").close());
+$("#repForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!rating){ $("#repErr").textContent = "Give it a star rating first."; $("#repErr").hidden = false; return; }
+  const k = keepPlan(reporting), choice = k ? e.target.querySelector('input[name="keep"]:checked')?.value : null;
+  if (k && !choice){ $("#repErr").textContent = "Choose whether the recipe keeps this bake's ratios."; $("#repErr").hidden = false; return; }
+  $("#repBtn").disabled = true;
+  if (k && choice === "yes"){
+    const r = await sb.from("dough_types").update({ ingredients: k.next }).eq("id", k.ty.id);
+    if (r.error){ $("#repBtn").disabled = false; $("#repErr").textContent = "Couldn't update the recipe: " + r.error.message; $("#repErr").hidden = false; return; }
+    k.ty.ingredients = clone(k.next);
+    if (s.type_id === k.ty.id && !s.sharedTok){ s.ings = clone(k.next); replan(); }   // the calculator follows the recipe
+  }
+  const { error } = await sb.from("dough_bakes").update({
+    kept: k ? choice === "yes" : reporting.kept ?? null,
+    rating, went_well: $("#wentWell").value.trim(), went_poorly: $("#wentPoorly").value.trim(), next_time: $("#nextTime").value.trim(),
+    reported_at: reporting.reported_at || new Date().toISOString(),
+  }).eq("id", reporting.id);
+  $("#repBtn").disabled = false;
+  if (error){ $("#repErr").textContent = "That didn't save: " + error.message; $("#repErr").hidden = false; return; }
+  $("#repDlg").close(); load();
+});
+
+// ---- auth --------------------------------------------------------------------
+let mode = "in";   // "in" | "up" | "reset"
+const HERE = location.origin + location.pathname;
+const BACK = () => HERE + (shareTok ? "?r=" + encodeURIComponent(shareTok) : "");   // where sign-in emails and Google send people back to
+function openAuth(m){
+  mode = m;
+  $("#authTitle").textContent = m === "in" ? "Sign in" : m === "up" ? "Create an account" : "Reset your password";
+  $("#authSub").textContent = m === "reset" ? "Enter your email and I'll send a link to set a new password." : "Your bakes are saved to your account and only you can see them.";
+  $("#authBtn").textContent = m === "in" ? "Sign in" : m === "up" ? "Create account" : "Send the link";
+  $("#pwWrap").hidden = m === "reset"; $("#password").required = m !== "reset";
+  $("#password").autocomplete = m === "up" ? "new-password" : "current-password";
+  $("#googleWrap").hidden = !GOOGLE_ENABLED || m === "reset";
+  $("#authLinks").innerHTML = m === "in"
+    ? `<button type="button" class="btn link" data-mode="up">Create an account</button> · <button type="button" class="btn link" data-mode="reset">Forgot your password?</button>`
+    : `<button type="button" class="btn link" data-mode="in">Back to sign in</button>`;
+  $("#authErr").hidden = $("#authOk").hidden = true;
+  if (!$("#authDlg").open) $("#authDlg").showModal();
+}
+$("#authLinks").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
+$("#authCancel").addEventListener("click", () => $("#authDlg").close());
+$("#signIn").addEventListener("click", () => openAuth("in"));
+$("#signOut").addEventListener("click", () => sb.auth.signOut());
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: BACK() } }));
+$("#authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("#email").value.trim(), password = $("#password").value, b = $("#authBtn");
+  const fail = (m) => { $("#authErr").textContent = m; $("#authErr").hidden = false; };
+  const good = (m) => { $("#authOk").textContent = m; $("#authOk").hidden = false; };
+  $("#authErr").hidden = $("#authOk").hidden = true; b.disabled = true;
+  if (mode === "in"){
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) fail(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message I sent when you signed up." : "That email and password didn't match. Check for a typo, or tap Forgot your password." + (GOOGLE_ENABLED ? " Continue with Google also works if it's a Google address." : "")); else $("#authDlg").close();
+  } else if (mode === "up"){
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: BACK() } });
+    if (error) fail("Couldn't create the account: " + error.message);
+    else if (data.session) $("#authDlg").close();
+    // Supabase answers a sign-up for an existing email with a user that has no identities, and sends nothing
+    else if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length){
+      openAuth("in"); $("#email").value = email;
+      fail(GOOGLE_ENABLED ? "You already have an account with that email. Use Continue with Google, or sign in with your password. If you don't remember it, tap Forgot your password."
+        : "You already have an account with that email (Shawn's apps share one sign-in). Sign in with your password, or tap Forgot your password to set a new one.");
+    }
+    else good("Almost there. Check your email (and spam) for a confirmation link. Open it on this same device and browser, then you're in.");
+  } else {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: BACK() });
+    if (error) fail("Couldn't send that: " + error.message); else good("Sent. Check your email (and spam). Open the link on this same device and browser, since that is where it signs you in.");
+  }
+  b.disabled = false;
+});
+$("#showPw").addEventListener("change", e => { $("#password").type = e.target.checked ? "text" : "password"; });
+$("#pwSkip").addEventListener("click", () => $("#pwDlg").close());
+$("#pwForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("#pwErr").hidden = true; $("#pwBtn").disabled = true;
+  const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
+  $("#pwBtn").disabled = false;
+  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else $("#pwDlg").close();
+});
+function setSession(sess){
+  const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
+  session = sess;
+  $("#signIn").hidden = !!sess; $("#signOut").hidden = !sess;
+  $("#whoEmail").hidden = !sess; $("#whoEmail").textContent = sess ? sess.user.email : "";
+  if (changed || !sess) load(); else render();
+}
+
+// ---- boot --------------------------------------------------------------------
+wire();
+$("#madeOn").value = todayISO();
+try { $("#flourName").value = localStorage.getItem("dough.flour") || ""; } catch (_) {}
+buildControls(); renderTypes(); renderBakes();
+sb.auth.onAuthStateChange((event, sess) => {
+  if (event === "PASSWORD_RECOVERY") $("#pwDlg").showModal();
+  setTimeout(() => setSession(sess), 0);   // never call back into supabase from inside this callback
+});
+</script>
+</body>
+</html>
