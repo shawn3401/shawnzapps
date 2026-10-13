@@ -132,6 +132,13 @@ textarea{min-height:120px;resize:vertical}
 .rev .why{color:var(--ink-2);font-size:14px}
 .rev .b{display:flex;gap:6px;flex:none}
 
+.prev{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin:6px 0 0}
+.ph{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin:18px 0 0}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-top:10px}
+.ptile{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink-3);text-align:center}
+.ptile img{width:100%;height:100%;object-fit:cover;display:block}
+.px{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(20,20,20,.65);color:#fff;font-size:16px;line-height:1;cursor:pointer}
+
 dialog{border:1px solid var(--line);border-top:5px solid var(--accent);border-radius:10px;background:var(--paper);color:var(--ink);padding:22px;width:min(520px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
 dialog::backdrop{background:rgba(15,15,15,.55)}
 dialog h2{font-size:22px}
@@ -170,27 +177,34 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
       <div class="grid2">
         <div><label class="f" for="lName">Seller</label><input type="text" id="lName" data-col="name" placeholder="Name"></div>
         <div><label class="f" for="lAddr">Property</label><input type="text" id="lAddr" data-col="address" placeholder="Street address, city"></div>
-        <div><label class="f" for="lPhone">Phone</label><input type="tel" id="lPhone" data-col="phone"></div>
-        <div><label class="f" for="lEmail">Email</label><input type="email" id="lEmail" data-col="email"></div>
       </div>
       <label class="f">Stage</label>
       <div class="pills" id="stagePills"></div>
-      <label class="f" for="lNext">Next step</label>
-      <input type="text" id="lNext" data-col="next_step" placeholder="The one thing to do next">
     </div>
 
-    <div class="card">
-      <div class="head" style="margin:0"><h2>What you've gathered</h2><button class="btn" id="addMat">Add a call, walkthrough, notes, or photos</button></div>
-      <div id="items"></div>
-    </div>
+    <div class="tabs pills" id="tabs" style="margin-top:18px"></div>
+    <div class="card" style="margin-top:8px">
+      <div id="notesTab">
+        <textarea id="noteText" placeholder="Type a thought or new info, or paste a transcript."></textarea>
+        <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px"><input type="date" id="noteDate" style="width:auto" aria-label="Date"><button class="btn primary" id="noteSave">Save note</button></div>
+        <div class="err" id="noteErr" hidden></div>
+        <div id="notes"></div>
+      </div>
 
-    <div class="card" id="briefCard">
-      <div class="head" style="margin:0"><h2>The brief</h2><button class="btn primary" id="buildBtn">Build the brief</button></div>
-      <p class="sub" id="briefHint"></p>
-      <div class="busy" id="briefBusy" hidden><div class="spin"></div><span>Reading everything and writing the brief. This takes a minute or two, keep this page open.</span></div>
-      <div class="err" id="briefErr" hidden></div>
-      <div id="briefBody" hidden>
-        <div class="tabs pills" id="tabs"></div>
+      <div id="filesTab" hidden>
+        <div class="head" style="margin:0"><p class="sub" style="margin:0;flex:1">Photos, recordings, video, documents. Pick as many at once as you like.</p><button class="btn primary" id="addFiles">Add files</button></div>
+        <input type="file" id="filePick" multiple hidden accept="audio/*,video/*,image/*,.m4a,.mp3,.wav,.aac,.mp4,.mov,.pdf,.doc,.docx,.txt">
+        <div class="busy" id="upBusy" hidden><div class="spin"></div><span id="upBusyText">Uploading…</span></div>
+        <div class="err" id="upErr" hidden></div>
+        <div class="pills" id="fileFilters" style="margin-top:12px"></div>
+        <div id="files"></div>
+      </div>
+
+      <div id="briefTab" hidden>
+        <div class="head" style="margin:0"><p class="sub" id="briefHint" style="margin:0;flex:1"></p><button class="btn primary" id="buildBtn">Build the brief</button></div>
+        <div class="busy" id="briefBusy" hidden><div class="spin"></div><span>Reading everything and writing the brief. This takes a minute or two, keep this page open.</span></div>
+        <div class="err" id="briefErr" hidden></div>
+        <div class="tabs pills" id="subtabs"></div>
         <div id="tabBody"></div>
       </div>
     </div>
@@ -200,27 +214,15 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
 <footer>Private. Client details stay behind the sign-in. <a href="/">shawnzapps.com</a></footer>
 <input type="file" id="blankPick" accept="application/pdf" hidden>
 
-<!-- add material, and new lead -->
-<dialog id="matDlg">
-  <form id="matForm">
-    <h2 id="matTitle">Add to this lead</h2>
-    <div id="newFields">
-      <p class="sub">Fill in what you know. If you leave the name or address blank, the brief fills them in from the recording.</p>
-      <label class="f" for="nName">Seller</label><input type="text" id="nName" placeholder="Name">
-      <label class="f" for="nAddr">Property</label><input type="text" id="nAddr" placeholder="Street address, city">
-      <label class="f" for="nPhone">Phone</label><input type="tel" id="nPhone">
-    </div>
-    <label class="f">What is it?</label>
-    <div class="pills" id="kindPills"></div>
-    <label class="f" for="mDate">When</label>
-    <input type="date" id="mDate">
-    <label class="f" for="mFiles">Recording, photos, or video</label>
-    <input type="file" id="mFiles" multiple accept="audio/*,video/*,image/*,.m4a,.mp3,.wav,.aac,.mp4,.mov">
-    <label class="f" for="mText">Transcript or notes</label>
-    <textarea id="mText" placeholder="Paste a transcript, or type what you remember. Leave blank to have a recording transcribed."></textarea>
-    <div class="busy" id="matBusy" hidden><div class="spin"></div><span id="matBusyText">Saving…</span></div>
-    <div class="err" id="matErr" hidden></div>
-    <div class="row"><button type="button" class="btn" id="matCancel">Cancel</button><button class="btn primary" id="matBtn">Save</button></div>
+<!-- new seller lead: just enough to make the record -->
+<dialog id="newDlg">
+  <form id="newForm">
+    <h2>New seller lead</h2>
+    <p class="sub">Just the basics. Notes and files go on the record once it exists.</p>
+    <label class="f" for="nName">Seller</label><input type="text" id="nName" placeholder="Name">
+    <label class="f" for="nAddr">Property</label><input type="text" id="nAddr" placeholder="Street address, city">
+    <div class="err" id="newErr" hidden></div>
+    <div class="row"><button type="button" class="btn" id="newCancel">Cancel</button><button class="btn primary" id="newBtn">Create</button></div>
   </form>
 </dialog>
 
@@ -266,8 +268,9 @@ fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } })
 
 const BUCKET = "listing-files", BLANK_PATH = "_shared/form-blank.pdf", MAX_FILE = 200 * 1024 * 1024;
 const STAGES = [["new", "New lead"], ["call", "First call done"], ["walk_set", "Walkthrough set"], ["walked", "Walked"], ["pricing", "Pricing"], ["signed", "Signed"], ["listed", "Listed"], ["hold", "On hold"], ["closed", "Closed out"]];
-const KINDS = [["call", "Phone call"], ["walkthrough", "Walkthrough"], ["note", "Note"], ["photos", "Photos"]];
-const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"], ["form", "Property form"]];
+const VIEWS = [["notes", "Notes"], ["files", "Files"], ["brief", "Brief"], ["form", "Property form"]];
+const FTYPES = [["photo", "Photos"], ["audio", "Recordings"], ["video", "Video"], ["doc", "Documents"]];
+const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"]];   // inside Brief
 const LONG_FIELDS = ["improvements", "additional_notes"];
 const EXT_TYPE = { m4a: "audio/mp4", mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", mov: "video/quicktime", m4v: "video/mp4", webm: "video/webm" };
 // the form's boxes, as the AI function wants them: {section: {t, g, i: {item: [label, option keys, has count, has text]}}}
@@ -276,12 +279,13 @@ const CATALOG = Object.fromEntries(FORM.sections.map(s => [s.key, { t: s.title, 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const stageName = k => (STAGES.find(s => s[0] === k) || [0, k])[1];
-const kindName = k => (KINDS.find(s => s[0] === k) || [0, k])[1];
+const ftype = f => f.type.startsWith("image/") ? "photo" : f.type.startsWith("audio/") ? "audio" : f.type.startsWith("video/") ? "video" : "doc";
+const fsize = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
 const todayISO = () => new Date().toLocaleDateString("en-CA");
 const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
-let session = null, leads = [], cur = null, items = [], thumbs = {}, tab = "overview", filter = "all", matKind = "call", matNew = false, blank = null;
+let session = null, leads = [], cur = null, items = [], thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
 
 function show(id){ for (const s of ["out", "noAccess", "list", "lead"]) $("#" + s).hidden = s !== id; }
 
@@ -290,7 +294,7 @@ async function load(){
   if (!session){ show("out"); return; }
   const { data: a } = await sb.from("listing_access").select("user_id").maybeSingle();
   if (!a){ show("noAccess"); return; }
-  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, next_step, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
+  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
   leads = error ? [] : data;
   route();
 }
@@ -310,9 +314,8 @@ function renderList(){
       <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
       ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
       ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
-      ${l.next_step ? `<div class="nx"><b style="font-size:15px">Next:</b> ${esc(l.next_step)}</div>` : ""}
       <div class="when">Updated ${niceDate(l.updated_at)}</div>
-    </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> and drop in your first call or walkthrough.</div>`;
+    </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
 }
 $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b){ filter = b.dataset.f; renderList(); } });
 $("#leadCards").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) location.hash = b.dataset.id; });
@@ -324,104 +327,108 @@ window.addEventListener("hashchange", () => { if (skipHash){ skipHash = false; r
 async function openLead(id){
   const [{ data: l }, { data: its }] = await Promise.all([
     sb.from("listing_leads").select("*").eq("id", id).maybeSingle(),
-    sb.from("listing_items").select("*").eq("lead_id", id).order("occurred_on").order("created_at"),
+    sb.from("listing_items").select("*").eq("lead_id", id).order("created_at"),
   ]);
   if (!l){ location.hash = ""; return; }
-  cur = l; cur.form = normForm(cur.form); items = its || []; tab = "overview";
+  cur = l; cur.form = normForm(cur.form); items = its || []; view = "notes"; tab = "overview"; fileFilter = "all";
+  $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
   show("lead"); renderLead(); window.scrollTo(0, 0);
   loadThumbs();
 }
 function normForm(f){ f = f || {}; return { fields: f.fields || {}, checks: f.checks || {}, rooms: f.rooms || {}, locked: f.locked || {} }; }
 function renderLead(){
-  $("#lName").value = cur.name; $("#lAddr").value = cur.address; $("#lPhone").value = cur.phone; $("#lEmail").value = cur.email; $("#lNext").value = cur.next_step;
+  $("#lName").value = cur.name; $("#lAddr").value = cur.address;
   $("#stagePills").innerHTML = STAGES.map(([k, n]) => `<button class="pill${cur.stage === k ? " on" : ""}" data-s="${k}">${n}</button>`).join("");
-  renderItems(); renderBrief();
+  renderView();
 }
+// An entry is a note (words, no file) or a file (one upload). Notes and Files are two views of the same list.
+const isNote = i => !i.files.length;
+function renderView(){
+  const nNotes = items.filter(isNote).length, n = { notes: nNotes, files: items.length - nNotes };
+  $("#tabs").innerHTML = VIEWS.map(([k, name]) => `<button class="pill${view === k ? " on" : ""}" data-v="${k}">${name}${n[k] ? `<span class="n">${n[k]}</span>` : ""}</button>`).join("");
+  $("#notesTab").hidden = view !== "notes"; $("#filesTab").hidden = view !== "files"; $("#briefTab").hidden = view !== "brief" && view !== "form";
+  if (view === "notes") renderNotes(); else if (view === "files") renderFiles(); else renderBrief();
+}
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (b){ view = b.dataset.v; renderView(); } });
 async function saveLead(patch){
   Object.assign(cur, patch);
+  const row = leads.find(l => l.id === cur.id); if (row) for (const k of ["name", "address", "stage"]) if (k in patch) row[k] = patch[k];
   const { error } = await sb.from("listing_leads").update(patch).eq("id", cur.id);
   if (error) alert("That didn't save: " + error.message);
 }
 document.querySelectorAll("#lead [data-col]").forEach(el => el.addEventListener("change", () => saveLead({ [el.dataset.col]: el.value.trim() })));
 $("#stagePills").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b){ saveLead({ stage: b.dataset.s }); renderLead(); } });
 $("#delLead").addEventListener("click", async () => {
-  if (!confirm("Delete " + (cur.name || "this lead") + " and everything gathered on it? This can't be undone.")) return;
+  if (!confirm("Delete " + (cur.name || "this lead") + " and everything on it? This can't be undone.")) return;
   const paths = items.flatMap(i => i.files.map(f => f.path));
   if (paths.length) await sb.storage.from(BUCKET).remove(paths);
   await sb.from("listing_leads").delete().eq("id", cur.id);
   location.hash = "";
 });
 
-// ---- what's been gathered --------------------------------------------------------
-function renderItems(){
-  $("#items").innerHTML = items.length ? items.map(i => {
-    const imgs = i.files.filter(f => f.type.startsWith("image/")), other = i.files.filter(f => !f.type.startsWith("image/"));
-    const media = i.files.some(f => /^(audio|video)\//.test(f.type));
-    const state = i.status === "transcribing" ? `<div class="busy"><div class="spin"></div><span>Transcribing the recording…</span></div>`
-      : i.status === "failed" ? `<div class="err">${esc(i.error || "The recording couldn't be transcribed.")} <button class="btn link" data-retry="${i.id}">Try again</button></div>` : "";
-    return `<div class="item">
-      <div class="ih"><b>${esc(kindName(i.kind))}</b><span class="meta">${niceDate(i.occurred_on)} · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
-      ${i.files.length ? `<div class="files">${imgs.map(f => thumbs[f.path] ? `<a href="${thumbs[f.path]}" target="_blank" rel="noopener"><img src="${thumbs[f.path]}" alt="${esc(f.name)}" loading="lazy"></a>` : `<span class="chipf">${esc(f.name)}</span>`).join("")}${other.map(f => `<span class="chipf">${esc(f.name)}</span>`).join("")}</div>` : ""}
-      ${state}
-      ${i.transcript || !media ? `<details><summary>${i.kind === "note" ? "Note" : "Transcript"} (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
-        : i.status === "ready" ? `<p class="note" style="margin:8px 0 0">Not transcribed. <button class="btn link" data-retry="${i.id}">Transcribe it</button></p>` : ""}
-    </div>`;
-  }).join("") : `<p class="sub">Nothing yet. Add a call recording, a walkthrough, typed notes, or photos, and the brief is built from all of it.</p>`;
+// ---- new seller lead ---------------------------------------------------------------
+$("#newLead").addEventListener("click", () => { $("#newForm").reset(); $("#newErr").hidden = true; $("#newBtn").disabled = false; $("#newDlg").showModal(); });
+$("#newCancel").addEventListener("click", () => $("#newDlg").close());
+$("#newForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("#nName").value.trim(), address = $("#nAddr").value.trim();
+  const fail = m => { $("#newErr").textContent = m; $("#newErr").hidden = false; $("#newBtn").disabled = false; };
+  if (!name && !address) return fail("Give it a name or an address so you can find it in the list.");
+  $("#newBtn").disabled = true;
+  const { data, error } = await sb.from("listing_leads").insert({ name, address }).select().single();
+  if (error) return fail("Couldn't create the lead: " + error.message);
+  $("#newDlg").close(); leads.unshift(data); skipHash = true; location.hash = data.id; openLead(data.id);
+});
+
+// ---- notes ----------------------------------------------------------------------------
+function renderNotes(){
+  const notes = items.filter(isNote).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at));
+  $("#notes").innerHTML = notes.length ? notes.map(i => `<div class="item">
+      <div class="ih"><b>${niceDate(i.occurred_on)}</b><span class="meta">${words(i.transcript).toLocaleString()} words · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      <p class="prev">${esc(i.transcript)}</p>
+      <details><summary>Open and edit</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>
+    </div>`).join("") : `<p class="sub" style="margin-top:14px">No notes yet. Anything you type or paste here goes into the brief: a thought after a call, something the seller told you, a whole transcript.</p>`;
 }
+$("#noteSave").addEventListener("click", async () => {
+  const text = $("#noteText").value.trim(), err = $("#noteErr"); err.hidden = true;
+  if (!text){ err.textContent = "Type or paste something first."; err.hidden = false; return; }
+  $("#noteSave").disabled = true;
+  const { data, error } = await sb.from("listing_items").insert({ lead_id: cur.id, kind: "note", occurred_on: $("#noteDate").value || todayISO(), transcript: text }).select().single();
+  $("#noteSave").disabled = false;
+  if (error){ err.textContent = "That didn't save: " + error.message; err.hidden = false; return; }
+  items.push(data); $("#noteText").value = ""; renderView();
+});
+
+// ---- files ----------------------------------------------------------------------------
+function renderFiles(){
+  const rows = items.filter(i => !isNote(i)).flatMap(i => i.files.map(f => ({ i, f, t: ftype(f) }))).sort((a, b) => b.i.created_at.localeCompare(a.i.created_at));
+  const counts = {}; rows.forEach(r => counts[r.t] = (counts[r.t] || 0) + 1);
+  const kinds = FTYPES.filter(([k]) => counts[k]);
+  if (fileFilter !== "all" && !counts[fileFilter]) fileFilter = "all";
+  $("#fileFilters").innerHTML = kinds.length > 1 ? [["all", "All"], ...kinds].map(([k, name]) => `<button class="pill${fileFilter === k ? " on" : ""}" data-ff="${k}">${name}<span class="n">${k === "all" ? rows.length : counts[k]}</span></button>`).join("") : "";
+  const shown = rows.filter(r => fileFilter === "all" || r.t === fileFilter), photos = shown.filter(r => r.t === "photo"), rest = shown.filter(r => r.t !== "photo");
+  let html = rest.map(({ i, f, t }) => {
+    const media = t === "audio" || t === "video";
+    const state = i.status === "transcribing" ? `<div class="busy"><div class="spin"></div><span>Transcribing…</span></div>`
+      : i.status === "failed" ? `<div class="err">${esc(i.error || "This couldn't be transcribed.")} <button class="btn link" data-retry="${i.id}">Try again</button></div>` : "";
+    return `<div class="item">
+      <div class="ih"><b>${esc(f.name)}</b><span class="meta">${FTYPES.find(x => x[0] === t)[1].replace(/s$/, "")} · ${fsize(f.size)} · ${niceDate(i.occurred_on)} · <button class="btn link" data-open="${esc(f.path)}">Open</button> · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      ${state}
+      ${media && i.transcript ? `<details><summary>Transcript (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
+        : media && i.status === "ready" ? `<p class="note" style="margin:8px 0 0">Not transcribed. <button class="btn link" data-retry="${i.id}">Transcribe it</button></p>` : ""}
+    </div>`;
+  }).join("");
+  if (photos.length) html += `${rest.length ? `<h3 class="ph">Photos (${photos.length})</h3>` : ""}<div class="pgrid">${photos.map(({ i, f }) => `<div class="ptile">${thumbs[f.path] ? `<a href="${thumbs[f.path]}" target="_blank" rel="noopener"><img src="${thumbs[f.path]}" alt="${esc(f.name)}" loading="lazy"></a>` : esc(f.name)}<button class="px" data-rm="${i.id}" title="Remove" aria-label="Remove ${esc(f.name)}">×</button></div>`).join("")}</div>`;
+  $("#files").innerHTML = html || `<p class="sub" style="margin-top:14px">No files yet. Recordings are transcribed, photos are looked at, and all of it goes into the brief.</p>`;
+}
+$("#fileFilters").addEventListener("click", e => { const b = e.target.closest("[data-ff]"); if (b){ fileFilter = b.dataset.ff; renderFiles(); } });
 async function loadThumbs(){
   const paths = items.flatMap(i => i.files.filter(f => f.type.startsWith("image/")).map(f => f.path)).filter(p => !thumbs[p]);
   if (!paths.length) return;
   const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
   (data || []).forEach(d => { if (d.signedUrl) thumbs[d.path] = d.signedUrl; });
-  if (cur) renderItems();
+  if (cur && view === "files") renderFiles();
 }
-$("#items").addEventListener("click", async e => {
-  const rm = e.target.closest("[data-rm]"), re = e.target.closest("[data-retry]");
-  if (rm){
-    const it = items.find(i => i.id === rm.dataset.rm);
-    if (!confirm("Remove this " + kindName(it.kind).toLowerCase() + " and its files?")) return;
-    if (it.files.length) await sb.storage.from(BUCKET).remove(it.files.map(f => f.path));
-    await sb.from("listing_items").delete().eq("id", it.id);
-    items = items.filter(i => i !== it); renderItems(); renderBrief();
-  }
-  if (re) transcribe(items.find(i => i.id === re.dataset.retry));
-});
-$("#items").addEventListener("change", async e => {
-  const t = e.target.closest("[data-tr]"); if (!t) return;
-  const it = items.find(i => i.id === t.dataset.tr); it.transcript = t.value;
-  await sb.from("listing_items").update({ transcript: t.value }).eq("id", it.id);
-});
-
-async function fn(name, body){
-  const { data } = await sb.auth.getSession();
-  const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, { method: "POST", headers: { Authorization: "Bearer " + data.session.access_token, apikey: SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || d.message || "Something went wrong (" + r.status + ").");
-  return d;
-}
-async function transcribe(it){
-  it.status = "transcribing"; it.error = ""; if (cur) renderItems();
-  try { const d = await fn("listing-transcribe", { item_id: it.id }); it.transcript = d.transcript; it.status = "ready"; }
-  catch (err){ it.status = "failed"; it.error = err.message; }
-  if (cur && cur.id === it.lead_id){ renderItems(); renderBrief(); }
-  return it.status === "ready";
-}
-
-// ---- add material / new lead ------------------------------------------------------
-function openMat(isNew){
-  matNew = isNew; matKind = "call";
-  $("#matTitle").textContent = isNew ? "New seller lead" : "Add to this lead";
-  $("#newFields").hidden = !isNew; $("#matBtn").textContent = isNew ? "Start the lead" : "Save";
-  $("#matForm").reset(); $("#mDate").value = todayISO();
-  $("#matErr").hidden = true; $("#matBusy").hidden = true; $("#matBtn").disabled = false;
-  renderKinds(); $("#matDlg").showModal();
-}
-function renderKinds(){ $("#kindPills").innerHTML = KINDS.map(([k, n]) => `<button type="button" class="pill${matKind === k ? " on" : ""}" data-k="${k}">${n}</button>`).join(""); }
-$("#kindPills").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b){ matKind = b.dataset.k; renderKinds(); } });
-$("#newLead").addEventListener("click", () => openMat(true));
-$("#addMat").addEventListener("click", () => openMat(false));
-$("#matCancel").addEventListener("click", () => $("#matDlg").close());
-
 async function shrink(file){   // photos go up as JPEGs no bigger than the AI can use
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
@@ -431,69 +438,86 @@ async function shrink(file){   // photos go up as JPEGs no bigger than the AI ca
     return await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
   } catch (_) { return null; }
 }
-$("#matForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const files = [...$("#mFiles").files], text = $("#mText").value.trim();
-  const fail = m => { $("#matErr").textContent = m; $("#matErr").hidden = false; $("#matBusy").hidden = true; $("#matBtn").disabled = false; };
-  const busy = m => { $("#matBusyText").textContent = m; $("#matBusy").hidden = false; };
-  $("#matErr").hidden = true;
-  if (!matNew && !files.length && !text) return fail("Add a file, or paste or type something.");
-  const big = files.find(f => f.size > MAX_FILE); if (big) return fail(big.name + " is over 200 MB. Trim it, or send the audio only.");
-  $("#matBtn").disabled = true; busy("Saving…");
-
-  let lead = cur;
-  if (matNew){
-    const { data, error } = await sb.from("listing_leads").insert({ name: $("#nName").value.trim(), address: $("#nAddr").value.trim(), phone: $("#nPhone").value.trim() }).select().single();
-    if (error) return fail("Couldn't start the lead: " + error.message);
-    lead = data;
-  }
-  let item = null;
-  if (files.length || text){
-    const meta = [], uid = session.user.id;
-    for (let n = 0; n < files.length; n++){
-      const f = files[n], ext = (f.name.split(".").pop() || "").toLowerCase();
-      busy(`Uploading ${n + 1} of ${files.length}: ${f.name}`);
-      let type = f.type || EXT_TYPE[ext] || "application/octet-stream", blob = f, outExt = ext || "bin";
-      if (type.startsWith("image/")){
-        const small = await shrink(f);
-        if (small){ blob = small; type = "image/jpeg"; outExt = "jpg"; } else type = "application/octet-stream";   // a photo this browser can't read (HEIC on some); kept, but the AI can't see it
-      }
-      const path = `${uid}/${lead.id}/${crypto.randomUUID()}.${outExt}`;
-      const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: type });
-      if (error) return fail(`Couldn't upload ${f.name}: ${error.message}`);
-      meta.push({ path, name: f.name, type, size: blob.size });
+$("#addFiles").addEventListener("click", () => $("#filePick").click());
+$("#filePick").addEventListener("change", async e => {
+  const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+  const lead = cur, uid = session.user.id, problems = [], added = [];
+  $("#upErr").hidden = true; $("#upBusy").hidden = false; $("#addFiles").disabled = true;
+  for (let n = 0; n < files.length; n++){
+    const f = files[n], ext = (f.name.split(".").pop() || "").toLowerCase();
+    $("#upBusyText").textContent = `Uploading ${n + 1} of ${files.length}: ${f.name}`;
+    if (f.size > MAX_FILE){ problems.push(f.name + " is over 200 MB."); continue; }
+    let type = f.type || EXT_TYPE[ext] || "application/octet-stream", blob = f, outExt = ext || "bin";
+    if (type.startsWith("image/")){
+      const small = await shrink(f);
+      if (small){ blob = small; type = "image/jpeg"; outExt = "jpg"; } else type = "application/octet-stream";   // a photo this browser can't read (HEIC on some); kept, but the AI can't see it
     }
-    const media = meta.some(f => /^(audio|video)\//.test(f.type));
-    const kind = !media && !text && meta.length ? "photos" : matKind;
-    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind, occurred_on: $("#mDate").value || todayISO(), transcript: text, files: meta, status: media && !text ? "transcribing" : "ready" }).select().single();
-    if (error) return fail("Couldn't save that: " + error.message);
-    item = data;
+    const path = `${uid}/${lead.id}/${crypto.randomUUID()}.${outExt}`;
+    const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: type });
+    if (up.error){ problems.push(`${f.name}: ${up.error.message}`); continue; }
+    const media = /^(audio|video)\//.test(type);
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: f.name, files: [{ path, name: f.name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
+    if (error){ problems.push(`${f.name}: ${error.message}`); await sb.storage.from(BUCKET).remove([path]); continue; }
+    added.push(data);
+    if (cur && cur.id === lead.id){ items.push(data); renderView(); }
   }
-  $("#matDlg").close();
-  if (matNew){ leads.unshift(lead); skipHash = true; location.hash = lead.id; await openLead(lead.id); }
-  else if (item){ items.push(item); renderItems(); renderBrief(); loadThumbs(); }
-  if (item && item.status === "transcribing"){
-    const mine = items.find(i => i.id === item.id) || item;
-    const ok = await transcribe(mine);
-    if (ok && matNewStarted(lead)) buildBrief();
-  } else if (item && matNewStarted(lead)) buildBrief();
+  $("#upBusy").hidden = true; $("#addFiles").disabled = false;
+  if (problems.length){ $("#upErr").textContent = "Not added: " + problems.join(" "); $("#upErr").hidden = false; }
+  loadThumbs();
+  for (const it of added) if (it.status === "transcribing") await transcribe(it);
 });
-// a brand-new lead builds its first brief by itself, so one upload kicks everything off
-function matNewStarted(lead){ return cur && cur.id === lead.id && !cur.brief; }
+
+// shared by the Notes and Files lists
+async function entryClick(e){
+  const rm = e.target.closest("[data-rm]"), re = e.target.closest("[data-retry]"), op = e.target.closest("[data-open]");
+  if (rm){
+    const it = items.find(i => i.id === rm.dataset.rm);
+    if (!confirm(isNote(it) ? "Remove this note?" : "Remove " + (it.title || "this file") + "?")) return;
+    if (it.files.length) await sb.storage.from(BUCKET).remove(it.files.map(f => f.path));
+    await sb.from("listing_items").delete().eq("id", it.id);
+    items = items.filter(i => i !== it); renderView();
+  }
+  if (re) transcribe(items.find(i => i.id === re.dataset.retry));
+  if (op){ const { data } = await sb.storage.from(BUCKET).createSignedUrl(op.dataset.open, 600); if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener"); }
+}
+async function entryChange(e){
+  const t = e.target.closest("[data-tr]"); if (!t) return;
+  const it = items.find(i => i.id === t.dataset.tr); it.transcript = t.value;
+  const prev = t.closest(".item").querySelector(".prev"); if (prev) prev.textContent = t.value;
+  await sb.from("listing_items").update({ transcript: t.value }).eq("id", it.id);
+}
+for (const id of ["#notes", "#files"]){ $(id).addEventListener("click", entryClick); $(id).addEventListener("change", entryChange); }
+
+async function fn(name, body){
+  const { data } = await sb.auth.getSession();
+  const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, { method: "POST", headers: { Authorization: "Bearer " + data.session.access_token, apikey: SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || d.message || "Something went wrong (" + r.status + ").");
+  return d;
+}
+async function transcribe(it){
+  const show = () => { if (cur && cur.id === it.lead_id && view === "files") renderFiles(); };
+  it.status = "transcribing"; it.error = ""; show();
+  try { const d = await fn("listing-transcribe", { item_id: it.id }); it.transcript = d.transcript; it.status = "ready"; }
+  catch (err){ it.status = "failed"; it.error = err.message; }
+  show();
+  return it.status === "ready";
+}
 
 // ---- the brief ---------------------------------------------------------------------------
+// The Brief and Property form tabs share this panel: the build button on top, then either the notes or the form.
 function renderBrief(){
   const b = cur.brief, newer = b && items.some(i => new Date(i.created_at) > new Date(cur.brief_at));
   $("#buildBtn").textContent = b ? "Update the brief" : "Build the brief";
-  $("#buildBtn").disabled = !items.length;
-  $("#briefHint").textContent = !items.length ? "Add something above first." : !b ? "Reads every call, walkthrough, note, and photo above and writes the form, the notes, and the next steps."
+  $("#buildBtn").disabled = !items.length || !$("#briefBusy").hidden;
+  $("#briefHint").textContent = !items.length ? "Add a note or a file first. The brief is written from everything on this lead." : !b ? "Reads every note, transcript, and photo on this lead and writes the overview, the notes for each reader, and the property form."
     : (newer ? "There is new material since this brief was built. " : "") + "Built " + new Date(cur.brief_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ". Updating rereads everything; boxes and fields you changed by hand are kept.";
-  $("#briefBody").hidden = !b;
-  if (!b) return;
-  $("#tabs").innerHTML = TABS.map(([k, n]) => `<button class="pill${tab === k ? " on" : ""}" data-t="${k}">${n}</button>`).join("");
-  $("#tabBody").innerHTML = tab === "form" ? formHtml() : `<div class="row" style="margin-top:8px"><button class="btn small" id="copyBtn">Copy</button></div>` + noteHtml(tab);
+  if (view === "form"){ tab = "form"; $("#subtabs").innerHTML = ""; $("#tabBody").innerHTML = formHtml(); return; }
+  if (tab === "form") tab = "overview";
+  $("#subtabs").innerHTML = b ? TABS.map(([k, n]) => `<button class="pill${tab === k ? " on" : ""}" data-t="${k}">${n}</button>`).join("") : "";
+  $("#tabBody").innerHTML = b ? `<div class="row" style="margin-top:8px"><button class="btn small" id="copyBtn">Copy</button></div>` + noteHtml(tab) : "";
 }
-$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (b){ tab = b.dataset.t; renderBrief(); } });
+$("#subtabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (b){ tab = b.dataset.t; renderBrief(); } });
 const ul = a => a?.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="note">Nothing here.</p>`;
 function noteHtml(t){
   const b = cur.brief;
@@ -501,6 +525,7 @@ function noteHtml(t){
   if (t === "admin") return `<div class="sec">${ul(b.admin_notes)}</div>`;
   if (t === "private") return `<div class="sec"><p class="note">For you only. Keep this out of what you send the team.</p>${ul(b.private_notes)}</div>`;
   return `<div class="sec"><p>${esc(b.summary)}</p></div>
+    ${b.next_step ? `<div class="sec"><h3>Suggested next step</h3><p>${esc(b.next_step)}</p></div>` : ""}
     ${b.motivation ? `<div class="sec"><h3>Why they're selling</h3><p>${esc(b.motivation)}</p></div>` : ""}
     ${b.timeline ? `<div class="sec"><h3>Timeline</h3><p>${esc(b.timeline)}</p></div>` : ""}
     <div class="sec"><h3>Action items</h3>${(b.actions || []).map(a => `<div class="act"><div class="w">${esc(a.who)}</div><div>${esc(a.what)}${a.when ? `<div class="t">${esc(a.when)}</div>` : ""}</div></div>`).join("") || `<p class="note">None.</p>`}</div>
@@ -512,7 +537,7 @@ function noteText(t){
   if (t === "team") return head + "\n\n" + (b.team_notes || []).map(s => s.heading.toUpperCase() + "\n" + s.body).join("\n\n");
   if (t === "admin") return head + "\nAdmin notes\n\n" + li(b.admin_notes);
   if (t === "private") return head + "\nMy notes\n\n" + li(b.private_notes);
-  return [head, b.summary, b.motivation && "Why they're selling: " + b.motivation, b.timeline && "Timeline: " + b.timeline,
+  return [head, b.summary, b.next_step && "Suggested next step: " + b.next_step, b.motivation && "Why they're selling: " + b.motivation, b.timeline && "Timeline: " + b.timeline,
     "Action items\n" + (b.actions || []).map(a => `- ${a.who}: ${a.what}${a.when ? " (" + a.when + ")" : ""}`).join("\n"), "Ask next time\n" + li(b.questions)].filter(Boolean).join("\n\n");
 }
 $("#tabBody").addEventListener("click", async e => {
@@ -521,24 +546,21 @@ $("#tabBody").addEventListener("click", async e => {
 $("#buildBtn").addEventListener("click", () => buildBrief());
 async function buildBrief(){
   if (!$("#briefBusy").hidden) return;
-  const waiting = items.some(i => i.status === "transcribing");
-  if (waiting){ $("#briefErr").textContent = "A recording is still being transcribed. Give it a moment, then build the brief."; $("#briefErr").hidden = false; return; }
+  if (items.some(i => i.status === "transcribing")){ $("#briefErr").textContent = "A recording is still being transcribed. Give it a moment, then build the brief."; $("#briefErr").hidden = false; return; }
   $("#briefErr").hidden = true; $("#briefBusy").hidden = false; $("#buildBtn").disabled = true;
-  const leadId = cur.id, oldNext = cur.brief?.next_step || "";
+  const leadId = cur.id;
   try {
     const d = await fn("listing-ai", { lead_id: leadId, catalog: CATALOG });
     if (!cur || cur.id !== leadId) return;
     const b = d.brief, patch = { form: applyBrief(b, cur.form) };
     cur.brief = b; cur.brief_at = d.brief_at;
-    for (const k of ["name", "address", "phone", "email"]) if (!cur[k] && b.lead?.[k]) patch[k] = b.lead[k];
+    for (const k of ["name", "address"]) if (!cur[k] && b.lead?.[k]) patch[k] = b.lead[k];
     if (cur.stage === "new" && b.suggested_stage) patch.stage = b.suggested_stage;
-    if (b.next_step && (!cur.next_step || cur.next_step === oldNext)) patch.next_step = b.next_step;
     await saveLead(patch);
-    const row = leads.find(l => l.id === leadId); if (row) Object.assign(row, { name: cur.name, address: cur.address, stage: cur.stage, next_step: cur.next_step, summary: b.summary });
-    renderLead();
+    const row = leads.find(l => l.id === leadId); if (row) row.summary = b.summary;
   } catch (err){
     $("#briefErr").textContent = err.message + " If it timed out, wait a minute and reload: the brief may have finished on its own."; $("#briefErr").hidden = false;
-  } finally { $("#briefBusy").hidden = true; if (cur) $("#buildBtn").disabled = !items.length; }
+  } finally { $("#briefBusy").hidden = true; if (cur && cur.id === leadId) renderLead(); }
 }
 // The AI's draft becomes the form; anything the agent changed by hand (locked) is carried over on top.
 function applyBrief(b, old){
@@ -562,7 +584,7 @@ function formHtml(){
   const short = FORM.fields.map(x => x.key).filter(k => !LONG_FIELDS.includes(k));
   let html = `<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span class="note">Green is marked. Yellow is the AI's best reading and prints as a ? until you confirm it. Tap a box to change it.</span><button class="btn primary" id="pdfBtn">Download the form PDF</button></div><div class="err" id="pdfErr" hidden></div>`;
   if (inferred.length) html += `<div class="sec"><h3>Confirm these (${inferred.length})</h3>${inferred.map(([id, c]) => { const [s, it] = itemOf(id); return `<div class="rev"><div><b>${esc(s.title)}: ${esc(it.label)}</b><div class="why">${esc(c.why)}</div></div><div class="b"><button class="btn small" data-yes="${id}">Yes</button><button class="btn small" data-no="${id}">No</button></div></div>`; }).join("")}</div>`;
-  if (b.not_captured?.length) html += `<div class="sec"><h3>Not captured yet</h3>${ul(b.not_captured)}</div>`;
+  if (b?.not_captured?.length) html += `<div class="sec"><h3>Not captured yet</h3>${ul(b.not_captured)}</div>`;
   html += `<div class="sec"><h3>Top of the form</h3><div class="grid2">${short.slice(0, 2).concat(short.filter(k => ["year_built", "total_sf", "lot_size", "beds", "baths"].includes(k))).map(field).join("")}</div>${LONG_FIELDS.map(field).join("")}</div>`;
   html += `<div class="sec"><h3>Room count</h3><div class="rooms"><table><tr><th></th>${FORM.rooms.cols.map(c => `<th>${esc(c.label)}</th>`).join("")}</tr>${FORM.rooms.rows.map(r => `<tr><th>${esc(r.label)}</th>${FORM.rooms.cols.map(c => `<td><input type="text" inputmode="numeric" data-room="${r.key}.${c.key}" value="${esc(f.rooms[r.key + "." + c.key] || "")}"></td>`).join("")}</tr>`).join("")}</table></div></div>`;
   let grp = "";
