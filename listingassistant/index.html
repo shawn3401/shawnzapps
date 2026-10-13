@@ -192,7 +192,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
       </div>
 
       <div id="filesTab" hidden>
-        <div class="head" style="margin:0"><p class="sub" style="margin:0;flex:1">Photos, recordings, video, documents. Pick as many at once as you like.</p><button class="btn primary" id="addFiles">Add files</button></div>
+        <div class="head" style="margin:0"><p class="sub" style="margin:0;flex:1">Photos, recordings, video, documents. Pick as many at once as you like. A video is saved as its sound only.</p><button class="btn primary" id="addFiles">Add files</button></div>
         <input type="file" id="filePick" multiple hidden accept="audio/*,video/*,image/*,.m4a,.mp3,.wav,.aac,.mp4,.mov,.pdf,.doc,.docx,.txt">
         <div class="busy" id="upBusy" hidden><div class="spin"></div><span id="upBusyText">Uploading…</span></div>
         <div class="err" id="upErr" hidden></div>
@@ -438,6 +438,58 @@ async function shrink(file){   // photos go up as JPEGs no bigger than the AI ca
     return await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
   } catch (_) { return null; }
 }
+let mp4boxLoading = null;
+const loadMp4box = () => mp4boxLoading ||= new Promise((ok, no) => { const el = document.createElement("script"); el.src = "https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"; el.onload = ok; el.onerror = no; document.head.appendChild(el); });
+// Pull the AAC sound track out of an MP4 / MOV without loading the whole file: find the moov box, let
+// mp4box read its sample tables, then read just the audio samples and wrap each in an ADTS header.
+async function videoSound(file, onProgress){
+  const u32 = async at => new DataView(await file.slice(at, at + 16).arrayBuffer());
+  let at = 0, ftyp = null, moov = null;
+  while (at + 8 <= file.size && !(moov)){
+    const v = await u32(at); let size = v.getUint32(0); const type = String.fromCharCode(v.getUint8(4), v.getUint8(5), v.getUint8(6), v.getUint8(7));
+    if (size === 1) size = v.getUint32(8) * 4294967296 + v.getUint32(12); else if (size === 0) size = file.size - at;
+    if (size < 8) return null;
+    if (type === "ftyp") ftyp = [at, size]; if (type === "moov") moov = [at, size];
+    at += size;
+  }
+  if (!moov || moov[1] > 200 * 1048576) return null;
+  const head = new Uint8Array((ftyp ? ftyp[1] : 0) + moov[1]);
+  if (ftyp) head.set(new Uint8Array(await file.slice(ftyp[0], ftyp[0] + ftyp[1]).arrayBuffer()), 0);
+  head.set(new Uint8Array(await file.slice(moov[0], moov[0] + moov[1]).arrayBuffer()), ftyp ? ftyp[1] : 0);
+  const mp4 = MP4Box.createFile(); let info = null;
+  mp4.onReady = i => info = i; mp4.onError = () => {};
+  head.buffer.fileStart = 0; mp4.appendBuffer(head.buffer); mp4.flush();
+  const t = info?.audioTracks?.[0];
+  if (!t || !/^mp4a/.test(t.codec)) return null;
+  const samples = mp4.getTrackById(t.id)?.samples;
+  if (!samples?.length) return null;
+  // The true format is in the AAC decoder config inside the esds box (the sample entry's channel count is often
+  // just "2", and QuickTime files tuck esds where mp4box doesn't look), so find it in the raw bytes.
+  let asc = null;
+  for (let i = 4; i < head.length - 30 && !asc; i++){
+    if (head[i] !== 0x65 || head[i + 1] !== 0x73 || head[i + 2] !== 0x64 || head[i + 3] !== 0x73) continue;   // "esds"
+    let p = i + 8;
+    const len = () => { let v = 0, b; do { b = head[p++]; v = (v << 7) | (b & 127); } while (b & 128); return v; };
+    if (head[p++] !== 3) continue; len(); p += 2; const fl = head[p++]; if (fl & 128) p += 2; if (fl & 64) p += 1 + head[p]; if (fl & 32) p += 2;
+    if (head[p++] !== 4) continue; len(); if (head[p] !== 0x40) continue; p += 13;   // 0x40 = AAC
+    if (head[p++] !== 5) continue; const n = len(); if (n >= 2) asc = head.subarray(p, p + n);
+  }
+  if (!asc) return null;
+  const obj = asc[0] >> 3, fi = ((asc[0] & 7) << 1) | (asc[1] >> 7), ch = (asc[1] >> 3) & 15;
+  if (obj !== 2 || fi > 12 || ch < 1 || ch > 7) return null;   // plain AAC only, which is what phones record
+  const order = samples.map(s => s).sort((a, b) => a.offset - b.offset), out = new Array(samples.length), WIN = 8 * 1048576;
+  let n = 0;
+  while (n < order.length){
+    const start = order[n].offset, buf = new Uint8Array(await file.slice(start, start + Math.max(WIN, order[n].size)).arrayBuffer());
+    while (n < order.length && order[n].offset + order[n].size <= start + buf.length){
+      const s = order[n++], len = s.size + 7, a = new Uint8Array(len);
+      a[0] = 0xFF; a[1] = 0xF1; a[2] = (1 << 6) | (fi << 2) | (ch >> 2); a[3] = ((ch & 3) << 6) | (len >> 11); a[4] = (len >> 3) & 0xFF; a[5] = ((len & 7) << 5) | 0x1F; a[6] = 0xFC;
+      a.set(buf.subarray(s.offset - start, s.offset - start + s.size), 7); out[s.number] = a;
+    }
+    if (onProgress) onProgress(n / order.length);
+  }
+  return new Blob(out, { type: "audio/aac" });
+}
 $("#addFiles").addEventListener("click", () => $("#filePick").click());
 $("#filePick").addEventListener("change", async e => {
   const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
@@ -446,8 +498,15 @@ $("#filePick").addEventListener("change", async e => {
   for (let n = 0; n < files.length; n++){
     const f = files[n], ext = (f.name.split(".").pop() || "").toLowerCase();
     $("#upBusyText").textContent = `Uploading ${n + 1} of ${files.length}: ${f.name}`;
-    if (f.size > MAX_FILE){ problems.push(f.name + " is over 200 MB."); continue; }
-    let type = f.type || EXT_TYPE[ext] || "application/octet-stream", blob = f, outExt = ext || "bin";
+    let type = f.type || EXT_TYPE[ext] || "application/octet-stream", blob = f, outExt = ext || "bin", name = f.name;
+    if (type.startsWith("video/")){   // a walkthrough video can be gigabytes; only its sound is used, so only its sound goes up
+      $("#upBusyText").textContent = `Pulling the sound out of ${f.name}…`;
+      let sound = null;
+      try { await loadMp4box(); sound = await videoSound(f, k => { $("#upBusyText").textContent = `Pulling the sound out of ${f.name}: ${Math.round(k * 100)}%`; }); } catch (_) {}
+      if (sound){ blob = sound; type = "audio/aac"; outExt = "aac"; name = f.name + " (sound only)"; $("#upBusyText").textContent = `Uploading the sound from ${f.name}`; }
+      else if (f.size > MAX_FILE){ problems.push(`Couldn't pull the sound out of ${f.name}, and the whole video is too big to upload (over 200 MB).`); continue; }
+    }
+    if (blob.size > MAX_FILE){ problems.push(f.name + " is over 200 MB."); continue; }
     if (type.startsWith("image/")){
       const small = await shrink(f);
       if (small){ blob = small; type = "image/jpeg"; outExt = "jpg"; } else type = "application/octet-stream";   // a photo this browser can't read (HEIC on some); kept, but the AI can't see it
@@ -456,7 +515,7 @@ $("#filePick").addEventListener("change", async e => {
     const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: type });
     if (up.error){ problems.push(`${f.name}: ${up.error.message}`); continue; }
     const media = /^(audio|video)\//.test(type);
-    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: f.name, files: [{ path, name: f.name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
     if (error){ problems.push(`${f.name}: ${error.message}`); await sb.storage.from(BUCKET).remove([path]); continue; }
     added.push(data);
     if (cur && cur.id === lead.id){ items.push(data); renderView(); }
