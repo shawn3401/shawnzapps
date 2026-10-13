@@ -3,6 +3,7 @@
 shawnzapps.com, the home for Shawn Anderson's apps. Plain HTML on GitHub Pages (repo `shawn3401/shawnzapps`, branch `main`, repo root = site root, cloned at `~/Code/ShawnZapps`). No build step, no framework. Live since Oct 12, 2026.
 
 - `index.html` the home page: navy and zap-yellow theme (the Z in the wordmark and a lightning bolt), Bricolage Grotesque headlines, Source Sans 3 body, color tokens on `:root` with a dark palette. Two sections: Personal (red-orange, "For home and the weekend") and Business (blue, "For real estate"). One card per app with a monogram tile, one line, and a chip (Live, iPhone, Coming soon). Coming-soon apps are dashed cards with no link. Shawn approved the look Oct 12, 2026. CareTrack and PackRight have no description yet; ask Shawn, never invent one. Putting the mobile apps under Personal was Claude's guess.
+- `privacy/index.html` the privacy policy (copied from the old site Oct 13, 2026, same text, old site's look), linked from the home page footer. Needed for Google's brand verification, so the Google sign-in screen can say ShawnZapps instead of the Supabase address.
 - `dough/` Dough, the dough calculator. See "dough/ app" below.
 - `yourturn/` Your Turn, the restaurant picker. See "yourturn/ app" below.
 - `listingassistant/` Listing Assistant, the seller lead tool for Shawn's real estate team. See "listingassistant/ app" below.
