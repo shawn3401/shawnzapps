@@ -144,6 +144,23 @@ dialog::backdrop{background:rgba(15,15,15,.55)}
 dialog h2{font-size:22px}
 .or{text-align:center;color:var(--ink-3);font-size:14px;margin:12px 0 0}
 .chk{display:flex;gap:7px;align-items:center;font-size:14px;color:var(--ink-2);margin-top:8px}
+/* the form shown as the real page, with the boxes live on top of it */
+.fpage{position:relative;container-type:inline-size;border:1px solid var(--line);margin-top:12px;background:#fff;line-height:1;overflow:hidden}
+.fpage img{display:block;width:100%}
+.fpage > :not(img){position:absolute;margin:0}
+.fx{height:1.3%;padding:0;border:0;background:transparent;cursor:pointer;border-radius:2px;text-align:left;font:700 1.24cqw Helvetica,Arial,sans-serif;color:#0D33BF;line-height:1}
+.fx span{display:inline-block;width:2.29cqw;text-align:center}
+.fx:hover{background:rgba(13,51,191,.12)}
+.fx.on{background:rgba(47,122,75,.18)}
+.fx.inf{background:rgba(227,185,90,.45)}
+.fo{width:1.6cqw;height:1.6cqw;padding:0;border:0;background:transparent;cursor:pointer;font:700 1.1cqw Helvetica,Arial,sans-serif;color:#0D33BF;line-height:1;border-radius:2px}
+.fo:hover{background:rgba(13,51,191,.15)}
+.fo.circ.on{border:.16cqw solid #0D33BF;border-radius:50%}
+.fpage input{height:1.45%;width:auto;border:0;border-radius:0;background:transparent;color:#0D33BF;font:1.2cqw Helvetica,Arial,sans-serif;padding:0 0 0 .3cqw}
+.fpage input.ctr{text-align:center;padding:0}
+.fpage input:hover{background:rgba(13,51,191,.07)}
+.fpage input:focus{outline:1px solid #0D33BF;background:rgba(13,51,191,.07)}
+.fl{color:#0D33BF;font-family:Helvetica,Arial,sans-serif;white-space:nowrap;overflow:hidden;cursor:pointer;height:1.35%;line-height:1.1}
 footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font-size:13px}
 </style>
 </head>
@@ -272,7 +289,7 @@ const VIEWS = [["notes", "Notes"], ["files", "Files"], ["brief", "Brief"], ["for
 const FTYPES = [["photo", "Photos"], ["audio", "Recordings"], ["video", "Video"], ["doc", "Documents"]];
 const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"]];   // inside Brief
 const LONG_FIELDS = ["improvements", "additional_notes"];
-const EXT_TYPE = { m4a: "audio/mp4", mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", mov: "video/quicktime", m4v: "video/mp4", webm: "video/webm" };
+const EXT_TYPE = { pdf: "application/pdf", m4a: "audio/mp4", mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", mov: "video/quicktime", m4v: "video/mp4", webm: "video/webm" };
 // the form's boxes, as the AI function wants them: {section: {t, g, i: {item: [label, option keys, has count, has text]}}}
 const CATALOG = Object.fromEntries(FORM.sections.map(s => [s.key, { t: s.title, g: s.group, i: Object.fromEntries(s.items.map(it => [it.key, [it.label, (it.opts || []).map(o => o.key), it.count ? 1 : 0, it.text ? 1 : 0]])) }]));
 
@@ -286,6 +303,8 @@ const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLoca
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
 let session = null, leads = [], cur = null, items = [], thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
+let formMode = innerWidth >= 760 ? "page" : "list", pageImgs = null, pagesLoading = false, pagesFailed = false;   // the form as the real page (wide screens) or as a list of boxes (phones)
+const triedPdf = new Set();
 
 function show(id){ for (const s of ["out", "noAccess", "list", "lead"]) $("#" + s).hidden = s !== id; }
 
@@ -414,7 +433,7 @@ function renderFiles(){
     return `<div class="item">
       <div class="ih"><b>${esc(f.name)}</b><span class="meta">${FTYPES.find(x => x[0] === t)[1].replace(/s$/, "")} · ${fsize(f.size)} · ${niceDate(i.occurred_on)} · <button class="btn link" data-open="${esc(f.path)}">Open</button> · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
       ${state}
-      ${media && i.transcript ? `<details><summary>Transcript (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
+      ${i.transcript ? `<details><summary>${media ? "Transcript" : "Text read from it"} (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
         : media && i.status === "ready" ? `<p class="note" style="margin:8px 0 0">Not transcribed. <button class="btn link" data-retry="${i.id}">Transcribe it</button></p>` : ""}
     </div>`;
   }).join("");
@@ -437,6 +456,22 @@ async function shrink(file){   // photos go up as JPEGs no bigger than the AI ca
     c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
     return await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
   } catch (_) { return null; }
+}
+let pdfjsLoading = null;
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+const loadPdfjs = () => pdfjsLoading ||= new Promise((ok, no) => { const el = document.createElement("script"); el.src = PDFJS + "pdf.min.js"; el.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(); }; el.onerror = no; document.head.appendChild(el); });
+async function pdfText(bytes){   // the words in a PDF (an old listing, a plat, an inspection), so the brief can use them; a scan has none
+  await loadPdfjs();
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise, out = [];
+  for (let n = 1; n <= Math.min(doc.numPages, 40); n++){
+    const tc = await (await doc.getPage(n)).getTextContent(); let line = "", y = null;
+    for (const it of tc.items){
+      if (y !== null && Math.abs(it.transform[5] - y) > 2){ out.push(line); line = ""; }
+      line += (line && !line.endsWith(" ") && it.str && !it.str.startsWith(" ") ? " " : "") + it.str; y = it.transform[5];
+    }
+    out.push(line);
+  }
+  return out.map(l => l.trim()).filter(Boolean).join("\n").slice(0, 60000);
 }
 let mp4boxLoading = null;
 const loadMp4box = () => mp4boxLoading ||= new Promise((ok, no) => { const el = document.createElement("script"); el.src = "https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"; el.onload = ok; el.onerror = no; document.head.appendChild(el); });
@@ -515,7 +550,10 @@ $("#filePick").addEventListener("change", async e => {
     const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: type });
     if (up.error){ problems.push(`${f.name}: ${up.error.message}`); continue; }
     const media = /^(audio|video)\//.test(type);
-    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
+    let text = "";
+    if (type === "application/pdf"){ $("#upBusyText").textContent = `Reading ${f.name}`; try { text = await pdfText(await f.arrayBuffer()); } catch (_) {} }
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, transcript: text, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
+    if (data && type === "application/pdf") triedPdf.add(data.id);
     if (error){ problems.push(`${f.name}: ${error.message}`); await sb.storage.from(BUCKET).remove([path]); continue; }
     added.push(data);
     if (cur && cur.id === lead.id){ items.push(data); renderView(); }
@@ -567,7 +605,7 @@ async function transcribe(it){
 // The Brief and Property form tabs share this panel: the build button on top, then either the notes or the form.
 function renderBrief(){
   const b = cur.brief, newer = b && items.some(i => new Date(i.created_at) > new Date(cur.brief_at));
-  $("#buildBtn").textContent = b ? "Update the brief" : "Build the brief";
+  $("#buildBtn").textContent = view === "form" ? (b ? "Refill from my notes and files" : "Fill in the form") : b ? "Update the brief" : "Build the brief";
   $("#buildBtn").disabled = !items.length || !$("#briefBusy").hidden;
   $("#briefHint").textContent = !items.length ? "Add a note or a file first. The brief is written from everything on this lead." : !b ? "Reads every note, transcript, and photo on this lead and writes the overview, the notes for each reader, and the property form."
     : (newer ? "There is new material since this brief was built. " : "") + "Built " + new Date(cur.brief_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ". Updating rereads everything; boxes and fields you changed by hand are kept.";
@@ -609,6 +647,12 @@ async function buildBrief(){
   $("#briefErr").hidden = true; $("#briefBusy").hidden = false; $("#buildBtn").disabled = true;
   const leadId = cur.id;
   try {
+    for (const it of items){   // PDFs added before the page could read them
+      const f0 = it.files[0];
+      if (!f0 || f0.type !== "application/pdf" || it.transcript || triedPdf.has(it.id)) continue;
+      triedPdf.add(it.id);
+      try { const { data } = await sb.storage.from(BUCKET).download(f0.path); const text = await pdfText(await data.arrayBuffer()); if (text){ it.transcript = text; await sb.from("listing_items").update({ transcript: text }).eq("id", it.id); } } catch (_) {}
+    }
     const d = await fn("listing-ai", { lead_id: leadId, catalog: CATALOG });
     if (!cur || cur.id !== leadId) return;
     const b = d.brief, patch = { form: applyBrief(b, cur.form) };
@@ -641,9 +685,11 @@ function formHtml(){
   const inferred = Object.entries(f.checks).filter(([, c]) => c.b === "inferred");
   const field = k => { const d = FORM.fields.find(x => x.key === k); return `<div><label class="f">${esc(d.label)}</label>${LONG_FIELDS.includes(k) ? `<textarea data-fld="${k}" style="min-height:74px">${esc(f.fields[k] || "")}</textarea>` : `<input type="text" data-fld="${k}" value="${esc(f.fields[k] || "")}">`}</div>`; };
   const short = FORM.fields.map(x => x.key).filter(k => !LONG_FIELDS.includes(k));
-  let html = `<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span class="note">Green is marked. Yellow is the AI's best reading and prints as a ? until you confirm it. Tap a box to change it.</span><button class="btn primary" id="pdfBtn">Download the form PDF</button></div><div class="err" id="pdfErr" hidden></div>`;
+  let html = `<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><div class="pills">${pagesFailed ? "" : [["page", "On the form"], ["list", "As a list"]].map(([k, n]) => `<button class="pill${formMode === k ? " on" : ""}" data-fm="${k}">${n}</button>`).join("")}</div><div style="display:flex;gap:8px"><button class="btn" id="printBtn">Print</button><button class="btn primary" id="pdfBtn">Save as PDF</button></div></div>
+    <p class="note" style="margin:8px 0 0">Tap a box to mark or clear it. Yellow is the AI's best reading: it prints as a ? until you tap it to confirm.</p><div class="err" id="pdfErr" hidden></div>`;
   if (inferred.length) html += `<div class="sec"><h3>Confirm these (${inferred.length})</h3>${inferred.map(([id, c]) => { const [s, it] = itemOf(id); return `<div class="rev"><div><b>${esc(s.title)}: ${esc(it.label)}</b><div class="why">${esc(c.why)}</div></div><div class="b"><button class="btn small" data-yes="${id}">Yes</button><button class="btn small" data-no="${id}">No</button></div></div>`; }).join("")}</div>`;
   if (b?.not_captured?.length) html += `<div class="sec"><h3>Not captured yet</h3>${ul(b.not_captured)}</div>`;
+  if (formMode === "page" && !pagesFailed) return html + pageHtml();
   html += `<div class="sec"><h3>Top of the form</h3><div class="grid2">${short.slice(0, 2).concat(short.filter(k => ["year_built", "total_sf", "lot_size", "beds", "baths"].includes(k))).map(field).join("")}</div>${LONG_FIELDS.map(field).join("")}</div>`;
   html += `<div class="sec"><h3>Room count</h3><div class="rooms"><table><tr><th></th>${FORM.rooms.cols.map(c => `<th>${esc(c.label)}</th>`).join("")}</tr>${FORM.rooms.rows.map(r => `<tr><th>${esc(r.label)}</th>${FORM.rooms.cols.map(c => `<td><input type="text" inputmode="numeric" data-room="${r.key}.${c.key}" value="${esc(f.rooms[r.key + "." + c.key] || "")}"></td>`).join("")}</tr>`).join("")}</table></div></div>`;
   let grp = "";
@@ -679,22 +725,95 @@ $("#tabBody").addEventListener("click", e => {
     else f.checks[id] = { ...(c || { opts: [], count: "", text: "" }), b: "agent", why: "" };   // a tap on a yellow box confirms it
     f.locked["c:" + id] = 1; saveForm(true);
   } else if (opt){
-    const [id, o] = opt.dataset.opt.split("|"), c = f.checks[id], [, it] = itemOf(id);
+    const [id, o] = opt.dataset.opt.split("|"), [, it] = itemOf(id), c = f.checks[id] ||= { b: "agent", why: "", opts: [], count: "", text: "" };
     const single = it.opts.some(x => x.mark === "circle");   // Paved yes or no: only one
     c.opts = c.opts.includes(o) ? c.opts.filter(x => x !== o) : (single ? [o] : [...c.opts, o]);
     f.locked["c:" + id] = 1; saveForm(true);
   } else if (t.id === "pdfBtn") makePdf();
+  else if (t.id === "printBtn") makePdf(true);
+  else if (t.id === "addBlank") $("#blankPick").click();
+  else if (t.closest("[data-fm]")){ formMode = t.closest("[data-fm]").dataset.fm; renderBrief(); }
 });
 $("#tabBody").addEventListener("change", e => {
   if (tab !== "form") return;
   const f = cur.form, d = e.target.dataset, v = e.target.value.trim();
-  if (d.fld){ if (v) f.fields[d.fld] = v; else delete f.fields[d.fld]; f.locked["f:" + d.fld] = 1; }
+  if (d.fld){ if (v) f.fields[d.fld] = v; else delete f.fields[d.fld]; f.locked["f:" + d.fld] = 1; if (LONG_FIELDS.includes(d.fld) && formMode === "page") return saveForm(true); }
   else if (d.room){ if (v) f.rooms[d.room] = v; else delete f.rooms[d.room]; f.locked["r:" + d.room] = 1; }
-  else if (d.cnt){ f.checks[d.cnt].count = v; f.locked["c:" + d.cnt] = 1; }
-  else if (d.txt){ f.checks[d.txt].text = v; f.locked["c:" + d.txt] = 1; }
+  else if (d.cnt || d.txt){   // typing a count or a detail marks the box too
+    const id = d.cnt || d.txt, had = f.checks[id], c = f.checks[id] ||= { b: "agent", why: "", opts: [], count: "", text: "" };
+    c[d.cnt ? "count" : "text"] = v; f.locked["c:" + id] = 1;
+    if (!had) return saveForm(true);
+  }
   else return;
   saveForm(false);
 });
+
+// ---- the form as the real page ----------------------------------------------------------
+// The blank PDF is drawn once as two images; every box, blank, and table cell from FORM sits on top at its
+// own spot (percent of the page, type sized in cqw so it scales with the page). Same data attributes as the list
+// view, so the same handlers run.
+async function loadPages(){
+  if (pagesLoading) return; pagesLoading = true;
+  try {
+    const bytes = await blankForm();
+    if (!bytes) pageImgs = "missing";
+    else {
+      await loadPdfjs();
+      const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise, imgs = [];
+      for (let n = 1; n <= 2; n++){
+        const page = await doc.getPage(n), vp = page.getViewport({ scale: 2.5 }), c = document.createElement("canvas");
+        c.width = vp.width; c.height = vp.height;
+        await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        imgs.push(URL.createObjectURL(await new Promise(r => c.toBlob(r, "image/png"))));
+      }
+      pageImgs = imgs;
+    }
+  } catch (_) { pagesFailed = true; formMode = "list"; }
+  pagesLoading = false;
+  if (cur && view === "form") renderBrief();
+}
+let meas = null;
+function wrapScreen(text, widths){   // like wrapTo, measured with the screen's Helvetica; close enough for the preview
+  meas ||= document.createElement("canvas").getContext("2d");
+  const all = String(text).split(/\s+/).filter(Boolean); let out, size;
+  for (size = 7; size >= 5; size -= 0.5){
+    meas.font = size + "px Helvetica, Arial, sans-serif"; out = []; let i = 0;
+    for (const w of widths){ let line = ""; while (i < all.length && meas.measureText((line ? line + " " : "") + all[i]).width <= w) line = (line ? line + " " : "") + all[i++]; out.push(line); }
+    if (i >= all.length) break;
+  }
+  return { out, size: Math.max(size, 5) };
+}
+function pageHtml(){
+  if (pageImgs === "missing") return `<div class="warnbox" style="margin-top:14px"><b>One-time setup.</b> Add your blank Anderson Hicks form (the two-page PDF) and it's kept privately for every lead from here on. <button class="btn small" id="addBlank" style="margin-left:6px">Add the blank form</button></div>`;
+  if (!pageImgs){ loadPages(); return `<div class="busy"><div class="spin"></div><span>Opening the form…</span></div>`; }
+  const f = cur.form, [W, H] = FORM.size, X = v => (v / W * 100).toFixed(3) + "%", Y = v => (v / H * 100).toFixed(3) + "%";
+  let out = "";
+  for (let pg = 1; pg <= 2; pg++){
+    let h = `<img src="${pageImgs[pg - 1]}" alt="Form page ${pg}">`;
+    for (const d of FORM.fields.filter(d => d.page === pg)){
+      const v = f.fields[d.key] || "";
+      if (d.lines){ const w = wrapScreen(v || "Tap to type", d.lines.map(l => l.x1 - l.x - 4)); d.lines.forEach((l, n) => { h += `<label class="fl" for="long_${d.key}" style="left:${X(l.x + 2)};top:${Y(l.y - 8)};width:${X(l.x1 - l.x - 2)};font-size:${(w.size / W * 100).toFixed(3)}cqw${v ? "" : ";opacity:.45"}">${esc(w.out[n])}</label>`; }); }
+      else h += `<input type="text" data-fld="${d.key}" value="${esc(v)}" aria-label="${esc(d.label)}" style="left:${X(d.x)};top:${Y(d.y - 9.5)};width:${X(d.x1 - d.x)}">`;
+    }
+    if (FORM.rooms.page === pg) for (const r of FORM.rooms.rows) for (const c of FORM.rooms.cols)
+      h += `<input type="text" class="ctr" inputmode="numeric" data-room="${r.key}.${c.key}" value="${esc(f.rooms[r.key + "." + c.key] || "")}" aria-label="${esc(r.label + " " + c.label)}" style="left:${X(c.x - 17)};top:${Y(r.y - 8.5)};width:${X(34)}">`;
+    for (const s of FORM.sections.filter(s => s.page === pg)) for (const it of s.items){
+      const id = s.key + "." + it.key, c = f.checks[id];
+      const stop = Math.min(...[...(it.opts || []).map(o => o.x - 5), it.count ? it.count.x - 2 : 1e9, it.text ? it.text.x - 2 : 1e9]);
+      const w = Math.max(14, Math.min(it.label.length * 3.5 + 18, stop - (it.x - 7)));
+      h += `<button class="fx${c ? (c.b === "inferred" ? " inf" : " on") : ""}" data-chk="${id}" aria-label="${esc(s.title + ": " + it.label)}"${c?.why ? ` title="${esc(c.why)}"` : ""} style="left:${X(it.x - 7)};top:${Y(it.y - 8)};width:${X(w)}"><span>${c ? (c.b === "inferred" ? "?" : "X") : ""}</span></button>`;
+      for (const o of it.opts || []){
+        const on = c?.opts?.includes(o.key), circ = o.mark === "circle";
+        h += `<button class="fo${circ ? " circ" : ""}${on ? " on" : ""}" data-opt="${id}|${o.key}" aria-label="${esc(it.label + " " + o.label)}" style="left:${X(o.x - 4.9)};top:${Y(o.y - (circ ? 4.9 : 7.6))}">${on && !circ ? "x" : ""}</button>`;
+      }
+      if (it.count) h += `<input type="text" inputmode="numeric" data-cnt="${id}" value="${esc(c?.count || "")}" aria-label="${esc(it.label)} how many" style="left:${X(it.count.x - 1)};top:${Y(it.count.y - 9)};width:${X(it.count.x1 - it.count.x + 4)}">`;
+      if (it.text) h += `<input type="text" data-txt="${id}" value="${esc(c?.text || "")}" aria-label="${esc(it.label)} detail" style="left:${X(it.text.x)};top:${Y(it.text.y - 9)};width:${X(it.text.x1 - it.text.x)}">`;
+    }
+    out += `<div class="fpage">${h}</div>`;
+  }
+  const long = k => { const d = FORM.fields.find(x => x.key === k); return `<div><label class="f" for="long_${k}">${esc(d.label)}</label><textarea id="long_${k}" data-fld="${k}" style="min-height:74px">${esc(f.fields[k] || "")}</textarea></div>`; };
+  return out + `<div class="sec"><h3>The two written lines</h3><p class="note">These print on the ruled lines at the top and bottom of page 1.</p>${LONG_FIELDS.map(long).join("")}</div>`;
+}
 
 // ---- the PDF: marks written onto the team's own blank form --------------------------------
 async function blankForm(){
@@ -712,7 +831,7 @@ $("#blankPick").addEventListener("change", async e => {
   } catch (_) { return pdfFail("That doesn't look like the two-page On Site Property Info Form. Pick the blank PDF."); }
   const { error } = await sb.storage.from(BUCKET).upload(BLANK_PATH, file, { contentType: "application/pdf", upsert: true });
   if (error) return pdfFail("Couldn't store the blank form: " + error.message);
-  blank = bytes; makePdf();
+  blank = bytes; pageImgs = null; renderBrief();
 });
 function pdfFail(m){ const el = $("#pdfErr"); if (el){ el.textContent = m; el.hidden = false; } else alert(m); }
 const latin = s => String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/…/g, "...").replace(/[^\x20-\x7E\xA1-\xFF]/g, "");
@@ -725,7 +844,7 @@ function wrapTo(text, widths, font){   // fit words onto the form's ruled lines,
   }
   return { out, size: Math.max(size, 5) };
 }
-async function makePdf(){
+async function makePdf(print){
   const btn = $("#pdfBtn"); if ($("#pdfErr")) $("#pdfErr").hidden = true;
   const bytes = await blankForm();
   if (!bytes){
@@ -762,7 +881,12 @@ async function makePdf(){
     for (const r of FORM.rooms.rows) for (const c of FORM.rooms.cols){ const v = f.rooms[r.key + "." + c.key]; if (v) put(FORM.rooms.page, c.x, r.y, v, 7.5, true, 40); }
     const url = URL.createObjectURL(new Blob([await doc.save()], { type: "application/pdf" })), a = document.createElement("a");
     a.href = url; a.download = (f.fields.client_last_name || cur.name || "Seller").replace(/[^\w .-]/g, "") + " - On Site Property Info Form.pdf";
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    if (print){   // hand the finished PDF to the browser's own print dialog
+      document.getElementById("printFrame")?.remove();
+      const fr = document.createElement("iframe"); fr.id = "printFrame"; fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0"; fr.src = url;
+      fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.open(url, "_blank"); } };
+      document.body.appendChild(fr);
+    } else { document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
     return url;
   } catch (err){ pdfFail("The PDF couldn't be made: " + err.message); }
   finally { if (btn) btn.disabled = false; }
