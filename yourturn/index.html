@@ -307,7 +307,8 @@ footer{text-align:center;color:var(--ink-3);font-size:14px;margin-top:30px}
 <script>
 const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
-const GOOGLE_ENABLED = false;   // flip to true once the Google provider is set up in Supabase Auth
+let GOOGLE_ENABLED = false;   // set at load from Supabase Auth's public settings: true once the Google provider is saved there (same as Dough)
+fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((d) => { GOOGLE_ENABLED = !!d?.external?.google; const w = document.getElementById("googleWrap"); if (w && document.getElementById("authDlg").open && mode !== "reset") w.hidden = !GOOGLE_ENABLED; }).catch(() => {});
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
