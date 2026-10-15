@@ -246,6 +246,7 @@ footer{text-align:center;color:var(--ink-3);font-size:14px;margin-top:30px}
     <input type="text" id="myName" maxlength="40" autocomplete="given-name" required>
     <div class="err" id="nameErr" hidden></div>
     <div class="row"><button class="btn primary">Save</button></div>
+    <p class="note" id="nameWho"></p>
   </form>
 </dialog>
 
@@ -609,7 +610,12 @@ async function load(){
   }
   R.party = new Set([...R.party].filter((id) => people.some((p) => p.id === id)));
   recallMode(); loaded = true; render();
-  if (!me && !$("#nameDlg").open) $("#nameDlg").showModal();
+  // A brand-new Your Turn account. Say which account it is, since a second Google account on the phone
+  // looks exactly like a fresh start (Shawn, Oct 14, 2026: his work Google account signed in instead of his own).
+  if (!me && !$("#nameDlg").open){
+    $("#nameWho").innerHTML = `Signed in as <b>${esc(session.user.email)}</b>. Not you, or expected to see your places? <button type="button" class="btn link" data-act="nameSignOut">Sign out and use another account</button>`;
+    $("#nameDlg").showModal();
+  }
 }
 
 // ---- render: Pick ------------------------------------------------------------------------------
@@ -918,6 +924,7 @@ async function hidePlace(id, mark){
 }
 const ACTS = {
   signin: () => openAuth("in"),
+  nameSignOut: () => { $("#nameDlg").close(); sb.auth.signOut(); },
   closeDlg: (d, b) => b.closest("dialog").close(),
   tab: (d) => { tab = d.v; R.err = ""; render(); window.scrollTo(0, 0); },
   // setup
@@ -1060,7 +1067,7 @@ $("#authLinks").addEventListener("click", (e) => { const b = e.target.closest("[
 $("#authCancel").addEventListener("click", () => $("#authDlg").close());
 $("#signIn").addEventListener("click", () => openAuth("in"));
 $("#signOut").addEventListener("click", () => sb.auth.signOut());
-$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE } }));
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE, queryParams: { prompt: "select_account" } } }));
 $("#authForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#email").value.trim(), password = $("#password").value, b = $("#authBtn");

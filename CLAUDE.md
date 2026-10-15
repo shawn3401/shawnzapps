@@ -105,6 +105,7 @@ Shawn asked for the ideal flow for sitting down to make another batch of an exis
 shawnzapps.com/yourturn/. Shawn and Leah's way to settle where to eat, also for double dates and business lunches. Named for "it's your turn to pick". It copies their real ritual: one person throws out options, the others rule some out, and whoever's turn it is decides. It may become a mobile app later, so it is phone-first (one 680px column) and everything lives behind Supabase, nothing in the page but display logic.
 
 ### Files
+- Two Google accounts (Shawn, Oct 14, 2026): on his iPhone, Google sign-in quietly used his work account (shawn@andersonhicks.com, a separate ShawnZapps account made Oct 13) instead of shawn3401@gmail.com, so Your Turn opened empty and asked for his name. Now Google sign-in always shows Google's account chooser (`prompt: "select_account"`), and the first-sign-in "What should people call you?" dialog says which email is signed in, with "Sign out and use another account". Dough and Listing Assistant have the same Google button without the chooser.
 - `yourturn/index.html` the whole app, CSS and JS inline, supabase-js v2 from jsDelivr. Same sign-in code as Dough (`GOOGLE_ENABLED` false until the Google provider is set up). Teal and mustard palette, Fraunces and Source Sans 3.
 - `supabase/yourturn/001_schema.sql` tables, RLS, and functions. Safe to re-run.
 - `supabase/yourturn/functions/yourturn-search/index.ts` the Edge Function that talks to Google Places (deploy with the Supabase tools, `verify_jwt` on).
