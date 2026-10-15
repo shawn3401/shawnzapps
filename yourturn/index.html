@@ -318,9 +318,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const GENRES = { american: "American", burgers: "Burgers", pizza: "Pizza", mexican: "Mexican", italian: "Italian", chinese: "Chinese",
   japanese: "Japanese & sushi", thai: "Thai", indian: "Indian", bbq: "BBQ", steak: "Steak", seafood: "Seafood", sandwiches: "Sandwiches",
   breakfast: "Breakfast", mediterranean: "Mediterranean", asian: "Other Asian", other: "Other" };
-// minutes = typical time in and out, the starting guess until someone corrects a place.
-const STYLES = { fast_food: { label: "Fast food", minutes: 20 }, fast_casual: { label: "Fast casual", hint: "order at the counter", minutes: 35 },
-  sit_down: { label: "Sit-down", minutes: 70 } };
+// minutes = typical time in and out, the starting guess until someone sets a place's own time in Details.
+// Lowered Oct 14, 2026 (Shawn): at 70 minutes no sit-down place could ever fit "1 hour", even next door.
+const STYLES = { fast_food: { label: "Fast food", minutes: 20 }, fast_casual: { label: "Fast casual", hint: "order at the counter", minutes: 30 },
+  sit_down: { label: "Sit-down", minutes: 50 } };
 // "Nice night out" was a fourth style until Oct 5, 2026 (Shawn: fewer options). Anything still marked that way counts as sit-down.
 const styleOf = (v) => STYLES[v] ? v : "sit_down";
 const TIMES = [[30, "30 min"], [45, "45 min"], [60, "1 hour"], [90, "1.5 hours"], [999, "No rush"]];
@@ -561,7 +562,7 @@ async function townSearch(q){
 
 // ---- saving ------------------------------------------------------------------------------
 const placeRow = (c) => { const f = facts(c); return { place_id: c.id, name: c.name, address: c.address || null, lat: c.lat, lng: c.lng, maps_url: c.maps || null,
-  genre: f.genre, style: f.style, minutes: f.minutes, waits: f.waits, reservable: c.reservable ?? null }; };
+  genre: f.genre, style: f.style, minutes: places.get(c.id)?.minutes ?? null, waits: f.waits, reservable: c.reservable ?? null }; };   // only a time someone set is saved; otherwise the starting guess applies
 // Save a place the first time someone touches it. An existing row is left alone so corrections stick.
 async function keepPlace(c){
   if (places.has(c.id)) return;
