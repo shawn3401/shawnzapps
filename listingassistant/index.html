@@ -160,6 +160,12 @@ dialog h2{font-size:22px}
 .whoc.on{outline:2px solid var(--ink);outline-offset:1px}
 .whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
+.tnotes{margin-top:6px;border-left:3px solid var(--line);padding-left:10px}
+.tnote{font-size:15px;margin-top:4px;white-space:pre-wrap}
+.tnote .d{color:var(--ink-3);font-size:13px;margin-right:6px}
+.tnoteForm{margin-top:8px}
+.tnoteForm textarea{min-height:70px;font-size:15px}
+.tnoteForm .row{margin-top:8px;justify-content:flex-start}
 .doneList{margin-top:14px}
 .doneList summary{cursor:pointer;color:var(--ink-2);font-size:15px}
 
@@ -331,7 +337,7 @@ const todayISO = () => new Date().toLocaleDateString("en-CA");
 const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
-let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, todoWho = "agent", whoFilter = "all", whoEdit = null, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
+let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, todoWho = "agent", whoFilter = "all", whoEdit = null, noteFor = null, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
 let formMode = innerWidth >= 760 ? "page" : "list", pageImgs = null, pagesLoading = false, pagesFailed = false;   // the form as the real page (wide screens) or as a list of boxes (phones)
 const triedPdf = new Set();
 
@@ -381,7 +387,7 @@ async function openLead(id){
     sb.from("listing_todos").select("*").eq("lead_id", id).order("created_at"),
   ]);
   if (!l){ location.hash = ""; return; }
-  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; view = "notes"; tab = "overview"; fileFilter = "all";
+  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; noteFor = null; view = "notes"; tab = "overview"; fileFilter = "all";
   $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteOk").hidden = $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
   show("lead"); renderLead(); window.scrollTo(0, 0);
   loadThumbs();
@@ -435,7 +441,7 @@ $("#newForm").addEventListener("submit", async e => {
 function renderNotes(){
   const notes = items.filter(isNote).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at));
   $("#notes").innerHTML = notes.length ? notes.map(i => `<div class="item">
-      <div class="ih"><b>${niceDate(i.occurred_on)}</b><span class="meta">${words(i.transcript).toLocaleString()} words · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      <div class="ih"><b>${niceDate(i.occurred_on)}${i.todo_id && i.title ? ` <span class="meta" style="font-weight:400">· ${esc(i.title)}</span>` : ""}</b><span class="meta">${words(i.transcript).toLocaleString()} words · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
       <p class="prev">${esc(i.transcript)}</p>
       <details><summary>Open and edit</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>
     </div>`).join("") : `<p class="sub" style="margin-top:14px">No notes yet. Anything you type or paste here goes into the brief: a thought after a call, something the seller told you, a whole transcript.</p>`;
@@ -461,6 +467,8 @@ $("#noteSave").addEventListener("click", async () => {
 // transcript, and PDF he adds is read for more (the listing-todos function). Nothing is ticked off for him:
 // when new material shows a to-do is finished, it gets a "Looks done" prompt instead.
 const whoName = k => (WHO.find(w => w[0] === k) || WHO[0])[1];
+// notes written on a to-do are ordinary note entries (so the brief reads them) tied back with todo_id
+const tnotes = t => { const ns = items.filter(i => i.todo_id === t.id).sort((a, b) => a.created_at.localeCompare(b.created_at)); return ns.length ? `<div class="tnotes">${ns.map(i => `<div class="tnote"><span class="d">${niceDate(i.occurred_on)}</span>${esc(i.transcript)}</div>`).join("")}</div>` : ""; };
 function renderTodos(){
   const all = todos.filter(t => !t.done), counts = {}; all.forEach(t => counts[t.who] = (counts[t.who] || 0) + 1);
   if (whoFilter !== "all" && !counts[whoFilter]) whoFilter = "all";
@@ -471,7 +479,9 @@ function renderTodos(){
   const row = t => `<div class="todo${t.done ? " done" : ""}">
       <button class="tick" data-tick="${t.id}" aria-label="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
       <div class="tb"><div class="tt">${esc(t.text)}</div>
-        <div class="meta">${from(t)}${t.done && t.done_at ? " · done " + niceDate(t.done_at) : ""} · <button class="btn link" data-trm="${t.id}">Remove</button></div>
+        <div class="meta">${from(t)}${t.done && t.done_at ? " · done " + niceDate(t.done_at) : ""} · <button class="btn link" data-tnote="${t.id}">Add a note</button> · <button class="btn link" data-trm="${t.id}">Remove</button></div>
+        ${tnotes(t)}
+        ${noteFor === t.id ? `<div class="tnoteForm"><textarea id="tnoteText" placeholder="What happened, what you found, what's next"></textarea><div class="row">${t.done ? "" : `<button class="btn primary small" data-tnsave="${t.id}|done">Save and mark done</button>`}<button class="btn${t.done ? " primary" : ""} small" data-tnsave="${t.id}|keep">Save note</button><button class="btn small" data-tncancel="1">Cancel</button></div></div>` : ""}
         ${!t.done && t.done_hint ? `<div class="warnbox">Looks done: ${esc(t.done_hint)} <button class="btn small" data-tick="${t.id}">Mark done</button> <button class="btn small" data-nothint="${t.id}">Not yet</button></div>` : ""}
       </div>${who(t)}</div>`;
   $("#todoWho").innerHTML = WHO.map(([k, n]) => `<button class="whoc ${k}${todoWho === k ? " on" : ""}" data-addwho="${k}">${n}</button>`).join("");
@@ -492,6 +502,25 @@ async function findTodos(item){   // one new entry, or with no item, everything 
   }
   return res;
 }
+async function saveTodoNote(id, how){
+  const t = todos.find(x => x.id === id), text = ($("#tnoteText")?.value || "").trim();
+  if (!t) return;
+  if (!text && how !== "done") return void $("#tnoteText")?.focus();
+  document.querySelectorAll("[data-tnsave]").forEach(b => b.disabled = true);
+  let item = null;
+  if (text){
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: cur.id, kind: "note", title: "To-do: " + t.text, todo_id: t.id, occurred_on: todayISO(), transcript: text }).select().single();
+    if (error){ alert("That note didn't save: " + error.message); return renderTodos(); }
+    item = data; items.push(data);
+  }
+  if (how === "done"){
+    const patch = { done: true, done_at: new Date().toISOString(), done_hint: "" }; Object.assign(t, patch);
+    const { error } = await sb.from("listing_todos").update(patch).eq("id", t.id);
+    if (error) alert("The to-do didn't save as done: " + error.message);
+  }
+  noteFor = null; renderView();
+  if (item) findTodos(item);   // a note can raise new to-dos too
+}
 async function addTodo(){
   const text = $("#todoText").value.trim(); if (!text) return;
   const { data, error } = await sb.from("listing_todos").insert({ lead_id: cur.id, text, who: todoWho }).select().single();
@@ -503,6 +532,10 @@ $("#todoText").addEventListener("keydown", e => { if (e.key === "Enter"){ e.prev
 $("#todosTab").addEventListener("click", async e => {
   const tick = e.target.closest("[data-tick]"), not = e.target.closest("[data-nothint]"), rm = e.target.closest("[data-trm]");
   if (e.target.id === "todoScan") return void findTodos(null);
+  const tn = e.target.closest("[data-tnote]"), tns = e.target.closest("[data-tnsave]");
+  if (tn){ noteFor = tn.dataset.tnote; renderTodos(); const box = $("#tnoteText"); if (box) box.focus(); return; }
+  if (e.target.closest("[data-tncancel]")){ noteFor = null; return renderTodos(); }
+  if (tns) return saveTodoNote(...tns.dataset.tnsave.split("|"));
   const aw = e.target.closest("[data-addwho]"), wf = e.target.closest("[data-wf]"), w = e.target.closest("[data-who]"), sw = e.target.closest("[data-setwho]");
   if (aw){ todoWho = aw.dataset.addwho; return renderTodos(); }
   if (wf){ whoFilter = wf.dataset.wf; return renderTodos(); }
