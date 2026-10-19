@@ -161,6 +161,21 @@ dialog h2{font-size:22px}
 .whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 #chat{display:flex;flex-direction:column}
+.vgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+@media (max-width:760px){.vgrid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:420px){.vgrid{grid-template-columns:repeat(2,1fr)}}
+.vt{border:1px solid var(--line);border-radius:8px;min-width:0;background:var(--paper)}
+.vbtn{background:none;border:0;width:100%;text-align:left;padding:9px 10px;cursor:pointer;font:inherit;color:inherit;border-radius:8px}
+.vbtn:hover{background:var(--soft)}
+.vl{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);font-weight:600}
+.va{font-size:19px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.vt.empty .va{color:var(--ink-3);font-weight:400;font-size:15px}
+.vs{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vhint{font-size:12px;background:var(--warn-soft);color:var(--warn);padding:6px 9px;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
+.vt.edit{padding:9px 10px;grid-column:span 2;border-color:var(--ink-3)}
+.vt.edit input{padding:6px 8px;font-size:15px;margin-top:6px}
+.vt.edit .row{margin-top:8px;justify-content:flex-start;gap:6px}
+.vh{font-size:12px;color:var(--ink-3);margin-top:6px}
 .pill.askpill{margin-left:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:14px;padding-right:16px}
 .pill.askpill:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
 .pill.askpill.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
@@ -239,6 +254,9 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
       </div>
       <label class="f">Stage</label>
       <div class="pills" id="stagePills"></div>
+      <label class="f">Value</label>
+      <div class="vgrid" id="values"></div>
+      <p class="note" id="vread" style="margin:8px 0 0"></p>
     </div>
 
     <div class="tabs pills" id="tabs" style="margin-top:18px"></div>
@@ -374,7 +392,7 @@ async function load(){
   if (!session){ show("out"); return; }
   const { data: a } = await sb.from("listing_access").select("user_id").maybeSingle();
   if (!a){ show("noAccess"); return; }
-  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
+  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, numbers, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
   leads = error ? [] : data;
   const { data: open } = await sb.from("listing_todos").select("lead_id").eq("done", false);
   const n = {}; (open || []).forEach(t => n[t.lead_id] = (n[t.lead_id] || 0) + 1); leads.forEach(l => l.todo = n[l.id] || 0);
@@ -396,6 +414,7 @@ function renderList(){
       <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
       ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
       ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
+      ${l.numbers?.wants || l.numbers?.cma_low || l.numbers?.cma_high ? `<div class="nx">${[l.numbers.wants && "Wants " + kmoney(l.numbers.wants.amount), (l.numbers.cma_low || l.numbers.cma_high) && "CMA " + [l.numbers.cma_low, l.numbers.cma_high].filter(Boolean).map(x => kmoney(x.amount)).join(" to ")].filter(Boolean).join(" · ")}</div>` : ""}
       <div class="when">${l.todo ? `<b style="color:var(--accent-deep)">${l.todo} to-do${l.todo === 1 ? "" : "s"} open</b> · ` : ""}Updated ${niceDate(l.updated_at)}</div>
     </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
 }
@@ -413,14 +432,14 @@ async function openLead(id){
     sb.from("listing_todos").select("*").eq("lead_id", id).order("created_at"),
   ]);
   if (!l){ location.hash = ""; return; }
-  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; noteFor = null; view = "notes"; tab = "overview"; fileFilter = "all";
+  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; noteFor = null; numEdit = null; view = "notes"; tab = "overview"; fileFilter = "all";
   $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteOk").hidden = $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
   show("lead"); renderLead(); window.scrollTo(0, 0);
   loadThumbs();
 }
 function normForm(f){ f = f || {}; return { fields: f.fields || {}, checks: f.checks || {}, rooms: f.rooms || {}, locked: f.locked || {} }; }
 function renderLead(){
-  $("#lName").value = cur.name; $("#lAddr").value = cur.address;
+  $("#lName").value = cur.name; $("#lAddr").value = cur.address; cur.numbers ||= {}; renderValues();
   $("#stagePills").innerHTML = STAGES.map(([k, n]) => `<button class="pill${cur.stage === k ? " on" : ""}" data-s="${k}">${n}</button>`).join("");
   renderView();
 }
@@ -488,6 +507,68 @@ $("#noteSave").addEventListener("click", async () => {
   setTimeout(() => { if (cur === lead) ok.hidden = true; }, got.length ? 9000 : 2500);
 });
 
+// ---- value -------------------------------------------------------------------------------
+// The numbers that bear on value (Shawn, Oct 19, 2026), entered by hand or through Ask. Zillow blocks automated
+// lookups, so nothing is fetched. listing-todos leaves a suggestion (hints) when a note or transcript states one.
+const NUMS = [["tax", "Tax assessed"], ["zest", "Zestimate"], ["wants", "Seller wants"], ["loan", "Loan amount"], ["cma_low", "CMA low"], ["cma_high", "CMA high"]];
+let numEdit = null;
+const money = n => "$" + Math.round(n).toLocaleString("en-US");
+const kmoney = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M" : "$" + Math.round(n / 1000) + "k";
+function parseMoney(t){   // "525k", "$525,000", "1.2m"; a bare number under 10,000 means thousands ("525" is $525,000)
+  t = String(t).toLowerCase().replace(/[$,\s]/g, ""); if (!t) return 0;
+  const m = t.match(/^(\d+(?:\.\d+)?)(k|m)?$/); if (!m) return NaN;
+  let n = parseFloat(m[1]); if (m[2] === "k") n *= 1e3; else if (m[2] === "m") n *= 1e6; else if (n < 10000) n *= 1e3;
+  return Math.round(n);
+}
+function renderValues(){
+  const N = cur.numbers || {}, H = N.hints || {};
+  $("#values").innerHTML = NUMS.map(([k, label]) => {
+    const v = N[k], h = H[k];
+    if (numEdit === k) return `<div class="vt edit"><div class="vl">${label}</div>
+      <input type="text" inputmode="decimal" id="numAmt" value="${v ? money(v.amount) : ""}" placeholder="Like 525k or $525,000" aria-label="${label}">
+      <input type="text" id="numNote" value="${esc(v?.note || "")}" placeholder="Where it's from (optional)" aria-label="Where it's from">
+      <div class="err" id="numErr" hidden></div>
+      <div class="row"><button class="btn small primary" data-numsave="${k}">Save</button><button class="btn small" data-numcancel="1">Cancel</button>${v ? `<button class="btn small" data-numclear="${k}">Clear</button>` : ""}</div>
+      ${v?.history?.length ? `<div class="vh">Before: ${v.history.slice().reverse().map(x => `${money(x.amount)} (${niceDate(x.at)})`).join(", ")}</div>` : ""}</div>`;
+    return `<div class="vt${v ? "" : " empty"}"><button class="vbtn" data-num="${k}"><div class="vl">${label}</div><div class="va">${v ? money(v.amount) : "Not yet"}</div><div class="vs" title="${esc(v?.note || "")}">${v ? (v.note ? esc(v.note) + " · " : "") + niceDate(v.at) : "Tap to add"}</div></button>${h ? `<div class="vhint">Found ${money(h.amount)}: "${esc(h.evidence)}" <button class="btn link" data-numuse="${k}">Use it</button> · <button class="btn link" data-numdis="${k}">Dismiss</button></div>` : ""}</div>`;
+  }).join("");
+  const a = k => N[k]?.amount, out = [];
+  if (a("wants") && a("cma_high") && a("wants") > a("cma_high")) out.push(`Seller wants ${kmoney(a("wants") - a("cma_high"))} over CMA high`);
+  else if (a("wants") && a("cma_low") && a("wants") < a("cma_low")) out.push(`Seller wants ${kmoney(a("cma_low") - a("wants"))} under CMA low`);
+  else if (a("wants") && a("cma_low") && a("cma_high")) out.push("Seller's number is inside the CMA range");
+  const both = a("cma_low") && a("cma_high"), mid = both ? (a("cma_low") + a("cma_high")) / 2 : a("cma_high") || a("cma_low");
+  if (a("loan") && mid) out.push(`Equity about ${kmoney(mid - a("loan"))} (${both ? "CMA midpoint" : "CMA"} minus loan)`);
+  $("#vread").textContent = out.join(" · "); $("#vread").hidden = !out.length;
+}
+async function saveNum(k, amount, note){
+  const N = cur.numbers ||= {}, prev = N[k];
+  if (amount > 0) N[k] = { amount, note, at: new Date().toISOString(), history: prev?.amount && prev.amount !== amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) };
+  else delete N[k];
+  if (N.hints) delete N.hints[k];
+  numEdit = null; renderValues();
+  const row = leads.find(l => l.id === cur.id); if (row) row.numbers = N;
+  const { error } = await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id);
+  if (error) alert("That didn't save: " + error.message);
+}
+$("#values").addEventListener("click", async e => {
+  const t = e.target, N = cur.numbers || {};
+  const open = t.closest("[data-num]"), sv = t.closest("[data-numsave]"), clr = t.closest("[data-numclear]"), use = t.closest("[data-numuse]"), dis = t.closest("[data-numdis]");
+  if (open){ numEdit = open.dataset.num; renderValues(); $("#numAmt").focus(); $("#numAmt").select(); }
+  else if (t.closest("[data-numcancel]")){ numEdit = null; renderValues(); }
+  else if (sv){
+    const n = parseMoney($("#numAmt").value);
+    if (isNaN(n)){ $("#numErr").textContent = "Type an amount like 525k or $525,000."; $("#numErr").hidden = false; return; }
+    saveNum(sv.dataset.numsave, n, $("#numNote").value.trim());
+  }
+  else if (clr) saveNum(clr.dataset.numclear, 0, "");
+  else if (use){ const h = N.hints[use.dataset.numuse]; saveNum(use.dataset.numuse, h.amount, "Found in your notes"); }
+  else if (dis){ delete N.hints[dis.dataset.numdis]; renderValues(); await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id); }
+});
+$("#values").addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.target.id === "numAmt" || e.target.id === "numNote")){ e.preventDefault(); document.querySelector("[data-numsave]")?.click(); }
+  if (e.key === "Escape"){ numEdit = null; renderValues(); }
+});
+
 // ---- ask -----------------------------------------------------------------------------
 // A chat about this lead. The listing-chat function answers from everything on the lead and can change
 // to-dos, notes, the form, and the stage; each change comes back with what it takes to undo it.
@@ -539,6 +620,12 @@ async function undoAction(msgId, n){
   else if (t === "todo_set") ({ error } = await sb.from("listing_todos").update(u.patch).eq("id", u.id));
   else if (t === "item_del") ({ error } = await sb.from("listing_items").delete().eq("id", u.id));
   else if (t === "stage") ({ error } = await sb.from("listing_leads").update({ stage: u.prev }).eq("id", cur.id));
+  else if (t === "num"){
+    const N = cur.numbers ||= {};
+    if (u.prev) N[u.key] = u.prev; else delete N[u.key];
+    if (u.prevHint){ N.hints ||= {}; N.hints[u.key] = u.prevHint; }
+    ({ error } = await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id));
+  }
   else if (t === "form"){
     const f = cur.form;
     if (u.prev === null) delete f[u.src][u.k]; else f[u.src][u.k] = u.prev;
@@ -594,6 +681,7 @@ async function findTodos(item){   // one new entry, or with no item, everything 
   if (cur === lead){
     for (const t of res.added || []) todos.push(t);
     for (const h of res.hinted || []){ const t = todos.find(x => x.id === h.id); if (t) t.done_hint = h.done_hint; }
+    if (res.numbers && typeof res.numbers === "object"){ cur.numbers = res.numbers; renderValues(); }
     if (res.error && view === "todos"){ renderTodos(); $("#todoStatus").textContent = "Couldn't check for to-dos: " + res.error; } else renderView();
   }
   return res;

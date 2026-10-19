@@ -41,6 +41,14 @@ Rules for done:
 - List an existing OPEN to-do only when the new material clearly shows it has been finished ("measured the house today, 2,340 square feet" finishes "Measure the property"). Give its number and one short sentence of evidence in the material's own words.
 - When in doubt, leave it out.
 
+Rules for numbers (only these six, only about THIS property, and only when the material states the amount):
+- tax: the county's assessed or taxable value of the property.
+- zest: Zillow's Zestimate for the property.
+- wants: the price the seller says they want or would list at.
+- loan: what the seller owes on the property (mortgage balance or payoff).
+- cma_low and cma_high: the low and high ends of the agent's own price range from a CMA or comparable sales.
+Give the amount in whole dollars ("she wants 525" means 525000) and one short quote of where it came from. Never use a comparable sale, a neighbor's house, a past purchase price, or a guess. When none of the six is stated, return an empty list.
+
 Plain words. No em dashes or en dashes. No markdown.`;
 
 const TOOL = {
@@ -50,7 +58,7 @@ const TOOL = {
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["add", "done"],
+    required: ["add", "done", "numbers"],
     properties: {
       add: {
         type: "array",
@@ -59,6 +67,10 @@ const TOOL = {
       done: {
         type: "array",
         items: { type: "object", additionalProperties: false, required: ["number", "evidence"], properties: { number: { type: "integer" }, evidence: { type: "string" } } },
+      },
+      numbers: {
+        type: "array",
+        items: { type: "object", additionalProperties: false, required: ["key", "amount", "evidence"], properties: { key: { type: "string", enum: ["tax", "zest", "wants", "loan", "cma_low", "cma_high"] }, amount: { type: "integer" }, evidence: { type: "string" } } },
       },
     },
   },
@@ -81,14 +93,14 @@ Deno.serve(async (req: Request) => {
 
   let body: { lead_id?: string; item_id?: string };
   try { body = await req.json(); } catch { return json({ error: "Bad request." }, 400); }
-  const { data: lead } = await admin.from("listing_leads").select("id, name, address").eq("id", body.lead_id ?? "").eq("user_id", userId).maybeSingle();
+  const { data: lead } = await admin.from("listing_leads").select("id, name, address, numbers").eq("id", body.lead_id ?? "").eq("user_id", userId).maybeSingle();
   if (!lead) return json({ error: "That lead wasn't found." }, 404);
 
   let q = admin.from("listing_items").select("id, kind, occurred_on, title, transcript").eq("lead_id", lead.id).order("occurred_on").order("created_at");
   if (body.item_id) q = q.eq("id", body.item_id);
   const { data: all } = await q;
   const items = (all || []).filter((i) => (i.transcript || "").trim());
-  if (!items.length) return json({ added: [], hinted: [] });
+  if (!items.length) return json({ added: [], hinted: [], numbers: lead.numbers });
   const { data: have } = await admin.from("listing_todos").select("id, text, who, done").eq("lead_id", lead.id).order("created_at");
   const todos = have || [];
 
@@ -128,7 +140,7 @@ Call save_todos.`;
       output_tokens: res.usage.output_tokens ?? 0,
     });
     const call = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "save_todos");
-    const out = (call?.input ?? { add: [], done: [] }) as { add: { text: string; who: string }[]; done: { number: number; evidence: string }[] };
+    const out = (call?.input ?? { add: [], done: [], numbers: [] }) as { add: { text: string; who: string }[]; done: { number: number; evidence: string }[]; numbers: { key: string; amount: number; evidence: string }[] };
     console.log(`todos lead=${lead.id} entries=${items.length} add=${out.add?.length ?? 0} done=${out.done?.length ?? 0} in=${res.usage.input_tokens} out=${res.usage.output_tokens}`);
 
     const rows = (out.add || []).filter((a) => a.text?.trim()).slice(0, MAX_ADD).map((a) => ({
@@ -147,7 +159,17 @@ Call save_todos.`;
       await admin.from("listing_todos").update({ done_hint }).eq("id", t.id);
       hinted.push({ id: t.id, done_hint });
     }
-    return json({ added, hinted });
+    // a number it spotted waits on the Value card as a suggestion; it never overwrites one
+    const nums = (lead.numbers || {}) as Record<string, any>; let numsDirty = false;
+    for (const n of out.numbers || []) {
+      if (!["tax", "zest", "wants", "loan", "cma_low", "cma_high"].includes(n.key) || !(n.amount > 0)) continue;
+      if (nums[n.key]?.amount === n.amount) continue;
+      nums.hints = nums.hints || {};
+      nums.hints[n.key] = { amount: n.amount, evidence: (n.evidence || "").trim().slice(0, 300), at: new Date().toISOString(), item_id: body.item_id ?? null };
+      numsDirty = true;
+    }
+    if (numsDirty) await admin.from("listing_leads").update({ numbers: nums }).eq("id", lead.id);
+    return json({ added, hinted, numbers: nums });
   } catch (err) {
     console.error("anthropic error", err);
     if (err instanceof Anthropic.RateLimitError) return json({ error: "The AI is busy right now. Try again in a minute." }, 503);
