@@ -161,6 +161,11 @@ dialog h2{font-size:22px}
 .whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 #chat{display:flex;flex-direction:column}
+.pill.askpill{margin-left:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:14px;padding-right:16px}
+.pill.askpill:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+.pill.askpill.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+:root[data-theme="dark"] .pill.askpill:not(.on){color:#1B120E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.askpill:not(.on){color:#1B120E}}
 .msg{max-width:86%;padding:9px 13px;border-radius:14px;margin-top:9px;overflow-wrap:anywhere}
 .msg.me{margin-left:auto;background:var(--ink);color:var(--bg);border-bottom-right-radius:4px;white-space:pre-wrap}
 .msg.ai{background:var(--bg);border:1px solid var(--line);border-bottom-left-radius:4px}
@@ -339,7 +344,8 @@ fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } })
 
 const BUCKET = "listing-files", BLANK_PATH = "_shared/form-blank.pdf", MAX_FILE = 200 * 1024 * 1024;
 const STAGES = [["new", "New lead"], ["call", "First call done"], ["walk_set", "Walkthrough set"], ["walked", "Walked"], ["pricing", "Pricing"], ["signed", "Signed"], ["listed", "Listed"], ["hold", "On hold"], ["closed", "Closed out"]];
-const VIEWS = [["notes", "Notes"], ["files", "Files"], ["todos", "To-dos"], ["ask", "Ask"], ["brief", "Brief"], ["form", "Property form"]];
+const VIEWS = [["notes", "Notes"], ["files", "Files"], ["todos", "To-dos"], ["brief", "Brief"], ["form", "Property form"], ["ask", "Ask"]];   // Ask sits apart at the far right (Shawn, Oct 19, 2026)
+const ASK_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/><path d="M12 8.5l.9 1.8 1.9.3-1.4 1.3.3 1.9-1.7-.9-1.7.9.3-1.9-1.4-1.3 1.9-.3z" fill="currentColor" stroke="none"/></svg>`;
 const WHO = [["agent", "Listing Agent"], ["seller", "Seller"], ["team", "Success Team"]];   // who a to-do belongs to
 const FTYPES = [["photo", "Photos"], ["audio", "Recordings"], ["video", "Video"], ["doc", "Documents"]];
 const TABS = [["overview", "Overview"], ["team", "Team notes"], ["admin", "Admin notes"], ["private", "My notes"]];   // inside Brief
@@ -422,7 +428,7 @@ function renderLead(){
 const isNote = i => !i.files.length;
 function renderView(){
   const nNotes = items.filter(isNote).length, n = { notes: nNotes, files: items.length - nNotes, todos: todos.filter(t => !t.done).length };
-  $("#tabs").innerHTML = VIEWS.map(([k, name]) => `<button class="pill${view === k ? " on" : ""}" data-v="${k}">${name}${n[k] ? `<span class="n">${n[k]}</span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = VIEWS.map(([k, name]) => `<button class="pill${k === "ask" ? " askpill" : ""}${view === k ? " on" : ""}" data-v="${k}">${k === "ask" ? ASK_ICON : ""}${name}${n[k] ? `<span class="n">${n[k]}</span>` : ""}</button>`).join("");
   $("#notesTab").hidden = view !== "notes"; $("#filesTab").hidden = view !== "files"; $("#todosTab").hidden = view !== "todos"; $("#askTab").hidden = view !== "ask"; $("#briefTab").hidden = view !== "brief" && view !== "form";
   if (view === "notes") renderNotes(); else if (view === "files") renderFiles(); else if (view === "todos") renderTodos(); else if (view === "ask") renderChat(); else renderBrief();
 }
