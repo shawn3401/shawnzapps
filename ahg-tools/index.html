@@ -6,59 +6,745 @@
 <meta name="robots" content="noindex">
 <title>AHG Tools</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
-:root { --bg: #f6f5f3; --card: #fff; --ink: #222; --muted: #666; --line: #ddd; --red: #b3262d; }
+:root {
+  --bg: #f3f3f2; --card: #fff; --ink: #222; --muted: #6b6b6b; --line: #cfcfcf; --field: #fff; --ro: #e4e4e4;
+  --teal: #24706f; --teal-ink: #fff; --red: #c8322b; --green: #1f7a2e; --head: #6e6e6e; --sel: #cfe3f7;
+}
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #161616; --card: #222; --ink: #eee; --muted: #aaa; --line: #3a3a3a; --red: #e0555b; }
+  :root { --bg: #151616; --card: #1f2121; --ink: #e9e9e9; --muted: #a3a3a3; --line: #3d4141; --field: #262929; --ro: #2f3333;
+    --teal: #1d5a59; --red: #e2574f; --green: #5cc06c; --head: #4a4d4d; --sel: #23405c; }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 "Source Sans 3", system-ui, sans-serif; }
-main { max-width: 440px; margin: 12vh auto; padding: 0 16px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; }
-h1 { margin: 0 0 6px; font-size: 26px; }
-p { margin: 0 0 18px; color: var(--muted); }
-button { font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
-button.primary { background: var(--red); border-color: var(--red); color: #fff; }
-.who { color: var(--ink); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 "Source Sans 3", system-ui, sans-serif; }
 [hidden] { display: none !important; }
+button { font: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: var(--ink); }
+
+/* header bar, like the Access form header */
+.bar { background: var(--teal); color: var(--teal-ink); }
+.bar-in { max-width: 1240px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mark { font-weight: 700; letter-spacing: .04em; line-height: 1.05; font-size: 15px; text-transform: uppercase; }
+.mark b { color: #ff6b5f; }
+.title { flex: 1; text-align: center; font-size: 30px; font-weight: 400; min-width: 200px; }
+.bar-btns { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.bar-btns button { background: #f2f2f2; color: #222; border: 1px solid #bbb; padding: 7px 26px; font-size: 16px; }
+.rid { opacity: .55; font-size: 14px; min-width: 40px; text-align: right; }
+.who { font-size: 13px; opacity: .85; text-align: right; }
+.who a { color: inherit; }
+
+main { max-width: 1240px; margin: 0 auto; padding: 18px 16px 70px; }
+.card { background: var(--card); border: 1px solid var(--line); padding: 22px; }
+.center { max-width: 460px; margin: 10vh auto; }
+.center h1 { margin: 0 0 6px; font-size: 26px; }
+.center p { color: var(--muted); margin: 0 0 16px; }
+.primary { background: var(--red); border: 1px solid var(--red); color: #fff; padding: 9px 18px; font-weight: 600; border-radius: 4px; }
+.plain { background: var(--card); border: 1px solid var(--line); color: var(--ink); padding: 7px 14px; border-radius: 4px; }
+
+/* home menu, like the Access navigation pane */
+.menu h2 { margin: 0 0 8px; font-size: 17px; color: var(--muted); font-weight: 600; }
+.menu a { display: block; padding: 9px 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; margin-bottom: 6px; max-width: 360px; }
+.menu a:hover { border-color: var(--teal); }
+
+/* search */
+.search { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.search label { width: 100%; color: var(--muted); }
+.search input { flex: 1; min-width: 220px; padding: 8px 10px; border: 1px solid var(--line); background: var(--field); }
+table.list { width: 100%; border-collapse: collapse; background: var(--card); }
+table.list th, table.list td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.list th { background: var(--head); color: #fff; font-weight: 600; }
+table.list tr.row { cursor: pointer; }
+table.list tr.row:hover td { background: var(--sel); }
+.scroll { overflow-x: auto; }
+.note { color: var(--muted); margin: 10px 0; }
+
+/* the form */
+.form { background: var(--card); border: 1px solid var(--line); padding: 18px 20px; }
+.top { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 28px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.f { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 8px; }
+.f > span { color: var(--muted); }
+.f input, .f select, .pick input { width: 100%; padding: 5px 7px; border: 1px solid var(--line); background: var(--field); min-height: 32px; }
+.f input[readonly], .f .ro { background: var(--ro); border: 1px solid var(--line); padding: 5px 7px; min-height: 32px; }
+.f input.num { text-align: right; }
+.f .ro.num { text-align: right; }
+.req > span::after { content: " *"; color: var(--red); }
+.leads { border: 1px solid var(--line); padding: 0 10px 10px; }
+.leads h3 { margin: 0 -10px 10px; background: var(--head); color: #fff; font-style: italic; font-weight: 400; text-align: center; padding: 5px; font-size: 17px; }
+.pick { position: relative; }
+.pick ul { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 0; list-style: none; background: var(--card); border: 1px solid var(--line); max-height: 260px; overflow: auto; box-shadow: 0 6px 18px rgba(0,0,0,.15); }
+.pick li { padding: 6px 8px; cursor: pointer; display: flex; gap: 10px; }
+.pick li small { color: var(--muted); margin-left: auto; white-space: nowrap; }
+.pick li:hover, .pick li.on { background: var(--sel); }
+
+.tabs { display: flex; gap: 2px; margin-top: 26px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tabs button { background: var(--ro); border: 1px solid var(--line); border-bottom: none; padding: 6px 12px; color: var(--ink); }
+.tabs button.on { background: var(--card); position: relative; top: 1px; font-weight: 600; }
+.pane { border: 1px solid var(--line); border-top: none; padding: 22px; min-height: 380px; }
+.ci { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 30px; }
+.ci .f { grid-template-columns: 1fr 150px; margin-bottom: 9px; }
+.ci .f input[type=checkbox] { justify-self: center; width: 18px; min-height: 18px; }
+.calc { border-top: 2px solid var(--ink); padding-top: 8px; font-weight: 700; }
+.calc > span { color: var(--ink) !important; }
+.calc .v { text-align: right; padding-right: 8px; }
+.v { text-align: right; padding-right: 8px; }
+.green > span, .green .v { color: var(--green) !important; }
+.redc > span, .redc .v { color: var(--red) !important; }
+.dl { display: grid; grid-template-columns: 200px 140px 140px; gap: 9px 18px; align-items: center; }
+.dl b { font-weight: 700; }
+.dl span { color: var(--muted); }
+.dl input { padding: 5px 7px; border: 1px solid var(--line); background: var(--field); min-height: 32px; width: 100%; }
+.dl input.num { text-align: right; }
+.cd { display: grid; grid-template-columns: auto auto; gap: 30px 60px; align-items: start; }
+.cp { max-width: 440px; margin: 20px auto; display: flex; flex-direction: column; gap: 10px; }
+.cp .f { grid-template-columns: 160px 1fr; }
+.cp .f input[type=checkbox] { width: 18px; min-height: 18px; justify-self: start; }
+
+table.grid { border-collapse: collapse; width: 100%; }
+table.grid th { background: var(--head); color: #fff; font-weight: 600; padding: 6px 8px; text-align: left; white-space: nowrap; }
+table.grid th:first-child { background: var(--red); }
+table.grid th.n { text-align: right; }
+table.grid td { border: 1px solid var(--line); padding: 0; }
+table.grid td input, table.grid td select { width: 100%; border: 0; padding: 6px 8px; background: var(--field); min-height: 32px; }
+table.grid td input.num { text-align: right; }
+table.grid td.v { padding: 6px 8px; }
+table.grid tr.total td { border: 0; font-weight: 700; padding: 8px; text-align: right; }
+table.grid td.x { width: 34px; text-align: center; }
+table.grid td.x button { border: 0; background: none; color: var(--muted); font-size: 18px; }
+.grid-title { text-align: center; color: var(--red); font-weight: 700; font-size: 18px; margin: 0 0 10px; }
+
+.nav { display: flex; gap: 6px; align-items: center; margin-top: 12px; color: var(--muted); }
+.nav button { background: var(--card); border: 1px solid var(--line); min-width: 34px; padding: 4px 8px; color: var(--ink); }
+.status { position: fixed; bottom: 14px; right: 14px; background: #222; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+.status.show { opacity: .92; }
+.status.err { background: var(--red); }
+.newnote { background: #fff6d9; color: #222; border: 1px solid #e6cf7a; padding: 8px 12px; margin-bottom: 14px; }
+
+@media (max-width: 1000px) {
+  .top, .ci { grid-template-columns: 1fr; }
+  .title { font-size: 22px; }
+  .cd { grid-template-columns: 1fr; }
+  .dl { grid-template-columns: 1fr 90px 130px; }
+}
 </style>
 </head>
 <body>
-<main>
-  <div class="card">
-    <h1>AHG Tools</h1>
-    <div id="out" hidden>
-      <p>Sign in with your andersonhicks.com Google account.</p>
-      <button id="google" class="primary">Sign in with Google</button>
+<header class="bar">
+  <div class="bar-in">
+    <div class="mark">Anderson<br>Hicks<br><b>Group</b></div>
+    <div class="title" id="title">AHG Tools</div>
+    <div class="bar-btns" id="saleBtns" hidden>
+      <button id="newSale">New Sale</button>
+      <button id="saveExit">Save and Exit</button>
     </div>
-    <div id="in" hidden>
-      <p>Signed in as <strong class="who" id="email"></strong>. Nothing is here yet; this page only checks that sign-in works.</p>
-      <button id="signout">Sign out</button>
-    </div>
+    <div class="rid" id="rid"></div>
+    <div class="who" id="who" hidden><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
   </div>
+</header>
+
+<main>
+  <section id="vSignin" hidden>
+    <div class="card center">
+      <h1>AHG Tools</h1>
+      <p>Sign in with your andersonhicks.com Google account.</p>
+      <button class="primary" id="google">Sign in with Google</button>
+    </div>
+  </section>
+
+  <section id="vDenied" hidden>
+    <div class="card center">
+      <h1>Not on the team list yet</h1>
+      <p>You're signed in as <strong id="deniedEmail"></strong>, but that address isn't on the AHG Tools team list. Ask Shawn to add you.</p>
+      <button class="plain" id="signout2">Sign out</button>
+    </div>
+  </section>
+
+  <section id="vHome" hidden class="menu">
+    <h2>Sales</h2>
+    <a href="#sales">Sales - East Idaho</a>
+  </section>
+
+  <section id="vSearch" hidden>
+    <form class="search" id="searchForm">
+      <label for="q">Enter any part of Name, Address, or File Number</label>
+      <input id="q" autocomplete="off">
+      <button class="primary">OK</button>
+    </form>
+    <div id="results"></div>
+  </section>
+
+  <section id="vSale" hidden>
+    <div class="newnote" id="newNote" hidden></div>
+    <div class="form">
+      <div class="top">
+        <div class="col">
+          <label class="f req"><span>Client</span>
+            <div class="pick" id="clientPick"><input id="client" autocomplete="off"><ul hidden></ul></div></label>
+          <label class="f req"><span>Address</span><input data-k="address"></label>
+          <label class="f"><span>City</span><select data-k="city" id="citySel"></select></label>
+          <label class="f req"><span>Sale Type</span><select data-k="sale_type" id="typeSel"></select></label>
+          <label class="f req"><span>Agent</span><select data-k="primary_sales_rep" data-t="int" id="agentSel"></select></label>
+          <label class="f req"><span>Coop Agt</span><input data-k="coop_agent"></label>
+        </div>
+        <div class="col">
+          <label class="f"><span>AHG Office:</span><input readonly id="office"></label>
+          <label class="f req"><span>Contract Date</span><input type="date" data-k="contract_date"></label>
+          <label class="f req"><span>Original Close Date</span><input type="date" data-k="orig_projected_close_date"></label>
+          <label class="f req"><span>Current Close Date</span><input type="date" data-k="current_projected_close_date"></label>
+          <label class="f"><span>TransCord</span><select data-k="trans_cord" data-t="int" id="tcSel"></select></label>
+          <label class="f req"><span>TitleCompany</span><input data-k="title_company"></label>
+          <label class="f"><span>Terminated</span><input type="date" data-k="termination_date"></label>
+        </div>
+        <div class="leads">
+          <h3>From Leads Table</h3>
+          <div class="col">
+            <div class="f"><span>Lead Rep</span><div class="ro" id="lRep"></div></div>
+            <div class="f"><span>Rep Date</span><div class="ro num" id="lRepDate"></div></div>
+            <div class="f"><span>Source</span><div class="ro" id="lSource"></div></div>
+            <div class="f"><span>Appt Set By</span><div class="ro" id="lAppt"></div></div>
+            <div class="f"><span>Lead Type</span><div class="ro" id="lType"></div></div>
+            <div class="f"><span>Credit:</span><div class="ro" id="lCredit"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs" id="tabs">
+        <button data-tab="ci" class="on">Commission Info</button>
+        <button data-tab="cs">Commission Shares</button>
+        <button data-tab="cd">Closing Deadlines</button>
+        <button data-tab="le">Lenders</button>
+        <button data-tab="cp">Contract Processing</button>
+      </div>
+
+      <div class="pane" data-pane="ci">
+        <div class="ci">
+          <div>
+            <label class="f req"><span>Purchase Price</span><input class="num" data-k="purchase_price" data-t="money"></label>
+            <label class="f"><span>Concessions</span><input class="num" data-k="contract_concessions" data-t="money"></label>
+            <label class="f"><span>Comm Pd On Concessions</span><input type="checkbox" data-k="commissions_pd_on_concessions"></label>
+            <div class="f calc"><span>Commissions Based On</span><div class="v" id="cBased"></div></div>
+            <label class="f"><span>Commission is Fixed Amt</span><input type="checkbox" data-k="commissionis_flat_amount"></label>
+            <label class="f"><span>Expected Comm Percent</span><input class="num" data-k="projected_commission_percent" data-t="pct"></label>
+            <label class="f"><span>Commission Fixed Amount</span><input class="num" data-k="projected_commission_flat_amount" data-t="money"></label>
+            <label class="f"><span>Transaction Fees/Bonuses</span><input class="num" data-k="transaction_fees_bonuses" data-t="money"></label>
+            <div class="f calc"><span>Gross Potential Commission</span><div class="v" id="cGpc"></div></div>
+          </div>
+          <div>
+            <label class="f"><span>Commission Rebates</span><input class="num" data-k="other_hud_commission_deduction" data-t="money"></label>
+            <label class="f"><span>Referral Percent Paid</span><input class="num" data-k="outside_agent_referral_percent" data-t="pct"></label>
+            <label class="f"><span>Referring Agent Name</span><input class="num" data-k="referralon_hud_agent"></label>
+            <label class="f"><span>ReferralPaidby</span><select data-k="referral_paidby" id="refSel"></select></label>
+            <div class="f"><span>Referral Paid Before Team</span><div class="v" id="cRefBefore"></div></div>
+            <div class="f calc green"><span>Brokerage Commission</span><div class="v" id="cBrokerage"></div></div>
+            <div class="f"><span>Referral Paid By Team</span><div class="v" id="cRefTeam"></div></div>
+            <label class="f"><span>Adjustments at Team Level</span><input class="num" data-k="agent_concessions_not_on_hud" data-t="money"></label>
+            <div class="f calc redc"><span>Commission to Disburse</span><div class="v" id="cCtd"></div></div>
+          </div>
+          <div>
+            <label class="f"><span>File Number</span><input data-k="file_number"></label>
+            <label class="f"><span>Actual Settlement Date</span><input type="date" data-k="actual_settlement_date"></label>
+            <label class="f"><span>Check to Team Date</span><input type="date" data-k="checkto_team_date"></label>
+            <label class="f"><span>Deposit Date</span><input type="date" data-k="deposit_date"></label>
+            <label class="f"><span>Agent Paid Date</span><input type="date" data-k="agent_paid_date"></label>
+            <label class="f"><span>Deposit Check Number</span><input data-k="deposit_check_number"></label>
+            <label class="f calc green" style="font-weight:600"><span>Deposit Check Amount</span><input class="num" data-k="deposit_check_amount" data-t="money"></label>
+            <label class="f"><span>Deposit Batch Num</span><input data-k="deposit_batch_num"></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="cs" hidden>
+        <p class="grid-title">Team Level Agent Shares</p>
+        <div class="scroll"><table class="grid" id="splits"></table></div>
+        <div class="nav"><button class="plain" id="addSplit">Add an agent</button></div>
+      </div>
+
+      <div class="pane" data-pane="cd" hidden>
+        <div class="cd">
+          <div class="dl">
+            <div></div><b>Due/Days</b><b>Completed</b>
+            <span>Earnest Money Days</span><input class="num" data-k="earnest_money_days" data-t="int"><input type="date" data-k="earnest_money_delivered">
+            <span>Loan Commitment Days</span><input class="num" data-k="loan_commitment_number_days" data-t="int"><input type="date" data-k="loan_commitment_completed_date">
+            <span>Inspection <input type="checkbox" data-k="inspection" style="width:auto;min-height:0;margin-left:14px;vertical-align:middle"></span><input class="num" data-k="insepction_days" data-t="int"><input type="date" data-k="inspection_transmittal_completed_date">
+            <span>Seller Response Days</span><input class="num" data-k="inspection_seller_response_days" data-t="int"><input type="date" data-k="inspection_seller_response_completed_date">
+            <span>BuyerResponse Days</span><input class="num" data-k="inspection_buyer_response_days" data-t="int"><input type="date" data-k="inspection_buyer_response_completed_date">
+          </div>
+          <div class="dl" style="grid-template-columns: 200px 150px">
+            <b style="grid-column: 1 / 3">Other Required Items</b>
+            <span>AppraisalVerified</span><input type="date" data-k="appraisal_verified">
+            <span>Closing Appointment Sched</span><input type="date" data-k="closing_appointment_scheduled">
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="le" hidden>
+        <div class="scroll"><table class="grid" id="lenders"></table></div>
+        <div class="nav"><button class="plain" id="addLender">Add a lender</button></div>
+      </div>
+
+      <div class="pane" data-pane="cp" hidden>
+        <div class="cp">
+          <label class="f"><span>Handoff Date</span><input type="date" data-k="handoff_date_time"></label>
+          <label class="f"><span>HandoffOnTime</span><input type="checkbox" data-k="handoff_on_time"></label>
+          <label class="f"><span>Agent Gave Promise</span><select data-k="agent_gave_promise_sale" id="promiseSel"></select></label>
+          <label class="f"><span>ReviewReceived</span><input type="date" data-k="review_received"></label>
+        </div>
+      </div>
+    </div>
+    <div class="nav" id="recNav">
+      Record:
+      <button data-go="first" title="First">|&lsaquo;</button>
+      <button data-go="prev" title="Previous">&lsaquo;</button>
+      <span id="recPos"></span>
+      <button data-go="next" title="Next">&rsaquo;</button>
+      <button data-go="last" title="Last">&rsaquo;|</button>
+    </div>
+  </section>
 </main>
+<div class="status" id="status"></div>
+
 <script>
 const SUPABASE_URL = "https://pjfiyfljkzcvfvcrdrcj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_XQn3G4SYVTsF2cT8IKZyUg_BAcJtlx4";
 const HERE = location.origin + location.pathname;
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function show(session) {
-  $("#out").hidden = !!session;
-  $("#in").hidden = !session;
-  if (session) $("#email").textContent = session.user.email;
+// Value lists from the Access tables and form.
+const SALE_TYPES = ["Sale", "Listing", "Referral", "Instant Offer Aquisition"];
+const REFERRAL_PAID_BY = ["NA", "Brokerage", "Team", "Title Co"];
+const PROMISE = ["Yes", "No"];
+// Required in the Access Sales table.
+const REQUIRED = { client_name: "Client", address: "Address", sale_type: "Sale Type", primary_sales_rep: "Agent",
+  coop_agent: "Coop Agt", contract_date: "Contract Date", orig_projected_close_date: "Original Close Date",
+  current_projected_close_date: "Current Close Date", title_company: "TitleCompany", purchase_price: "Purchase Price" };
+const OFFICE = "East Idaho";
+
+let L = {};            // lookups: team, success, cities, sources, lenders, officers
+let R = { ids: [], pos: -1, q: "" };   // search results and where we are in them
+let S = null;          // the sale on screen
+let lead = null;       // its lead
+let splits = [], lenders = [];
+let isNew = false;
+
+// ---------- formatting ----------
+const money = n => n == null || isNaN(n) ? "" : (n < 0 ? "($" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (n < 0 ? ")" : "");
+const pct = n => n == null || isNaN(n) ? "" : (n * 100).toFixed(2) + "%";
+const day = v => v ? String(v).slice(0, 10) : "";
+const usDate = v => { if (!v) return ""; const [y, m, d] = String(v).slice(0, 10).split("-"); return `${+m}/${+d}/${y}`; };
+const num = v => v == null || v === "" ? null : Number(v);
+
+function parse(type, raw) {
+  const s = String(raw).trim();
+  if (s === "") return null;
+  if (type === "money") { const n = Number(s.replace(/[$,\s]/g, "").replace(/^\((.*)\)$/, "-$1")); return isNaN(n) ? undefined : n; }
+  if (type === "pct") { const n = Number(s.replace(/[%\s]/g, "")); return isNaN(n) ? undefined : n / 100; }
+  if (type === "int") { const n = Number(s.replace(/,/g, "")); return Number.isInteger(n) ? n : undefined; }
+  return s;
+}
+function show(type, v) {
+  if (type === "money") return money(num(v));
+  if (type === "pct") return pct(num(v));
+  return v ?? "";
 }
 
-$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({
-  provider: "google",
-  options: { redirectTo: HERE, queryParams: { hd: "andersonhicks.com", prompt: "select_account" } }
-}));
-$("#signout").addEventListener("click", () => sb.auth.signOut());
-sb.auth.onAuthStateChange((_e, session) => show(session));
-sb.auth.getSession().then(({ data }) => show(data.session));
+let statusTimer;
+function status(msg, err) {
+  const el = $("#status");
+  el.textContent = msg; el.className = "status show" + (err ? " err" : "");
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => el.className = "status" + (err ? " err" : ""), err ? 5000 : 1400);
+}
+
+// ---------- the Access math (query SalesforSalesForm-EastIdaho) ----------
+// Access arithmetic with an empty field gives an empty result; same here.
+function calc(s) {
+  const P = num(s.purchase_price), C = num(s.contract_concessions), pctv = num(s.projected_commission_percent),
+    flatAmt = num(s.projected_commission_flat_amount), fees = num(s.transaction_fees_bonuses),
+    refPct = num(s.outside_agent_referral_percent), other = num(s.other_hud_commission_deduction),
+    adj = num(s.agent_concessions_not_on_hud), by = s.referral_paidby;
+  const nul = (...a) => a.some(x => x == null || isNaN(x));
+  const based = !s.commissions_pd_on_concessions ? (nul(P, C) ? null : P - C) : P;
+  let gpc;
+  if (s.commissionis_flat_amount) gpc = nul(flatAmt, fees) ? null : flatAmt + fees;
+  else gpc = nul(based, pctv, fees) ? null : based * pctv + fees;
+  const refBefore = (by === "Brokerage" || by === "Title Co") ? (nul(gpc, refPct) ? null : gpc * refPct) : 0;
+  const refTeam = by === "Team" ? (nul(gpc, refPct) ? null : gpc * refPct) : 0;
+  const brokerage = nul(gpc, other, refBefore) ? null : gpc - other - refBefore;
+  const ctd = nul(brokerage, refTeam, adj) ? null : brokerage - refTeam - adj;
+  return { based, gpc, refBefore, refTeam, brokerage, ctd };
+}
+
+// ---------- sign in ----------
+$("#google").onclick = () => sb.auth.signInWithOAuth({ provider: "google",
+  options: { redirectTo: HERE, queryParams: { hd: "andersonhicks.com", prompt: "select_account" } } });
+const signOut = e => { e?.preventDefault(); sb.auth.signOut().then(() => location.replace(HERE)); };
+$("#signout").onclick = signOut; $("#signout2").onclick = signOut;
+
+let started = false;
+sb.auth.onAuthStateChange((_e, session) => { if (session && !started) { started = true; start(session); } });
+sb.auth.getSession().then(({ data }) => {
+  if (data.session) { if (!started) { started = true; start(data.session); } }
+  else view("vSignin");
+});
+
+function view(id) {
+  for (const v of ["vSignin", "vDenied", "vHome", "vSearch", "vSale"]) $("#" + v).hidden = v !== id;
+  $("#saleBtns").hidden = !(id === "vSale" || id === "vSearch");
+  $("#title").textContent = id === "vSale" || id === "vSearch" ? "Sales - East Idaho" : "AHG Tools";
+  if (id !== "vSale") $("#rid").textContent = "";
+}
+
+async function start(session) {
+  $("#who").hidden = false;
+  $("#whoEmail").textContent = session.user.email;
+  const { data: role } = await sb.rpc("my_role");
+  if (role !== "admin" && role !== "staff") {
+    $("#deniedEmail").textContent = session.user.email;
+    view("vDenied");
+    return;
+  }
+  await loadLookups();
+  window.addEventListener("hashchange", route);
+  route();
+}
+
+async function loadLookups() {
+  const [team, roles, cities, sources, lend, officers] = await Promise.all([
+    sb.from("team_members").select("id, team_member_name, current_role").order("team_member_name"),
+    sb.from("roles").select("id, role_name"),
+    sb.from("city_list").select("city_name").order("city_name"),
+    sb.from("lead_source").select("id, lead_source"),
+    sb.from("lenders").select("id, lender_name").order("lender_name"),
+    sb.from("loan_officer").select("id, loan_officer").order("loan_officer"),
+  ]);
+  const successRoles = new Set((roles.data || []).filter(r => /Success/.test(r.role_name)).map(r => r.id));
+  L.team = team.data || [];
+  L.teamName = Object.fromEntries(L.team.map(t => [t.id, t.team_member_name]));
+  L.success = L.team.filter(t => successRoles.has(t.current_role));
+  L.cities = (cities.data || []).map(c => c.city_name);
+  L.source = Object.fromEntries((sources.data || []).map(s => [s.id, s.lead_source]));
+  L.lenders = lend.data || [];
+  L.officers = officers.data || [];
+}
+
+function route() {
+  const h = location.hash.slice(1);
+  if (h === "sales") { view("vSearch"); $("#q").value = R.q; $("#q").focus(); renderResults(); return; }
+  const m = h.match(/^sale=(\d+)$/);
+  if (m) { openSale(+m[1]); return; }
+  if (h === "new") { newSale(); return; }
+  view("vHome");
+}
+
+// ---------- search ----------
+$("#searchForm").onsubmit = async e => {
+  e.preventDefault();
+  R.q = $("#q").value.trim();
+  await runSearch();
+};
+let searched = false;
+async function runSearch() {
+  const q = R.q.replace(/[%_\\]/g, m => "\\" + m);
+  let query = sb.from("sales_search").select("sale_id, address, city, sale_type, contract_date, current_projected_close_date, lead_name, agent, file_number")
+    .eq("office", OFFICE).order("contract_date", { ascending: false }).limit(1000);
+  if (q) query = query.ilike("search", `%${q}%`);
+  const { data, error } = await query;
+  if (error) return status(error.message, true);
+  R.rows = data; R.ids = data.map(r => r.sale_id); searched = true;
+  if (data.length === 1) { R.pos = 0; location.hash = "sale=" + data[0].sale_id; return; }
+  renderResults();
+}
+function renderResults() {
+  const el = $("#results");
+  if (!searched) { el.innerHTML = ""; return; }
+  if (!R.rows.length) { el.innerHTML = `<p class="note">No sales match.</p>`; return; }
+  el.innerHTML = `<p class="note">${R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : R.rows.length + " sales, newest contract first."}</p>
+  <div class="scroll"><table class="list"><tr><th>Client</th><th>Address</th><th>City</th><th>Type</th><th>Agent</th><th>Contract</th><th>Close</th><th>File #</th></tr>
+  ${R.rows.map((r, i) => `<tr class="row" data-i="${i}"><td>${esc(r.lead_name)}</td><td>${esc(r.address)}</td><td>${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td>${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td>${esc(r.file_number)}</td></tr>`).join("")}
+  </table></div>`;
+  el.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { R.pos = +tr.dataset.i; location.hash = "sale=" + R.ids[R.pos]; });
+}
+
+// ---------- the form ----------
+function fillSelect(sel, opts, value, blank = true) {
+  const has = opts.some(o => String(o.v) === String(value ?? ""));
+  if (value != null && value !== "" && !has) opts = [...opts, { v: value, t: String(L.teamName?.[value] ?? value) }];
+  sel.innerHTML = (blank ? `<option value=""></option>` : "") + opts.map(o => `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+  sel.value = value ?? "";
+}
+
+async function openSale(id) {
+  const [s, sp, le] = await Promise.all([
+    sb.from("sales").select("*").eq("sale_id", id).maybeSingle(),
+    sb.from("sharedat_team_level").select("*").eq("sales_id", id).order("id"),
+    sb.from("lender_approvals").select("*").eq("sale", id).order("id"),
+  ]);
+  if (s.error || !s.data) { status(s.error?.message || "That sale wasn't found.", true); location.hash = "sales"; return; }
+  S = s.data; splits = sp.data || []; lenders = le.data || []; isNew = false;
+  const p = R.ids.indexOf(id); R.pos = p;
+  await loadLead(S.client_name);
+  render();
+  view("vSale");
+}
+
+async function loadLead(id) {
+  lead = null;
+  if (id == null) return;
+  const { data } = await sb.from("leads").select("id, lead_name, office, sales_rep, representation_contract_signed_date, lead_source, lead_type, team_member_credit, first_appt_set_by, second_appt_set_by, third_appt_set_by, lead_received_date").eq("id", id).maybeSingle();
+  lead = data;
+}
+
+function render() {
+  $("#rid").textContent = isNew ? "" : S.sale_id;
+  $("#newNote").hidden = !isNew;
+  if (isNew) $("#newNote").textContent = "New sale. It saves once the starred fields are filled in.";
+  $("#client").value = lead?.lead_name ?? "";
+  fillSelect($("#citySel"), L.cities.map(c => ({ v: c, t: c })), S.city);
+  fillSelect($("#typeSel"), SALE_TYPES.map(c => ({ v: c, t: c })), S.sale_type);
+  fillSelect($("#agentSel"), L.team.map(t => ({ v: t.id, t: t.team_member_name })), S.primary_sales_rep);
+  fillSelect($("#tcSel"), L.success.map(t => ({ v: t.id, t: t.team_member_name })), S.trans_cord);
+  fillSelect($("#refSel"), REFERRAL_PAID_BY.map(c => ({ v: c, t: c })), S.referral_paidby);
+  fillSelect($("#promiseSel"), PROMISE.map(c => ({ v: c, t: c })), S.agent_gave_promise_sale);
+  for (const el of $$("#vSale [data-k]")) {
+    const k = el.dataset.k, t = el.dataset.t;
+    if (el.tagName === "SELECT") continue;
+    if (el.type === "checkbox") el.checked = !!S[k];
+    else if (el.type === "date") el.value = day(S[k]);
+    else el.value = show(t, S[k]);
+  }
+  renderLead();
+  renderCalc();
+  renderSplits();
+  renderLenders();
+  for (const b of $$("#tabs button")) b.disabled = isNew && b.dataset.tab !== "ci" && b.dataset.tab !== "cd" && b.dataset.tab !== "cp" ? true : false;
+  const n = R.ids.length;
+  $("#recNav").hidden = isNew || R.pos < 0;
+  $("#recPos").textContent = R.pos >= 0 ? `${R.pos + 1} of ${n}` : "";
+}
+
+function renderLead() {
+  $("#office").value = lead?.office ?? "";
+  $("#lRep").textContent = lead ? (L.teamName[lead.sales_rep] ?? "") : "";
+  $("#lRepDate").textContent = usDate(lead?.representation_contract_signed_date);
+  $("#lSource").textContent = lead ? (L.source[lead.lead_source] ?? "") : "";
+  $("#lAppt").textContent = lead ? (lead.third_appt_set_by ?? lead.second_appt_set_by ?? lead.first_appt_set_by ?? "") : "";
+  $("#lType").textContent = lead?.lead_type ?? "";
+  $("#lCredit").textContent = lead?.team_member_credit ?? "";
+}
+
+function renderCalc() {
+  const c = calc(S);
+  $("#cBased").textContent = money(c.based);
+  $("#cGpc").textContent = money(c.gpc);
+  $("#cRefBefore").textContent = money(c.refBefore);
+  $("#cBrokerage").textContent = money(c.brokerage);
+  $("#cRefTeam").textContent = money(c.refTeam);
+  $("#cCtd").textContent = money(c.ctd);
+  return c;
+}
+
+// Save one field of the sale as soon as it changes, the way Access does.
+async function saveField(k, v) {
+  if (REQUIRED[k] && (v == null || v === "")) { status(`${REQUIRED[k]} is required.`, true); render(); return; }
+  const old = S[k];
+  S[k] = v;
+  renderCalc(); renderSplits();
+  if (isNew) return tryInsert();
+  const { error } = await sb.from("sales").update({ [k]: v }).eq("sale_id", S.sale_id);
+  if (error) { S[k] = old; render(); return status("Not saved: " + error.message, true); }
+  status("Saved");
+}
+
+for (const el of $$("#vSale [data-k]")) {
+  el.addEventListener("change", () => {
+    const k = el.dataset.k, t = el.dataset.t;
+    let v;
+    if (el.type === "checkbox") v = el.checked;
+    else if (el.type === "date") v = el.value || null;
+    else if (el.tagName === "SELECT") v = el.value === "" ? null : (t === "int" ? +el.value : el.value);
+    else {
+      v = parse(t, el.value);
+      if (v === undefined) { status("That isn't a number.", true); el.value = show(t, S[k]); return; }
+      el.value = show(t, v);
+    }
+    saveField(k, v);
+  });
+}
+
+// Client: type part of a lead's name, pick from the list (Access combo: name, received date, type).
+(function clientPicker() {
+  const input = $("#client"), list = $("#clientPick ul");
+  let timer, items = [], on = -1;
+  const close = () => { list.hidden = true; on = -1; };
+  const choose = async i => {
+    const l = items[i]; close();
+    input.value = l.lead_name;
+    await saveField("client_name", l.id);
+    await loadLead(l.id); renderLead();
+  };
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) return close();
+    timer = setTimeout(async () => {
+      const { data } = await sb.from("leads").select("id, lead_name, lead_received_date, lead_type")
+        .ilike("lead_name", `%${q.replace(/[%_\\]/g, m => "\\" + m)}%`).order("lead_name").limit(40);
+      items = data || []; on = -1;
+      list.innerHTML = items.map((l, i) => `<li data-i="${i}">${esc(l.lead_name)}<small>${usDate(l.lead_received_date)} · ${esc(l.lead_type ?? "")}</small></li>`).join("") || `<li>No leads match.</li>`;
+      list.hidden = false;
+      list.querySelectorAll("li[data-i]").forEach(li => li.onmousedown = e => { e.preventDefault(); choose(+li.dataset.i); });
+    }, 200);
+  });
+  input.addEventListener("keydown", e => {
+    if (list.hidden || !items.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); on = Math.max(0, Math.min(items.length - 1, on + (e.key === "ArrowDown" ? 1 : -1)));
+      list.querySelectorAll("li").forEach((li, i) => li.classList.toggle("on", i === on));
+    } else if (e.key === "Enter" && on >= 0) { e.preventDefault(); choose(on); }
+    else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", () => setTimeout(() => { close(); input.value = lead?.lead_name ?? ""; }, 150));
+})();
+
+// ---------- Commission Shares (Access subform on SharedatTeamLevelSubtableNew) ----------
+function renderSplits() {
+  const ctd = calc(S).ctd;
+  const opts = L.team.map(t => `<option value="${t.id}">${esc(t.team_member_name)}</option>`).join("");
+  const tot = { share: 0, gross: 0, roy: 0, brk: 0, don: 0, net: 0 };
+  const rows = splits.map((r, i) => {
+    const share = num(r.team_level_sales_rep_share_percent);
+    const gross = share == null || ctd == null ? null : share * ctd;
+    const roy = num(r.agent_royalty_dollar), brk = num(r.agent_brokerage_dollar), don = num(r.agent_donation);
+    const net = [gross, roy, brk, don].some(x => x == null) ? null : gross - roy - brk - don;
+    tot.share += share || 0; tot.gross += gross || 0; tot.roy += roy || 0; tot.brk += brk || 0; tot.don += don || 0; tot.net += net || 0;
+    return `<tr data-i="${i}">
+      <td><select data-f="team_level_sales_rep">${`<option value=""></option>` + opts}</select></td>
+      <td><input class="num" data-f="team_level_sales_rep_share_percent" data-t="pct" value="${pct(share)}"></td>
+      <td class="v">${money(gross)}</td>
+      <td><input class="num" data-f="agent_royalty_dollar" data-t="money" value="${money(roy)}"></td>
+      <td><input class="num" data-f="agent_brokerage_dollar" data-t="money" value="${money(brk)}"></td>
+      <td><input class="num" data-f="agent_donation" data-t="money" value="${money(don)}"></td>
+      <td class="v">${money(net)}</td>
+      <td class="x"><button title="Remove this agent" data-del="${i}">&times;</button></td></tr>`;
+  }).join("");
+  const t = $("#splits");
+  t.innerHTML = `<tr><th>Agent</th><th class="n">Rep Share %</th><th class="n">AgentGross</th><th class="n">Royalty</th><th class="n">Broker Split</th><th class="n">Donation</th><th class="n">Agent Net</th><th></th></tr>${rows}
+    <tr class="total"><td>Total</td><td>${pct(tot.share)}</td><td>${money(tot.gross)}</td><td>${money(tot.roy)}</td><td>${money(tot.brk)}</td><td>${money(tot.don)}</td><td>${money(tot.net)}</td><td></td></tr>`;
+  t.querySelectorAll("tr[data-i]").forEach(tr => { tr.querySelector("select").value = splits[+tr.dataset.i].team_level_sales_rep ?? ""; });
+  wireGrid(t, splits, "sharedat_team_level", renderSplits);
+}
+
+// ---------- Lenders (Access subform on LenderApprovals) ----------
+function renderLenders() {
+  const lo = `<option value=""></option>` + L.lenders.map(l => `<option value="${l.id}">${esc(l.lender_name)}</option>`).join("");
+  const oo = `<option value=""></option>` + L.officers.map(l => `<option value="${l.id}">${esc(l.loan_officer)}</option>`).join("");
+  const t = $("#lenders");
+  t.innerHTML = `<tr><th>Lender</th><th>Loan Office</th><th>CloseonTime</th><th>OpenDate</th><th>DeclinedDate</th><th>NumberofLenderForcedExtensions</th><th>CommunicationRating</th><th>Note</th><th></th></tr>` +
+    lenders.map((r, i) => `<tr data-i="${i}">
+      <td><select data-f="lender" data-t="int">${lo}</select></td>
+      <td><select data-f="loan_officer_linked" data-t="int">${oo}</select></td>
+      <td style="text-align:center"><input type="checkbox" data-f="closeon_time" ${r.closeon_time ? "checked" : ""} style="width:auto;min-height:0"></td>
+      <td><input type="date" data-f="open_date" value="${day(r.open_date)}"></td>
+      <td><input type="date" data-f="declined_date" value="${day(r.declined_date)}"></td>
+      <td><input class="num" data-f="numberof_lender_forced_extensions" data-t="int" value="${r.numberof_lender_forced_extensions ?? ""}"></td>
+      <td><input class="num" data-f="communication_rating" data-t="int" value="${r.communication_rating ?? ""}"></td>
+      <td><input data-f="note" value="${esc(r.note)}"></td>
+      <td class="x"><button title="Remove this lender" data-del="${i}">&times;</button></td></tr>`).join("");
+  t.querySelectorAll("tr[data-i]").forEach(tr => {
+    const r = lenders[+tr.dataset.i];
+    tr.querySelector('[data-f="lender"]').value = r.lender ?? "";
+    tr.querySelector('[data-f="loan_officer_linked"]').value = r.loan_officer_linked ?? "";
+  });
+  wireGrid(t, lenders, "lender_approvals", renderLenders);
+}
+
+// One cell saves on change; × deletes the row after asking.
+function wireGrid(table, rows, tbl, rerender) {
+  table.querySelectorAll("tr[data-i] [data-f]").forEach(el => el.addEventListener("change", async () => {
+    const r = rows[+el.closest("tr").dataset.i], f = el.dataset.f, t = el.dataset.t;
+    let v;
+    if (el.type === "checkbox") v = el.checked;
+    else if (el.type === "date") v = el.value || null;
+    else if (el.tagName === "SELECT") v = el.value === "" ? null : +el.value;
+    else { v = parse(t, el.value); if (v === undefined) { status("That isn't a number.", true); return rerender(); } }
+    const old = r[f]; r[f] = v;
+    const { error } = await sb.from(tbl).update({ [f]: v }).eq("id", r.id);
+    if (error) { r[f] = old; status("Not saved: " + error.message, true); }
+    else status("Saved");
+    rerender();
+  }));
+  table.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const i = +b.dataset.del;
+    if (!confirm("Delete this row? This can't be undone.")) return;
+    const { error } = await sb.from(tbl).delete().eq("id", rows[i].id);
+    if (error) return status("Not deleted: " + error.message, true);
+    rows.splice(i, 1); status("Deleted"); rerender();
+  });
+}
+
+$("#addSplit").onclick = async () => {
+  const { data, error } = await sb.from("sharedat_team_level").insert({ sales_id: S.sale_id }).select().single();
+  if (error) return status(error.message, true);
+  splits.push(data); renderSplits();
+  $("#splits").querySelector(`tr[data-i="${splits.length - 1}"] select`)?.focus();
+};
+$("#addLender").onclick = async () => {
+  const { data, error } = await sb.from("lender_approvals").insert({ sale: S.sale_id }).select().single();
+  if (error) return status(error.message, true);
+  lenders.push(data); renderLenders();
+  $("#lenders").querySelector(`tr[data-i="${lenders.length - 1}"] select`)?.focus();
+};
+
+// ---------- tabs and record navigation ----------
+$$("#tabs button").forEach(b => b.onclick = () => {
+  $$("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $$(".pane").forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+});
+$$("#recNav [data-go]").forEach(b => b.onclick = () => {
+  const n = R.ids.length; if (!n) return;
+  const go = b.dataset.go;
+  const p = go === "first" ? 0 : go === "last" ? n - 1 : go === "prev" ? Math.max(0, R.pos - 1) : Math.min(n - 1, R.pos + 1);
+  if (p !== R.pos) { R.pos = p; location.hash = "sale=" + R.ids[p]; }
+});
+
+// ---------- New Sale, Save and Exit ----------
+$("#newSale").onclick = () => { location.hash = "new"; };
+$("#saveExit").onclick = () => {
+  if (isNew && missing().length && !confirm("This new sale isn't saved yet (missing " + missing().join(", ") + "). Leave without saving?")) return;
+  location.hash = "sales";
+};
+
+// Defaults from the Access table, so the math shows right away on a new sale.
+function newSale() {
+  isNew = true; lead = null; splits = []; lenders = []; R.pos = -1;
+  S = { commissions_pd_on_concessions: true, commissionis_flat_amount: false, inspection: true, reo: false,
+    inspection_on_calendar: false, transaction_fees_bonuses: 0, other_hud_commission_deduction: 0,
+    outside_agent_referral_percent: 0, agent_concessions_not_on_hud: 0, referralon_hud_agent: "NA",
+    referralon_hud_percent: 0, charitable_donations: 0, market_center_charges: 0, market_center_split: 0,
+    paidat_mc_level_percent: 0, next_split: 0.25, steve_percent: 0, shawn_percent: 0, janell_percent: 0 };
+  render(); view("vSale");
+  $$("#tabs button")[0].click();
+  $("#client").focus();
+}
+function missing() { return Object.entries(REQUIRED).filter(([k]) => S[k] == null || S[k] === "").map(([, t]) => t); }
+
+let inserting = false;
+async function tryInsert() {
+  if (missing().length || inserting) return;
+  inserting = true;
+  const { data, error } = await sb.from("sales").insert(S).select().single();
+  inserting = false;
+  if (error) return status("Not saved: " + error.message, true);
+  S = data; isNew = false;
+  status("Sale saved");
+  history.replaceState(null, "", "#sale=" + S.sale_id);
+  render();
+}
 </script>
 </body>
 </html>
