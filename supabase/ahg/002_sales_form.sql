@@ -39,11 +39,13 @@ alter table public.sharedat_team_level
   alter column agent_royalty_dollar set default 0;
 
 -- The form's search, as in Access query SalesforSalesForm-EastIdaho: any part of the client's
--- name, the address, the file number, the lead id, or the sale id. Office comes from the lead.
--- Inner join on the primary rep, as in Access. security_invoker so the table policies apply.
-create or replace view public.sales_search with (security_invoker = true) as
+-- name, the address, the file number, the lead id, or the sale id. Inner join on the primary rep,
+-- as in Access. No office filter: one location now (Shawn, Oct 20, 2026), so the page searches
+-- every sale. security_invoker so the table policies apply.
+drop view if exists public.sales_search;
+create view public.sales_search with (security_invoker = true) as
 select s.sale_id, s.address, s.city, s.sale_type, s.contract_date, s.current_projected_close_date,
-       s.termination_date, s.file_number, s.client_name as lead_id, l.lead_name, l.office,
+       s.termination_date, s.file_number, s.client_name as lead_id, l.lead_name,
        tm.team_member_name as agent,
        concat_ws(' ', l.lead_name, s.address, s.file_number, l.id::text, s.sale_id::text) as search
 from public.sales s

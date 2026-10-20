@@ -163,7 +163,7 @@ table.grid td.x button { border: 0; background: none; color: var(--muted); font-
 
   <section id="vHome" hidden class="menu">
     <h2>Sales</h2>
-    <a href="#sales">Sales - East Idaho</a>
+    <a href="#sales">Sales</a>
   </section>
 
   <section id="vSearch" hidden>
@@ -189,7 +189,6 @@ table.grid td.x button { border: 0; background: none; color: var(--muted); font-
           <label class="f req"><span>Coop Agt</span><input data-k="coop_agent"></label>
         </div>
         <div class="col">
-          <label class="f"><span>AHG Office:</span><input readonly id="office"></label>
           <label class="f req"><span>Contract Date</span><input type="date" data-k="contract_date"></label>
           <label class="f req"><span>Original Close Date</span><input type="date" data-k="orig_projected_close_date"></label>
           <label class="f req"><span>Current Close Date</span><input type="date" data-k="current_projected_close_date"></label>
@@ -322,7 +321,6 @@ const PROMISE = ["Yes", "No"];
 const REQUIRED = { client_name: "Client", address: "Address", sale_type: "Sale Type", primary_sales_rep: "Agent",
   coop_agent: "Coop Agt", contract_date: "Contract Date", orig_projected_close_date: "Original Close Date",
   current_projected_close_date: "Current Close Date", title_company: "TitleCompany", purchase_price: "Purchase Price" };
-const OFFICE = "East Idaho";
 
 let L = {};            // lookups: team, success, cities, sources, lenders, officers
 let R = { ids: [], pos: -1, q: "" };   // search results and where we are in them
@@ -395,7 +393,7 @@ sb.auth.getSession().then(({ data }) => {
 function view(id) {
   for (const v of ["vSignin", "vDenied", "vHome", "vSearch", "vSale"]) $("#" + v).hidden = v !== id;
   $("#saleBtns").hidden = !(id === "vSale" || id === "vSearch");
-  $("#title").textContent = id === "vSale" || id === "vSearch" ? "Sales - East Idaho" : "AHG Tools";
+  $("#title").textContent = id === "vSale" || id === "vSearch" ? "Sales" : "AHG Tools";
   if (id !== "vSale") $("#rid").textContent = "";
 }
 
@@ -451,7 +449,7 @@ let searched = false;
 async function runSearch() {
   const q = R.q.replace(/[%_\\]/g, m => "\\" + m);
   let query = sb.from("sales_search").select("sale_id, address, city, sale_type, contract_date, current_projected_close_date, lead_name, agent, file_number")
-    .eq("office", OFFICE).order("contract_date", { ascending: false }).limit(1000);
+    .order("contract_date", { ascending: false }).limit(1000);
   if (q) query = query.ilike("search", `%${q}%`);
   const { data, error } = await query;
   if (error) return status(error.message, true);
@@ -495,7 +493,7 @@ async function openSale(id) {
 async function loadLead(id) {
   lead = null;
   if (id == null) return;
-  const { data } = await sb.from("leads").select("id, lead_name, office, sales_rep, representation_contract_signed_date, lead_source, lead_type, team_member_credit, first_appt_set_by, second_appt_set_by, third_appt_set_by, lead_received_date").eq("id", id).maybeSingle();
+  const { data } = await sb.from("leads").select("id, lead_name, sales_rep, representation_contract_signed_date, lead_source, lead_type, team_member_credit, first_appt_set_by, second_appt_set_by, third_appt_set_by, lead_received_date").eq("id", id).maybeSingle();
   lead = data;
 }
 
@@ -528,7 +526,6 @@ function render() {
 }
 
 function renderLead() {
-  $("#office").value = lead?.office ?? "";
   $("#lRep").textContent = lead ? (L.teamName[lead.sales_rep] ?? "") : "";
   $("#lRepDate").textContent = usDate(lead?.representation_contract_signed_date);
   $("#lSource").textContent = lead ? (L.source[lead.lead_source] ?? "") : "";
