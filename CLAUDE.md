@@ -224,3 +224,16 @@ shawnzapps.com/listingassistant/. A work tool for Shawn's real estate business (
 ### Not built yet
 - Reading video footage (only its sound is transcribed), reading scanned PDFs or Word documents, sharing a lead with teammates or an admin view, sending notes by email, a CMA or pricing step, and tasks with due dates. The home page link exists (Oct 13, 2026: Shawn asked for it; the home page has a "Listing Assistant" card under Business with a "Team only" chip, linking to /listingassistant/).
 
+
+## ahg-tools/ (started Oct 20, 2026)
+
+### What it is
+shawnzapps.com/ahg-tools/ (for now; may move to an andersonhicks.com address later). A like-for-like web replacement for Anderson Hicks Group's roughly 15-year-old Access database, with logins, plus replacements for the Google Sheets and Excel reports it feeds and how they are distributed. NO new features at this stage (Shawn's rule). Possibly the start of a suite of team tools and later a mobile app. Switchover goal: about 30 days from Oct 20, 2026, with a final data refresh from Access on that date. Nothing is built yet; discovery and planning only.
+
+### Client data rules
+- The Access copies are in `ahg-tools/private/` (gitignored, never commit): backend `AHG DB Backend.accdb` (data) and front end `AndersonHicks Database 3.23.accdb` (36 forms, 48 reports, 200 queries, 2 macros, 1 VBA module). The `.laccdb` is Access's lock file. Read with mdbtools (installed with Homebrew). The live backend is on the team's shared drive at `Y:\AndersonHicks DB\`.
+- The front end file holds two data tables of its own (`Entity`, `Entity_Lead_xref`); their purpose is unknown, asked Shawn.
+
+### Supabase and sign-in
+- Its OWN Supabase project, not the shared ShawnZapps one (Shawn agreed Oct 20, 2026, so team tables and logins never blend with hobby apps): `Anderson Hicks Group`, ref `pjfiyfljkzcvfvcrdrcj`, us-west-1, $10/month, same "Shawn Anderson Apps" org.
+- Sign-in plan: Google only, with an OAuth client made in the andersonhicks.com Google Workspace's own Google Cloud as an Internal app (only andersonhicks.com accounts, no brand review). Shawn is a Workspace admin. About 30 people. Roles and who sees what are not decided yet.
