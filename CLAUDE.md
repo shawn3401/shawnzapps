@@ -256,3 +256,9 @@ shawnzapps.com/ahg-tools/ (for now; may move to an andersonhicks.com address lat
 - No locations anywhere (Shawn, Oct 20, 2026: one location, so remove every reference to East Idaho, Boise, Salt Lake City, or office): the form is "Sales", the AHG Office field is gone, and the search covers every sale, including old Boise and Salt Lake City ones. Apply the same to every later form and report.
 - Differences from Access: percent fields take 3 or 3% as 3% (Access takes 3 as 300%); the splits grid drops the always-zero "AgentSplitfo" column.
 - Tested against a local copy with a stand-in for Supabase, not signed in for real; Shawn's first sign-in is the first live run.
+
+### Look (Oct 20, 2026)
+- Shawn picked "Look B" from two mockups: a dark sidebar with the AHG logo (in a white box) and the tool menu, the record's name as the heading with chips (sale type, id), a row of four summary tiles (Gross potential, Brokerage commission, Commission to disburse, Closing), then cards and tabs. Team red and charcoal from Listing Assistant, Source Sans 3, follows the computer's light or dark setting. Labels are in sentence case ("Coop agent", "Title company").
+- The shared look is `ahg-tools/ahg.css`; every AHG Tools page links it (bump the `?v=` on the link when it changes). The logo is `ahg-tools/img/ahg-logo.png` (Shawn's file, shrunk); the original is in `ahg-tools/private/`.
+- Phones (Shawn: mostly desktops and laptops, but it must work on a phone): under 860px the sidebar becomes a top bar with a menu button, fields stack, tabs scroll sideways, and editable tables with class `cards` turn into one card per row with each cell labelled from `data-label`. No React; Shawn asked, and plain HTML with the shared stylesheet is enough for now.
+- Enter runs the search (Shawn asked).
