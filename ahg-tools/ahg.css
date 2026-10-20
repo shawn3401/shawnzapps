@@ -70,7 +70,7 @@ main { padding: 24px 28px 90px; min-width: 0; max-width: 1400px; }
 .card-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 0; }
 .card-b { padding: 12px 18px 18px; }
 .center { max-width: 440px; margin: 12vh auto; padding: 28px 26px; }
-.center .logo-box { padding: 0; margin-bottom: 18px; max-width: 220px; background: none; }
+.center .logo-box { margin-bottom: 18px; max-width: 220px; border: 1px solid var(--line); }
 .center h1 { margin: 0 0 6px; font-size: 24px; }
 .center p { color: var(--ink-2); margin: 0 0 18px; }
 
