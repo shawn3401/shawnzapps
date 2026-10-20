@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AHG Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root { --bg: #f6f5f3; --card: #fff; --ink: #222; --muted: #666; --line: #ddd; --red: #b3262d; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161616; --card: #222; --ink: #eee; --muted: #aaa; --line: #3a3a3a; --red: #e0555b; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 "Source Sans 3", system-ui, sans-serif; }
+main { max-width: 440px; margin: 12vh auto; padding: 0 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; }
+h1 { margin: 0 0 6px; font-size: 26px; }
+p { margin: 0 0 18px; color: var(--muted); }
+button { font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--red); border-color: var(--red); color: #fff; }
+.who { color: var(--ink); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>AHG Tools</h1>
+    <div id="out" hidden>
+      <p>Sign in with your andersonhicks.com Google account.</p>
+      <button id="google" class="primary">Sign in with Google</button>
+    </div>
+    <div id="in" hidden>
+      <p>Signed in as <strong class="who" id="email"></strong>. Nothing is here yet; this page only checks that sign-in works.</p>
+      <button id="signout">Sign out</button>
+    </div>
+  </div>
+</main>
+<script>
+const SUPABASE_URL = "https://pjfiyfljkzcvfvcrdrcj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_XQn3G4SYVTsF2cT8IKZyUg_BAcJtlx4";
+const HERE = location.origin + location.pathname;
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+
+function show(session) {
+  $("#out").hidden = !!session;
+  $("#in").hidden = !session;
+  if (session) $("#email").textContent = session.user.email;
+}
+
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({
+  provider: "google",
+  options: { redirectTo: HERE, queryParams: { hd: "andersonhicks.com", prompt: "select_account" } }
+}));
+$("#signout").addEventListener("click", () => sb.auth.signOut());
+sb.auth.onAuthStateChange((_e, session) => show(session));
+sb.auth.getSession().then(({ data }) => show(data.session));
+</script>
+</body>
+</html>
