@@ -161,19 +161,23 @@ dialog h2{font-size:22px}
 .whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 #chat{display:flex;flex-direction:column}
-.vgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-@media (max-width:760px){.vgrid{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:420px){.vgrid{grid-template-columns:repeat(2,1fr)}}
+.vgroups{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;align-items:start}
+.vgrp.wide{grid-column:1/-1}
+@media (max-width:520px){.vgroups{grid-template-columns:1fr}.vgrp.wide .vgrid{grid-template-columns:1fr 1fr!important}.vt.agreedt{grid-column:1/-1}}
+.vgrp h5{margin:0 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-deep)}
+.vgrid{display:grid;gap:8px;align-items:start}
 .vt{border:1px solid var(--line);border-radius:8px;min-width:0;background:var(--paper)}
-.vbtn{background:none;border:0;width:100%;text-align:left;padding:9px 10px;cursor:pointer;font:inherit;color:inherit;border-radius:8px}
+.vbtn{display:block;background:none;border:0;width:100%;text-align:left;padding:8px 10px;cursor:pointer;font:inherit;color:inherit;border-radius:8px}
 .vbtn:hover{background:var(--soft)}
-.vl{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);font-weight:600}
-.va{font-size:19px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
-.vt.empty .va{color:var(--ink-3);font-weight:400;font-size:15px}
+.vl{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.va{font-size:18px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vt.blank .va{color:var(--ink-3);font-weight:400;font-size:15px}
+.vt.key{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 .vs{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vhint{font-size:12px;background:var(--warn-soft);color:var(--warn);padding:6px 9px;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
-.vt.edit{padding:9px 10px;grid-column:span 2;border-color:var(--ink-3)}
+.vt.edit{padding:9px 10px;grid-column:1/-1;border-color:var(--ink-3)}
 .vt.edit input{padding:6px 8px;font-size:15px;margin-top:6px}
+.vt.edit .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .vt.edit .row{margin-top:8px;justify-content:flex-start;gap:6px}
 .vh{font-size:12px;color:var(--ink-3);margin-top:6px}
 .pill.askpill{margin-left:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:14px;padding-right:16px}
@@ -255,7 +259,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
       <label class="f">Stage</label>
       <div class="pills" id="stagePills"></div>
       <label class="f">Value</label>
-      <div class="vgrid" id="values"></div>
+      <div class="vgroups" id="values"></div>
       <p class="note" id="vread" style="margin:8px 0 0"></p>
     </div>
 
@@ -414,7 +418,7 @@ function renderList(){
       <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
       ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
       ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
-      ${l.numbers?.wants || l.numbers?.cma_low || l.numbers?.cma_high ? `<div class="nx">${[l.numbers.wants && "Wants " + kmoney(l.numbers.wants.amount), (l.numbers.cma_low || l.numbers.cma_high) && "CMA " + [l.numbers.cma_low, l.numbers.cma_high].filter(Boolean).map(x => kmoney(x.amount)).join(" to ")].filter(Boolean).join(" · ")}</div>` : ""}
+      ${(() => { const N = l.numbers || {}, rg = (a, b) => [N[a], N[b]].filter(Boolean).map(x => kmoney(x.amount)).join(" to "); const bits = [N.agreed && "Listing at " + kmoney(N.agreed.amount), !N.agreed && (N.rec_low || N.rec_high) && "Recommended " + rg("rec_low", "rec_high"), N.wants && "Wants " + kmoney(N.wants.amount), !N.agreed && !N.rec_low && !N.rec_high && (N.cma_low || N.cma_high) && "CMA " + rg("cma_low", "cma_high")].filter(Boolean); return bits.length ? `<div class="nx">${bits.join(" · ")}</div>` : ""; })()}
       <div class="when">${l.todo ? `<b style="color:var(--accent-deep)">${l.todo} to-do${l.todo === 1 ? "" : "s"} open</b> · ` : ""}Updated ${niceDate(l.updated_at)}</div>
     </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
 }
@@ -510,7 +514,10 @@ $("#noteSave").addEventListener("click", async () => {
 // ---- value -------------------------------------------------------------------------------
 // The numbers that bear on value (Shawn, Oct 19, 2026), entered by hand or through Ask. Zillow blocks automated
 // lookups, so nothing is fetched. listing-todos leaves a suggestion (hints) when a note or transcript states one.
-const NUMS = [["tax", "Tax assessed"], ["zest", "Zestimate"], ["wants", "Seller wants"], ["loan", "Loan amount"], ["cma_low", "CMA low"], ["cma_high", "CMA high"]];
+// nine numbers in three groups; a range is one tile over two keys (Shawn, Oct 20, 2026, added the recommended range
+// and the agreed list price and asked for groupings)
+const NUMS = { tax: "Tax assessed", zest: "Zestimate", wants: "Seller wants", loan: "Loan amount", cma_low: "CMA low", cma_high: "CMA high", rec_low: "Recommended low", rec_high: "Recommended high", agreed: "Agreed list price" };
+const VGROUPS = [["Public", [["tax"], ["zest"]]], ["Seller", [["wants"], ["loan"]]], ["Our pricing", [["cma_low", "cma_high", "CMA range"], ["rec_low", "rec_high", "Recommended list price"], ["agreed"]]]];
 let numEdit = null;
 const money = n => "$" + Math.round(n).toLocaleString("en-US");
 const kmoney = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M" : "$" + Math.round(n / 1000) + "k";
@@ -520,31 +527,47 @@ function parseMoney(t){   // "525k", "$525,000", "1.2m"; a bare number under 10,
   let n = parseFloat(m[1]); if (m[2] === "k") n *= 1e3; else if (m[2] === "m") n *= 1e6; else if (n < 10000) n *= 1e3;
   return Math.round(n);
 }
-function renderValues(){
-  const N = cur.numbers || {}, H = N.hints || {};
-  $("#values").innerHTML = NUMS.map(([k, label]) => {
-    const v = N[k], h = H[k];
-    if (numEdit === k) return `<div class="vt edit"><div class="vl">${label}</div>
-      <input type="text" inputmode="decimal" id="numAmt" value="${v ? money(v.amount) : ""}" placeholder="Like 525k or $525,000" aria-label="${label}">
-      <input type="text" id="numNote" value="${esc(v?.note || "")}" placeholder="Where it's from (optional)" aria-label="Where it's from">
+function tileHtml(keys, label){
+  const N = cur.numbers || {}, H = N.hints || {}, id = keys[0], range = keys.length === 2;
+  const vals = keys.map(k => N[k]), any = vals.filter(Boolean);
+  label = label || NUMS[id];
+  if (numEdit === id){
+    const inp = (k, ph) => `<input type="text" inputmode="decimal" id="numAmt_${k}" value="${N[k] ? money(N[k].amount) : ""}" placeholder="${ph}" aria-label="${esc(NUMS[k])}">`;
+    const hist = keys.flatMap(k => (N[k]?.history || []).map(x => ({ ...x, k }))).sort((a, b) => b.at.localeCompare(a.at));
+    return `<div class="vt edit"><div class="vl">${label}</div>
+      ${range ? `<div class="pair">${inp(keys[0], "Low, like 470k")}${inp(keys[1], "High, like 495k")}</div>` : inp(id, "Like 525k or $525,000")}
+      <input type="text" id="numNote" value="${esc(any[0]?.note || "")}" placeholder="Where it's from (optional)" aria-label="Where it's from">
       <div class="err" id="numErr" hidden></div>
-      <div class="row"><button class="btn small primary" data-numsave="${k}">Save</button><button class="btn small" data-numcancel="1">Cancel</button>${v ? `<button class="btn small" data-numclear="${k}">Clear</button>` : ""}</div>
-      ${v?.history?.length ? `<div class="vh">Before: ${v.history.slice().reverse().map(x => `${money(x.amount)} (${niceDate(x.at)})`).join(", ")}</div>` : ""}</div>`;
-    return `<div class="vt${v ? "" : " empty"}"><button class="vbtn" data-num="${k}"><div class="vl">${label}</div><div class="va">${v ? money(v.amount) : "Not yet"}</div><div class="vs" title="${esc(v?.note || "")}">${v ? (v.note ? esc(v.note) + " · " : "") + niceDate(v.at) : "Tap to add"}</div></button>${h ? `<div class="vhint">Found ${money(h.amount)}: "${esc(h.evidence)}" <button class="btn link" data-numuse="${k}">Use it</button> · <button class="btn link" data-numdis="${k}">Dismiss</button></div>` : ""}</div>`;
-  }).join("");
+      <div class="row"><button class="btn small primary" data-numsave="${keys.join(",")}">Save</button><button class="btn small" data-numcancel="1">Cancel</button>${any.length ? `<button class="btn small" data-numclear="${keys.join(",")}">Clear</button>` : ""}</div>
+      ${hist.length ? `<div class="vh">Before: ${hist.map(x => `${range ? (x.k === keys[0] ? "low " : "high ") : ""}${money(x.amount)} (${niceDate(x.at)})`).join(", ")}</div>` : ""}</div>`;
+  }
+  const shown = range ? (vals[0] && vals[1] ? `${kmoney(vals[0].amount)} to ${kmoney(vals[1].amount)}` : vals[0] ? `From ${kmoney(vals[0].amount)}` : vals[1] ? `Up to ${kmoney(vals[1].amount)}` : "") : vals[0] ? money(vals[0].amount) : "";
+  const last = any.slice().sort((a, b) => b.at.localeCompare(a.at))[0];
+  const hints = keys.filter(k => H[k]).map(k => `<div class="vhint">Found ${range ? (k === keys[0] ? "low " : "high ") : ""}${money(H[k].amount)}: "${esc(H[k].evidence)}" <button class="btn link" data-numuse="${k}">Use it</button> · <button class="btn link" data-numdis="${k}">Dismiss</button></div>`).join("");
+  return `<div class="vt${shown ? "" : " blank"}${id === "agreed" ? " agreedt" : ""}${id === "agreed" && shown ? " key" : ""}"><button class="vbtn" data-num="${id}"><div class="vl">${label}</div><div class="va">${shown || "Not yet"}</div><div class="vs" title="${esc(last?.note || "")}">${last ? (last.note ? esc(last.note) + " · " : "") + niceDate(last.at) : "Tap to add"}</div></button>${hints}</div>`;
+}
+function renderValues(){
+  const N = cur.numbers || {};
+  $("#values").innerHTML = VGROUPS.map(([name, tiles], gi) => `<div class="vgrp${gi === 2 ? " wide" : ""}"><h5>${name}</h5><div class="vgrid" style="grid-template-columns:repeat(${tiles.length},minmax(0,1fr))">${tiles.map(t => tileHtml(t.slice(0, t.length === 3 ? 2 : 1), t[2])).join("")}</div></div>`).join("");
+  // the quick read: the price we are working from against the seller's number and the loan
   const a = k => N[k]?.amount, out = [];
-  if (a("wants") && a("cma_high") && a("wants") > a("cma_high")) out.push(`Seller wants ${kmoney(a("wants") - a("cma_high"))} over CMA high`);
-  else if (a("wants") && a("cma_low") && a("wants") < a("cma_low")) out.push(`Seller wants ${kmoney(a("cma_low") - a("wants"))} under CMA low`);
-  else if (a("wants") && a("cma_low") && a("cma_high")) out.push("Seller's number is inside the CMA range");
-  const both = a("cma_low") && a("cma_high"), mid = both ? (a("cma_low") + a("cma_high")) / 2 : a("cma_high") || a("cma_low");
-  if (a("loan") && mid) out.push(`Equity about ${kmoney(mid - a("loan"))} (${both ? "CMA midpoint" : "CMA"} minus loan)`);
+  const lo = a("rec_low") || a("cma_low"), hi = a("rec_high") || a("cma_high"), what = a("rec_low") || a("rec_high") ? "our recommended range" : "the CMA range";
+  if (a("wants") && a("agreed")) out.push(a("wants") === a("agreed") ? "Listing at the seller's number" : `Listing ${kmoney(Math.abs(a("agreed") - a("wants")))} ${a("agreed") > a("wants") ? "over" : "under"} what the seller wanted`);
+  else if (a("wants") && hi && a("wants") > hi) out.push(`Seller wants ${kmoney(a("wants") - hi)} over the top of ${what}`);
+  else if (a("wants") && lo && a("wants") < lo) out.push(`Seller wants ${kmoney(lo - a("wants"))} under the bottom of ${what}`);
+  else if (a("wants") && lo && hi) out.push(`Seller's number is inside ${what}`);
+  const price = a("agreed") || (lo && hi ? (lo + hi) / 2 : hi || lo);
+  if (a("loan") && price) out.push(`Equity about ${kmoney(price - a("loan"))} (${a("agreed") ? "list price" : (lo && hi ? "midpoint of " : "") + what.replace("our ", "the ")} minus loan)`);
   $("#vread").textContent = out.join(" · "); $("#vread").hidden = !out.length;
 }
-async function saveNum(k, amount, note){
-  const N = cur.numbers ||= {}, prev = N[k];
-  if (amount > 0) N[k] = { amount, note, at: new Date().toISOString(), history: prev?.amount && prev.amount !== amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) };
-  else delete N[k];
-  if (N.hints) delete N.hints[k];
+async function saveNums(changes, note){   // changes: [[key, amount]], amount 0 clears
+  const N = cur.numbers ||= {};
+  for (const [k, amount] of changes){
+    const prev = N[k];
+    if (amount > 0){ if (prev?.amount === amount && (prev.note || "") === note) continue; N[k] = { amount, note, at: new Date().toISOString(), history: prev?.amount && prev.amount !== amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) }; }
+    else delete N[k];
+    if (N.hints) delete N.hints[k];
+  }
   numEdit = null; renderValues();
   const row = leads.find(l => l.id === cur.id); if (row) row.numbers = N;
   const { error } = await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id);
@@ -553,19 +576,20 @@ async function saveNum(k, amount, note){
 $("#values").addEventListener("click", async e => {
   const t = e.target, N = cur.numbers || {};
   const open = t.closest("[data-num]"), sv = t.closest("[data-numsave]"), clr = t.closest("[data-numclear]"), use = t.closest("[data-numuse]"), dis = t.closest("[data-numdis]");
-  if (open){ numEdit = open.dataset.num; renderValues(); $("#numAmt").focus(); $("#numAmt").select(); }
+  if (open){ numEdit = open.dataset.num; renderValues(); const f = document.querySelector("#values .edit input"); f.focus(); f.select(); }
   else if (t.closest("[data-numcancel]")){ numEdit = null; renderValues(); }
   else if (sv){
-    const n = parseMoney($("#numAmt").value);
-    if (isNaN(n)){ $("#numErr").textContent = "Type an amount like 525k or $525,000."; $("#numErr").hidden = false; return; }
-    saveNum(sv.dataset.numsave, n, $("#numNote").value.trim());
+    const keys = sv.dataset.numsave.split(","), ch = keys.map(k => [k, parseMoney($("#numAmt_" + k).value)]);
+    if (ch.some(([, n]) => isNaN(n))){ $("#numErr").textContent = "Type amounts like 525k or $525,000."; $("#numErr").hidden = false; return; }
+    if (ch.length === 2 && ch[0][1] && ch[1][1] && ch[0][1] > ch[1][1]){ $("#numErr").textContent = "The low number is above the high one."; $("#numErr").hidden = false; return; }
+    saveNums(ch, $("#numNote").value.trim());
   }
-  else if (clr) saveNum(clr.dataset.numclear, 0, "");
-  else if (use){ const h = N.hints[use.dataset.numuse]; saveNum(use.dataset.numuse, h.amount, "Found in your notes"); }
+  else if (clr) saveNums(clr.dataset.numclear.split(",").map(k => [k, 0]), "");
+  else if (use){ const k = use.dataset.numuse, h = N.hints[k]; saveNums([[k, h.amount]], "Found in your notes"); }
   else if (dis){ delete N.hints[dis.dataset.numdis]; renderValues(); await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id); }
 });
 $("#values").addEventListener("keydown", e => {
-  if (e.key === "Enter" && (e.target.id === "numAmt" || e.target.id === "numNote")){ e.preventDefault(); document.querySelector("[data-numsave]")?.click(); }
+  if (e.key === "Enter" && e.target.closest(".vt.edit")){ e.preventDefault(); document.querySelector("[data-numsave]")?.click(); }
   if (e.key === "Escape"){ numEdit = null; renderValues(); }
 });
 

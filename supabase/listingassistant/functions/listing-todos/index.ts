@@ -41,13 +41,15 @@ Rules for done:
 - List an existing OPEN to-do only when the new material clearly shows it has been finished ("measured the house today, 2,340 square feet" finishes "Measure the property"). Give its number and one short sentence of evidence in the material's own words.
 - When in doubt, leave it out.
 
-Rules for numbers (only these six, only about THIS property, and only when the material states the amount):
+Rules for numbers (only these nine, only about THIS property, and only when the material states the amount):
 - tax: the county's assessed or taxable value of the property.
 - zest: Zillow's Zestimate for the property.
 - wants: the price the seller says they want or would list at.
 - loan: what the seller owes on the property (mortgage balance or payoff).
-- cma_low and cma_high: the low and high ends of the agent's own price range from a CMA or comparable sales.
-Give the amount in whole dollars ("she wants 525" means 525000) and one short quote of where it came from. Never use a comparable sale, a neighbor's house, a past purchase price, or a guess. When none of the six is stated, return an empty list.
+- cma_low and cma_high: the low and high ends of the price range from the agent's CMA (comparable sales analysis).
+- rec_low and rec_high: the low and high ends of the list price range the agent recommends to the seller.
+- agreed: the list price the agent and seller agreed on.
+Give the amount in whole dollars ("she wants 525" means 525000) and one short quote of where it came from. Never use a comparable sale, a neighbor's house, a past purchase price, or a guess. When none of the nine is stated, return an empty list.
 
 Plain words. No em dashes or en dashes. No markdown.`;
 
@@ -70,7 +72,7 @@ const TOOL = {
       },
       numbers: {
         type: "array",
-        items: { type: "object", additionalProperties: false, required: ["key", "amount", "evidence"], properties: { key: { type: "string", enum: ["tax", "zest", "wants", "loan", "cma_low", "cma_high"] }, amount: { type: "integer" }, evidence: { type: "string" } } },
+        items: { type: "object", additionalProperties: false, required: ["key", "amount", "evidence"], properties: { key: { type: "string", enum: ["tax", "zest", "wants", "loan", "cma_low", "cma_high", "rec_low", "rec_high", "agreed"] }, amount: { type: "integer" }, evidence: { type: "string" } } },
       },
     },
   },
@@ -162,7 +164,7 @@ Call save_todos.`;
     // a number it spotted waits on the Value card as a suggestion; it never overwrites one
     const nums = (lead.numbers || {}) as Record<string, any>; let numsDirty = false;
     for (const n of out.numbers || []) {
-      if (!["tax", "zest", "wants", "loan", "cma_low", "cma_high"].includes(n.key) || !(n.amount > 0)) continue;
+      if (!["tax", "zest", "wants", "loan", "cma_low", "cma_high", "rec_low", "rec_high", "agreed"].includes(n.key) || !(n.amount > 0)) continue;
       if (nums[n.key]?.amount === n.amount) continue;
       nums.hints = nums.hints || {};
       nums.hints[n.key] = { amount: n.amount, evidence: (n.evidence || "").trim().slice(0, 300), at: new Date().toISOString(), item_id: body.item_id ?? null };
