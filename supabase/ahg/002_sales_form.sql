@@ -47,6 +47,12 @@ create view public.sales_search with (security_invoker = true) as
 select s.sale_id, s.address, s.city, s.sale_type, s.contract_date, s.current_projected_close_date,
        s.termination_date, s.file_number, s.client_name as lead_id, l.lead_name,
        tm.team_member_name as agent,
+       -- Status from the key dates, the rule Access's own queries use (Sales-Open-ForReport,
+       -- HistoricalSalesReport): a termination date means Terminated, else a settlement date means
+       -- Closed, else Pending. Same rule as statusOf() in ahg-tools/index.html.
+       case when s.termination_date is not null then 'Terminated'
+            when s.actual_settlement_date is not null then 'Closed'
+            else 'Pending' end as status,
        concat_ws(' ', l.lead_name, s.address, s.file_number, l.id::text, s.sale_id::text) as search
 from public.sales s
 left join public.leads l on l.id = s.client_name

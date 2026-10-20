@@ -6,7 +6,7 @@
 :root {
   --bg:#F4F4F2; --paper:#FFFFFF; --ink:#1F2124; --ink-2:#565B62; --ink-3:#8A9097;
   --line:#DEDFDC; --field:#FFFFFF; --ro:#F1F1EF; --accent:#C8322B; --accent-deep:#A02620; --soft:#F8E9E7;
-  --good:#2F7A4B; --good-soft:#E1F0E6; --side:#25282C; --side-ink:#E9EAEB; --side-2:#9BA0A6;
+  --good:#2F7A4B; --good-soft:#E1F0E6; --warn:#9A6A00; --warn-soft:#FBF1D6; --side:#25282C; --side-ink:#E9EAEB; --side-2:#9BA0A6;
   --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
   color-scheme: light;
 }
@@ -14,7 +14,7 @@
   :root {
     --bg:#16181A; --paper:#1F2225; --ink:#EEF0F1; --ink-2:#BDC2C7; --ink-3:#8A9097;
     --line:#34383D; --field:#24282B; --ro:#2A2E32; --accent:#EC6A60; --accent-deep:#F38F86; --soft:#3A2321;
-    --good:#86C79D; --good-soft:#1D3024; --side:#111315; --side-ink:#E9EAEB; --side-2:#8A9097;
+    --good:#86C79D; --good-soft:#1D3024; --warn:#E3B95A; --warn-soft:#352C14; --side:#111315; --side-ink:#E9EAEB; --side-2:#8A9097;
     --shadow: none; color-scheme: dark;
   }
 }
@@ -53,6 +53,12 @@ main { padding: 24px 28px 90px; min-width: 0; max-width: 1400px; }
 .head .acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip { display: inline-block; background: var(--soft); color: var(--accent-deep); font-weight: 700; font-size: 12.5px; padding: 2px 9px; border-radius: 999px; margin-left: 6px; vertical-align: 4px; letter-spacing: 0; }
 .chip.gray { background: var(--ro); color: var(--ink-2); }
+/* record status pills */
+.st { display: inline-block; font-weight: 700; font-size: 12.5px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.st.pending { background: var(--warn-soft); color: var(--warn); }
+.st.closed { background: var(--good-soft); color: var(--good); }
+.st.terminated { background: var(--ro); color: var(--ink-3); }
+.head .st { margin-left: 6px; vertical-align: 4px; }
 .recnav { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .recnav button { border: 0; background: none; padding: 7px 10px; cursor: pointer; color: var(--ink-2); }
 .recnav button:hover { color: var(--ink); }
