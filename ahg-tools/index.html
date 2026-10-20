@@ -8,7 +8,7 @@
 <link rel="icon" href="img/ahg-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="ahg.css?v=4">
+<link rel="stylesheet" href="ahg.css?v=5">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 /* Sales page only; the shared look is in ahg.css */
@@ -384,6 +384,7 @@ async function runSearch(stay, pending = false) {
   if (searching) return;
   searching = true;
   R.q = pending ? "" : $("#q").value.trim();
+  const wasPending = R.pending;
   R.pending = pending;
   const q = R.q.replace(/[%_\\]/g, m => "\\" + m);
   let query = sb.from("sales_search").select("sale_id, status, address, city, sale_type, contract_date, current_projected_close_date, lead_name, agent, file_number")
@@ -393,20 +394,46 @@ async function runSearch(stay, pending = false) {
   const { data, error } = await query;
   searching = false;
   if (error) return status(error.message, true);
-  R.rows = data; R.ids = data.map(r => r.sale_id); searched = true;
+  if (!stay || !R.sort || R.pending !== wasPending) R.sort = defaultSort();   // a new search starts at its default order
+  R.rows = data; sortRows(); searched = true;
   if (data.length === 1 && !stay) { R.pos = 0; return go("sale=" + data[0].sale_id); }
   renderResults();
+}
+// List columns; click a heading to sort by it, click again to flip. Empty values sort last.
+const COLS = [["lead_name", "Client"], ["status", "Status"], ["address", "Address"], ["city", "City", "hide-sm"],
+  ["sale_type", "Type"], ["agent", "Agent", "hide-sm"], ["contract_date", "Contract"],
+  ["current_projected_close_date", "Close"], ["file_number", "File #", "hide-sm"]];
+// Pending list: soonest closing first (Shawn, Oct 20, 2026). Searches: newest contract first, as in Access.
+const defaultSort = () => R.pending ? { key: "current_projected_close_date", asc: true } : { key: "contract_date", asc: false };
+function sortRows() {
+  const { key, asc } = R.sort;
+  R.rows.sort((a, b) => {
+    const x = a[key] ?? "", y = b[key] ?? "";
+    if (x === "" || y === "") return x === y ? 0 : x === "" ? 1 : -1;
+    const c = String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
+    return asc ? c : -c;
+  });
+  R.ids = R.rows.map(r => r.sale_id);
 }
 function renderResults() {
   const el = $("#results");
   if (!searched) { el.innerHTML = ""; return; }
   const back = R.pending ? "" : ` <a href="#" data-pending>Show pending sales</a>`;
   if (!R.rows.length) { el.innerHTML = `<p class="note">${R.pending ? "No pending sales." : "No sales match."}${back}</p>`; return; }
+  sortRows();
   const n = R.rows.length.toLocaleString();
-  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales, newest contract first.` : R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : n + " sales, newest contract first."}${back}</p>
-  <div class="card scroll"><table class="grid list"><thead><tr><th>Client</th><th>Status</th><th>Address</th><th class="hide-sm">City</th><th>Type</th><th class="hide-sm">Agent</th><th>Contract</th><th class="hide-sm">Close</th><th class="hide-sm">File #</th></tr></thead><tbody>
-  ${R.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td class="hide-sm">${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
+  const label = COLS.find(c => c[0] === R.sort.key)[1].toLowerCase();
+  const order = R.sort.key.endsWith("date") ? (R.sort.asc ? `soonest ${label} first` : `newest ${label} first`) : `by ${label}`;
+  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales, ${order}.` : R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : `${n} sales, ${order}.`}${back}</p>
+  <div class="card scroll"><table class="grid list"><thead><tr>${COLS.map(([k, t, c]) =>
+    `<th class="sortable${c ? " " + c : ""}${R.sort.key === k ? " on" : ""}" data-sort="${k}">${t}${R.sort.key === k ? (R.sort.asc ? " &#9650;" : " &#9660;") : ""}</th>`).join("")}</tr></thead><tbody>
+  ${R.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
   </tbody></table></div>`;
+  el.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+    const k = th.dataset.sort;
+    R.sort = R.sort.key === k ? { key: k, asc: !R.sort.asc } : { key: k, asc: !k.endsWith("date") };
+    renderResults();
+  });
   el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { R.pos = +tr.dataset.i; go("sale=" + R.ids[R.pos]); });
 }
 

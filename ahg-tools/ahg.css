@@ -129,6 +129,8 @@ table.grid td.x { width: 36px; text-align: center; }
 table.grid td.x button { border: 0; background: none; color: var(--ink-3); font-size: 16px; cursor: pointer; padding: 6px; }
 table.grid td.x button:hover { color: var(--accent); }
 table.list tbody tr { cursor: pointer; }
+table.grid th.sortable { cursor: pointer; user-select: none; }
+table.grid th.sortable:hover, table.grid th.sortable.on { color: var(--ink); }
 table.list tbody tr:hover td { background: var(--ro); }
 table.list td { padding: 10px; white-space: nowrap; }
 
