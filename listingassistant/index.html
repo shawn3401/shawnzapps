@@ -175,10 +175,6 @@ dialog h2{font-size:22px}
 .vt.key{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 .vs{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vhint{font-size:12px;background:var(--warn-soft);color:var(--warn);padding:6px 9px;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
-.vt.edit{padding:9px 10px;grid-column:1/-1;border-color:var(--ink-3)}
-.vt.edit input{padding:6px 8px;font-size:15px;margin-top:6px}
-.vt.edit .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.vt.edit .row{margin-top:8px;justify-content:flex-start;gap:6px}
 .vh{font-size:12px;color:var(--ink-3);margin-top:6px}
 .pill.askpill{margin-left:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:14px;padding-right:16px}
 .pill.askpill:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
@@ -313,6 +309,18 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
 <input type="file" id="blankPick" accept="application/pdf" hidden>
 
 <!-- new seller lead: just enough to make the record -->
+<!-- one number (or a low and high pair) on the Value card -->
+<dialog id="numDlg">
+  <form id="numForm">
+    <h2 id="numTitle"></h2>
+    <p class="sub" id="numSub"></p>
+    <div id="numInputs"></div>
+    <div class="err" id="numErr" hidden></div>
+    <p class="note" id="numHist" hidden style="margin:10px 0 0"></p>
+    <div class="row" style="justify-content:space-between"><button type="button" class="btn" id="numClear">Clear it</button><span style="display:flex;gap:10px"><button type="button" class="btn" id="numCancel">Cancel</button><button class="btn primary" id="numSave">Save</button></span></div>
+  </form>
+</dialog>
+
 <dialog id="newDlg">
   <form id="newForm">
     <h2>New seller lead</h2>
@@ -436,7 +444,7 @@ async function openLead(id){
     sb.from("listing_todos").select("*").eq("lead_id", id).order("created_at"),
   ]);
   if (!l){ location.hash = ""; return; }
-  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; noteFor = null; numEdit = null; view = "notes"; tab = "overview"; fileFilter = "all";
+  cur = l; cur.form = normForm(cur.form); items = its || []; todos = tds || []; noteFor = null; view = "notes"; tab = "overview"; fileFilter = "all";
   $("#noteText").value = ""; $("#noteDate").value = todayISO(); $("#noteOk").hidden = $("#noteErr").hidden = $("#upErr").hidden = $("#briefErr").hidden = true;
   show("lead"); renderLead(); window.scrollTo(0, 0);
   loadThumbs();
@@ -518,7 +526,7 @@ $("#noteSave").addEventListener("click", async () => {
 // and the agreed list price and asked for groupings)
 const NUMS = { tax: "Tax assessed", zest: "Zestimate", wants: "Seller wants", loan: "Loan amount", cma_low: "CMA low", cma_high: "CMA high", rec_low: "Recommended low", rec_high: "Recommended high", agreed: "Agreed list price" };
 const VGROUPS = [["Public", [["tax"], ["zest"]]], ["Seller", [["wants"], ["loan"]]], ["Our pricing", [["cma_low", "cma_high", "CMA range"], ["rec_low", "rec_high", "Recommended list price"], ["agreed"]]]];
-let numEdit = null;
+let numKeys = null;   // the key or keys open in the number dialog
 const money = n => "$" + Math.round(n).toLocaleString("en-US");
 const kmoney = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M" : "$" + Math.round(n / 1000) + "k";
 function parseMoney(t){   // "525k", "$525,000", "1.2m"; a bare number under 10,000 means thousands ("525" is $525,000)
@@ -531,16 +539,6 @@ function tileHtml(keys, label){
   const N = cur.numbers || {}, H = N.hints || {}, id = keys[0], range = keys.length === 2;
   const vals = keys.map(k => N[k]), any = vals.filter(Boolean);
   label = label || NUMS[id];
-  if (numEdit === id){
-    const inp = (k, ph) => `<input type="text" inputmode="decimal" id="numAmt_${k}" value="${N[k] ? money(N[k].amount) : ""}" placeholder="${ph}" aria-label="${esc(NUMS[k])}">`;
-    const hist = keys.flatMap(k => (N[k]?.history || []).map(x => ({ ...x, k }))).sort((a, b) => b.at.localeCompare(a.at));
-    return `<div class="vt edit"><div class="vl">${label}</div>
-      ${range ? `<div class="pair">${inp(keys[0], "Low, like 470k")}${inp(keys[1], "High, like 495k")}</div>` : inp(id, "Like 525k or $525,000")}
-      <input type="text" id="numNote" value="${esc(any[0]?.note || "")}" placeholder="Where it's from (optional)" aria-label="Where it's from">
-      <div class="err" id="numErr" hidden></div>
-      <div class="row"><button class="btn small primary" data-numsave="${keys.join(",")}">Save</button><button class="btn small" data-numcancel="1">Cancel</button>${any.length ? `<button class="btn small" data-numclear="${keys.join(",")}">Clear</button>` : ""}</div>
-      ${hist.length ? `<div class="vh">Before: ${hist.map(x => `${range ? (x.k === keys[0] ? "low " : "high ") : ""}${money(x.amount)} (${niceDate(x.at)})`).join(", ")}</div>` : ""}</div>`;
-  }
   const shown = range ? (vals[0] && vals[1] ? `${kmoney(vals[0].amount)} to ${kmoney(vals[1].amount)}` : vals[0] ? `From ${kmoney(vals[0].amount)}` : vals[1] ? `Up to ${kmoney(vals[1].amount)}` : "") : vals[0] ? money(vals[0].amount) : "";
   const last = any.slice().sort((a, b) => b.at.localeCompare(a.at))[0];
   const hints = keys.filter(k => H[k]).map(k => `<div class="vhint">Found ${range ? (k === keys[0] ? "low " : "high ") : ""}${money(H[k].amount)}: "${esc(H[k].evidence)}" <button class="btn link" data-numuse="${k}">Use it</button> · <button class="btn link" data-numdis="${k}">Dismiss</button></div>`).join("");
@@ -568,29 +566,41 @@ async function saveNums(changes, note){   // changes: [[key, amount]], amount 0 
     else delete N[k];
     if (N.hints) delete N.hints[k];
   }
-  numEdit = null; renderValues();
+  renderValues();
   const row = leads.find(l => l.id === cur.id); if (row) row.numbers = N;
   const { error } = await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id);
   if (error) alert("That didn't save: " + error.message);
 }
+function openNum(id){   // a modal, not in place (Shawn, Oct 20, 2026: editing inside the tile was "a bit weird")
+  const t = VGROUPS.flatMap(g => g[1]).find(x => x[0] === id), keys = t.slice(0, t.length === 3 ? 2 : 1), range = keys.length === 2, N = cur.numbers || {};
+  numKeys = keys;
+  $("#numTitle").textContent = t[2] || NUMS[id];
+  $("#numSub").textContent = range ? "Type the low and high ends, like 470k and 495k. Either one can be left blank." : "Type it however is easiest: 525k, $525,000, or just 525.";
+  const inp = (k, lab) => `<div><label class="f" for="numAmt_${k}">${lab}</label><input type="text" inputmode="decimal" id="numAmt_${k}" value="${N[k] ? money(N[k].amount) : ""}" autocomplete="off"></div>`;
+  $("#numInputs").innerHTML = range ? `<div class="grid2">${inp(keys[0], "Low")}${inp(keys[1], "High")}</div>` : inp(id, "Amount");
+  const hist = keys.flatMap(k => (N[k]?.history || []).map(x => ({ ...x, k }))).sort((a, b) => b.at.localeCompare(a.at));
+  $("#numHist").textContent = hist.length ? "Before: " + hist.map(x => `${range ? (x.k === keys[0] ? "low " : "high ") : ""}${money(x.amount)} (${niceDate(x.at)})`).join(", ") : "";
+  $("#numHist").hidden = !hist.length;
+  $("#numClear").hidden = !keys.some(k => N[k]);
+  $("#numErr").hidden = true;
+  $("#numDlg").showModal();
+  const f = $("#numAmt_" + keys[0]); f.focus(); f.select();
+}
+$("#numForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const ch = numKeys.map(k => [k, parseMoney($("#numAmt_" + k).value)]), fail = m => { $("#numErr").textContent = m; $("#numErr").hidden = false; };
+  if (ch.some(([, n]) => isNaN(n))) return fail("Type amounts like 525k or $525,000.");
+  if (ch.length === 2 && ch[0][1] && ch[1][1] && ch[0][1] > ch[1][1]) return fail("The low number is above the high one.");
+  $("#numDlg").close(); saveNums(ch, "");   // typed by hand: no source label (Shawn dropped the "where it's from" box, Oct 20, 2026)
+});
+$("#numCancel").addEventListener("click", () => $("#numDlg").close());
+$("#numClear").addEventListener("click", () => { $("#numDlg").close(); saveNums(numKeys.map(k => [k, 0]), ""); });
 $("#values").addEventListener("click", async e => {
   const t = e.target, N = cur.numbers || {};
-  const open = t.closest("[data-num]"), sv = t.closest("[data-numsave]"), clr = t.closest("[data-numclear]"), use = t.closest("[data-numuse]"), dis = t.closest("[data-numdis]");
-  if (open){ numEdit = open.dataset.num; renderValues(); const f = document.querySelector("#values .edit input"); f.focus(); f.select(); }
-  else if (t.closest("[data-numcancel]")){ numEdit = null; renderValues(); }
-  else if (sv){
-    const keys = sv.dataset.numsave.split(","), ch = keys.map(k => [k, parseMoney($("#numAmt_" + k).value)]);
-    if (ch.some(([, n]) => isNaN(n))){ $("#numErr").textContent = "Type amounts like 525k or $525,000."; $("#numErr").hidden = false; return; }
-    if (ch.length === 2 && ch[0][1] && ch[1][1] && ch[0][1] > ch[1][1]){ $("#numErr").textContent = "The low number is above the high one."; $("#numErr").hidden = false; return; }
-    saveNums(ch, $("#numNote").value.trim());
-  }
-  else if (clr) saveNums(clr.dataset.numclear.split(",").map(k => [k, 0]), "");
+  const open = t.closest("[data-num]"), use = t.closest("[data-numuse]"), dis = t.closest("[data-numdis]");
+  if (open) openNum(open.dataset.num);
   else if (use){ const k = use.dataset.numuse, h = N.hints[k]; saveNums([[k, h.amount]], "Found in your notes"); }
   else if (dis){ delete N.hints[dis.dataset.numdis]; renderValues(); await sb.from("listing_leads").update({ numbers: N }).eq("id", cur.id); }
-});
-$("#values").addEventListener("keydown", e => {
-  if (e.key === "Enter" && e.target.closest(".vt.edit")){ e.preventDefault(); document.querySelector("[data-numsave]")?.click(); }
-  if (e.key === "Escape"){ numEdit = null; renderValues(); }
 });
 
 // ---- ask -----------------------------------------------------------------------------
