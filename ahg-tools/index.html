@@ -369,22 +369,27 @@ function route() {
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
   page("vSearch"); $("#q").value = R.q; renderResults(); $("#q").focus();
-  if (searched) runSearch(true);   // fresh results (and statuses) after editing a sale
+  runSearch(true, searched ? R.pending : true);   // pending sales until something is searched; fresh each time
 }
 const go = hash => { if (location.hash === "#" + hash) route(); else location.hash = hash; };
 
 // ---------- search ----------
 $("#searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch(); });
 $("#q").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
+$("#results").addEventListener("click", e => { if (e.target.closest("[data-pending]")) { e.preventDefault(); $("#q").value = ""; runSearch(true, true); } });
 let searched = false, searching = false;
-async function runSearch(stay) {
+// pending: the default list (Shawn, Oct 20, 2026), every Pending sale; otherwise the Access search,
+// where an empty box means every sale.
+async function runSearch(stay, pending = false) {
   if (searching) return;
   searching = true;
-  R.q = $("#q").value.trim();
+  R.q = pending ? "" : $("#q").value.trim();
+  R.pending = pending;
   const q = R.q.replace(/[%_\\]/g, m => "\\" + m);
   let query = sb.from("sales_search").select("sale_id, status, address, city, sale_type, contract_date, current_projected_close_date, lead_name, agent, file_number")
     .order("contract_date", { ascending: false }).limit(1000);
-  if (q) query = query.ilike("search", `%${q}%`);
+  if (pending) query = query.eq("status", "Pending");
+  else if (q) query = query.ilike("search", `%${q}%`);
   const { data, error } = await query;
   searching = false;
   if (error) return status(error.message, true);
@@ -395,8 +400,10 @@ async function runSearch(stay) {
 function renderResults() {
   const el = $("#results");
   if (!searched) { el.innerHTML = ""; return; }
-  if (!R.rows.length) { el.innerHTML = `<p class="note">No sales match.</p>`; return; }
-  el.innerHTML = `<p class="note">${R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : R.rows.length.toLocaleString() + " sales, newest contract first."}</p>
+  const back = R.pending ? "" : ` <a href="#" data-pending>Show pending sales</a>`;
+  if (!R.rows.length) { el.innerHTML = `<p class="note">${R.pending ? "No pending sales." : "No sales match."}${back}</p>`; return; }
+  const n = R.rows.length.toLocaleString();
+  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales, newest contract first.` : R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : n + " sales, newest contract first."}${back}</p>
   <div class="card scroll"><table class="grid list"><thead><tr><th>Client</th><th>Status</th><th>Address</th><th class="hide-sm">City</th><th>Type</th><th class="hide-sm">Agent</th><th>Contract</th><th class="hide-sm">Close</th><th class="hide-sm">File #</th></tr></thead><tbody>
   ${R.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td class="hide-sm">${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
   </tbody></table></div>`;
