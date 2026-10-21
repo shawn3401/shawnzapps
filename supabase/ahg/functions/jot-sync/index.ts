@@ -52,6 +52,18 @@ async function fetchSince(key: string, form: string, field: "created_at" | "upda
   }
 }
 
+// Re-read the form's question list each run, so a question added in Jotform (like the contract jot's
+// Contract Date, Oct 21, 2026) shows up on its own. One extra call per form per run.
+async function refreshQuestions(db: ReturnType<typeof createClient>, key: string, form: string) {
+  const r = await fetch(`${JOT}/form/${form}/questions?apiKey=${encodeURIComponent(key)}`);
+  const d = await r.json();
+  if (d.responseCode !== 200) throw new Error(`Jotform ${d.responseCode}: ${d.message}`);
+  const rows = Object.entries(d.content as Record<string, { text?: string; type?: string; order?: string }>).map(([qid, q]) =>
+    ({ form_id: form, qid, label: q.text ?? "", type: q.type ?? "", qorder: Number(q.order) || 0 }));
+  const { error } = await db.from("jot_questions").upsert(rows, { onConflict: "form_id,qid" });
+  if (error) throw new Error(error.message);
+}
+
 Deno.serve(async () => {
   const key = Deno.env.get("JOTFORM_API_KEY");
   if (!key) return json({ error: "JOTFORM_API_KEY isn't set." }, 500);
@@ -68,6 +80,7 @@ Deno.serve(async () => {
     }
     try {
       if (!f.synced_through) throw new Error("Run the backfill first (ahg-tools/import/jot_backfill.py).");
+      await refreshQuestions(db, key, f.form_id);
       const since = minusHours(f.synced_through, OVERLAP_HOURS);
       const [created, updated] = await Promise.all([
         fetchSince(key, f.form_id, "created_at", since),
