@@ -938,15 +938,15 @@ async function openLead(id) {
   const { data, error } = await sb.from("leads").select("*").eq("id", id).maybeSingle();
   if (error || !data) { status(error?.message || "That lead wasn't found.", true); return go("leads"); }
   LEAD = data; leadNew = false; LD.pos = LD.ids.indexOf(id);
-  renderLead(); page("vLead");
+  renderLeadForm(); page("vLead");
 }
 function newLead() {
   leadNew = true; LD.pos = -1;
   LEAD = { lead_received_date: new Date().toISOString().slice(0, 10), price_estimate: 0, competing_y_n: false, appt_qualification: "Qualified" };
-  renderLead(); page("vLead");
+  renderLeadForm(); page("vLead");
   $('[data-l="lead_name"]').focus();
 }
-function renderLead() {
+function renderLeadForm() {
   const names = L.team.map(t => ({ v: t.team_member_name, t: t.team_member_name }));
   const yn = ["Yes", "No"].map(v => ({ v, t: v }));
   fillSelect($("#lfType"), LEAD_TYPES.map(v => ({ v, t: v })), LEAD.lead_type);
@@ -986,11 +986,11 @@ function renderLeadHead() {
 
 // Each field saves when it changes, like the Sales form; a new lead saves once the required ones are in.
 async function saveLeadField(k, v) {
-  if (LEAD_REQUIRED[k] && (v == null || v === "")) { status(`${LEAD_REQUIRED[k]} is required.`, true); return renderLead(); }
+  if (LEAD_REQUIRED[k] && (v == null || v === "")) { status(`${LEAD_REQUIRED[k]} is required.`, true); return renderLeadForm(); }
   const old = LEAD[k]; LEAD[k] = v; renderLeadHead();
   if (leadNew) return tryInsertLead();
   const { error } = await sb.from("leads").update({ [k]: v }).eq("id", LEAD.id);
-  if (error) { LEAD[k] = old; renderLead(); return status("Not saved: " + error.message, true); }
+  if (error) { LEAD[k] = old; renderLeadForm(); return status("Not saved: " + error.message, true); }
   status("Saved");
 }
 for (const el of $$("#vLead [data-l]")) {
@@ -1021,7 +1021,7 @@ async function tryInsertLead() {
   LEAD = data; leadNew = false;
   status("Lead saved");
   history.replaceState(null, "", "#lead=" + LEAD.id);
-  renderLead();
+  renderLeadForm();
 }
 $$("[data-newlead]").forEach(b => b.onclick = () => go("newlead"));
 $("#leadExit").onclick = () => {
