@@ -34,6 +34,19 @@
 .st.miss { background: var(--soft); color: var(--accent-deep); }
 .st.none { background: var(--ro); color: var(--ink-3); }
 textarea.in { resize: vertical; font: inherit; }
+.seg { display: flex; flex-wrap: wrap; gap: 0; margin-top: 14px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; width: fit-content; max-width: 100%; }
+.seg button { border: 0; border-right: 1px solid var(--line); background: var(--paper); padding: 8px 14px; font-weight: 600; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: var(--paper); }
+.seg.small { margin-top: 0; } .seg.small button { padding: 7px 11px; font-size: 13.5px; }
+.filters { display: flex; flex-wrap: wrap; gap: 14px 18px; margin-top: 14px; align-items: flex-end; }
+.filters #agentFilter { min-width: 220px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+.chips:empty { display: none; }
+.chip-x { display: inline-flex; align-items: center; gap: 6px; background: var(--soft); color: var(--accent-deep); border-radius: 999px; padding: 3px 6px 3px 11px; font-size: 13.5px; font-weight: 600; }
+.chip-x button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; padding: 0 4px; }
+.chips .clear { border: 0; background: none; color: var(--ink-3); font-weight: 600; cursor: pointer; text-decoration: underline; font-size: 13.5px; }
+body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit, body.viewonly #addLender, body.viewonly td.x button { display: none !important; }
 .roles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .pills button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
@@ -56,7 +69,7 @@ textarea.in { resize: vertical; font: inherit; }
 .st.requested, .st.set, .st.new, .st.rescheduled { background: var(--warn-soft); color: var(--warn); }
 .st.cancelled { background: var(--ro); color: var(--ink-3); }
 .roles .tile span { display: block; color: var(--ink-2); margin-top: 2px; }
-.add-row { display: grid; grid-template-columns: 1fr 1.4fr 160px auto; gap: 12px; align-items: end; }
+.add-row { display: grid; grid-template-columns: 1fr 1.4fr 140px 1fr auto; gap: 12px; align-items: end; }
 .you { color: var(--ink-3); font-size: 13px; margin-left: 6px; }
 .off td { opacity: .55; }
 .search-row { display: flex; gap: 8px; }
@@ -92,14 +105,22 @@ textarea.in { resize: vertical; font: inherit; }
   <main>
     <!-- search, as Access asks when the Sales form opens -->
     <section id="vSearch" hidden>
-      <div class="head"><div class="grow"><h1>Sales</h1></div>
+      <div class="head"><div class="grow"><h1 id="salesTitle">Sales</h1></div>
         <div class="acts"><button class="btn red" data-new>+ New sale</button></div></div>
-      <form class="card search-card" id="searchForm">
-        <label class="fld"><span>Enter any part of name, address, or file number</span>
-          <div class="search-row"><input class="in" id="q" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
-        </label>
-      </form>
-      <div class="pills agents" id="agentPills"></div>
+      <div class="card search-card">
+        <form id="searchForm">
+          <label class="fld"><span>Search any part of name, address, or file number</span>
+            <div class="search-row"><input class="in" id="q" autocomplete="off" enterkeyhint="search" placeholder="Searches every sale you can see"><button class="btn red" type="submit">Search</button></div>
+          </label>
+        </form>
+        <div class="seg" id="views"></div>
+        <div class="filters">
+          <label class="fld" id="agentFilter"><span>Agent</span><select class="in" id="fAgent"></select></label>
+          <div class="fld"><span>Type</span><div class="seg small" id="fType"></div></div>
+          <div class="fld" id="periodFilter"><span id="periodLabel">Date</span><div class="seg small" id="fPeriod"></div></div>
+        </div>
+        <div class="chips" id="activeChips"></div>
+      </div>
       <div id="results"></div>
     </section>
 
@@ -238,7 +259,7 @@ textarea.in { resize: vertical; font: inherit; }
       <div class="strip roles">
         <div class="tile"><small>Admin</small><span>Sees every sale and manages this list.</span></div>
         <div class="tile"><small>Staff</small><span>Sees and edits every sale.</span></div>
-        <div class="tile"><small>Agent</small><span>Not turned on yet. Will see only their own sales.</span></div>
+        <div class="tile"><small>Agent</small><span>Views only their own sales (primary agent or on the split) and their leads. Can't change anything. Pick their team member name.</span></div>
       </div>
       <section class="card" style="margin-bottom:16px">
         <div class="card-h"><h3>Add someone</h3></div>
@@ -246,6 +267,7 @@ textarea.in { resize: vertical; font: inherit; }
           <label class="fld req"><span>Name</span><input class="in" id="nuName" autocomplete="off"></label>
           <label class="fld req"><span>Email</span><input class="in" id="nuEmail" type="email" autocomplete="off" placeholder="name@andersonhicks.com"></label>
           <label class="fld req"><span>Role</span><select class="in" id="nuRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="agent">Agent</option></select></label>
+          <label class="fld"><span>Team member (agents)</span><select class="in" id="nuMember"></select></label>
           <button class="btn red" type="submit">Add</button>
         </form>
       </section>
@@ -532,11 +554,21 @@ async function start(session) {
   const { data: role } = await sb.rpc("my_role");
   ME = { email: session.user.email.toLowerCase(), role };
   $("#navTeam").hidden = role !== "admin";
-  if (role !== "admin" && role !== "staff") {
+  let agentOk = false;
+  if (role === "agent") agentOk = (await sb.rpc("my_team_member")).data != null;
+  if (role !== "admin" && role !== "staff" && !agentOk) {
     $("#deniedEmail").textContent = session.user.email;
-    if (role === "agent") $("#vDenied h1").textContent = "Not turned on for agents yet";
+    if (role === "agent") $("#vDenied h1").textContent = "Your agent access isn't linked yet";
+    if (role === "agent") $("#vDenied p").textContent = "Ask an admin to pick your team member name for " + session.user.email + " on the Team page.";
     page("vDenied");
     return;
+  }
+  // Agents see only their own sales and leads (the database enforces it) and can't change anything.
+  if (role === "agent") {
+    document.body.classList.add("viewonly");
+    $('[data-nav="jots"]').hidden = true;
+    $("#salesTitle").textContent = "My sales";
+    $("#saveExit").textContent = "Back to list"; $("#leadExit").textContent = "Back to list";
   }
   await loadLookups();
   window.addEventListener("hashchange", route);
@@ -545,7 +577,7 @@ async function start(session) {
 
 async function loadLookups() {
   const [team, roles, cities, sources, lend, officers] = await Promise.all([
-    sb.from("team_members").select("id, team_member_name, current_role").order("team_member_name"),
+    sb.from("team_members").select("id, team_member_name, current_role, active").order("team_member_name"),
     sb.from("roles").select("id, role_name"),
     sb.from("city_list").select("city_name").order("city_name"),
     sb.from("lead_source").select("id, lead_source"),
@@ -555,6 +587,7 @@ async function loadLookups() {
   const successRoles = new Set((roles.data || []).filter(r => /Success/.test(r.role_name)).map(r => r.id));
   L.team = team.data || [];
   L.teamName = Object.fromEntries(L.team.map(t => [t.id, t.team_member_name]));
+  L.activeIds = new Set(L.team.filter(t => t.active === "Yes").map(t => t.id));
   L.success = L.team.filter(t => successRoles.has(t.current_role));
   L.cities = (cities.data || []).map(c => c.city_name);
   L.source = Object.fromEntries((sources.data || []).map(s => [s.id, s.lead_source]));
@@ -575,43 +608,121 @@ function route() {
   if (lm) return openLead(+lm[1]);
   const j = h.match(/^jot=(\d+)$/);
   if (j) return openJot(j[1]);
-  page("vSearch"); $("#q").value = R.q; renderResults(); $("#q").focus();
-  runSearch(true, searched ? R.pending : true);   // pending sales until something is searched; fresh each time
+  showSales(h);
 }
 const go = hash => { if (location.hash === "#" + hash) route(); else location.hash = hash; };
 
-// ---------- search ----------
-$("#searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch(); });
-$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
-$("#results").addEventListener("click", e => { if (e.target.closest("[data-pending]")) { e.preventDefault(); $("#q").value = ""; runSearch(true, true); } });
-let searched = false, searching = false;
-// pending: the default list (Shawn, Oct 20, 2026), every Pending sale; otherwise the Access search,
-// where an empty box means every sale.
-async function runSearch(stay, pending = false) {
-  if (searching) return;
-  searching = true;
-  R.q = pending ? "" : $("#q").value.trim();
-  const wasPending = R.pending;
-  R.pending = pending;
-  const q = R.q.replace(/[%_\\]/g, m => "\\" + m);
-  let query = sb.from("sales_search").select("sale_id, status, address, city, sale_type, contract_date, current_projected_close_date, lead_name, agent, file_number")
-    .order("contract_date", { ascending: false }).limit(1000);
-  if (pending) query = query.eq("status", "Pending");
-  else if (q) query = query.ilike("search", `%${q}%`);
-  const { data, error } = await query;
-  searching = false;
+// ---------- Sales list: views, filters, search (Shawn, Oct 21, 2026) ----------
+// The usual CRM pattern: preset views as tabs, a filter bar (agent dropdown, type, date), active
+// filters as removable chips, sortable columns. View and filters live in the address
+// (#sales?view=closed&agent=95&type=Listing&period=thisyear&q=...) and the last one is remembered.
+const VIEWS = [
+  ["pending", "Pending"], ["soon", "Closing soon"], ["closed", "Closed"], ["terminated", "Terminated"], ["all", "All"]];
+const TYPES = [["", "All"], ["Sale", "Sale"], ["Listing", "Listing"], ["Referral", "Referral"]];
+const PERIODS = [["thisyear", "This year"], ["lastyear", "Last year"], ["any", "Any time"]];
+// Which date the period filter and the default sort use in each view.
+const VIEW_DATE = { pending: "current_projected_close_date", soon: "current_projected_close_date",
+  closed: "actual_settlement_date", terminated: "termination_date", all: "contract_date" };
+const VIEW_SORT = { pending: ["current_projected_close_date", true], soon: ["current_projected_close_date", true],
+  closed: ["actual_settlement_date", false], terminated: ["termination_date", false], all: ["contract_date", false] };
+const F_DEFAULT = { view: "pending", agent: "", type: "", period: "thisyear", q: "" };
+let F = { ...F_DEFAULT };
+let searched = false, searchSeq = 0;   // only the newest request's answer is shown
+const isAgent = () => ME.role === "agent";
+// Agents can only look: every field in the given section is switched off after it is drawn.
+function lockIfAgent(sel) {
+  if (!isAgent()) return;
+  $$(`${sel} input, ${sel} select, ${sel} textarea`).forEach(el => { if (!el.closest("#searchForm, .search-card")) el.disabled = true; });
+}
+
+function readFilters(h) {
+  const qs = h.includes("?") ? new URLSearchParams(h.slice(h.indexOf("?") + 1)) : null;
+  if (qs) F = { ...F_DEFAULT, ...Object.fromEntries([...qs].filter(([k]) => k in F_DEFAULT)) };
+  else { try { F = { ...F_DEFAULT, ...JSON.parse(localStorage.getItem("ahg.sales") || "{}") }; } catch { F = { ...F_DEFAULT }; } }
+  if (!VIEWS.some(v => v[0] === F.view)) F.view = "pending";
+  if (isAgent()) F.agent = "";
+}
+function filterHash() {
+  const p = new URLSearchParams(Object.entries(F).filter(([k, v]) => v && v !== F_DEFAULT[k]));
+  return "sales" + (p.toString() ? "?" + p : "");
+}
+function setFilters(patch) {
+  F = { ...F, ...patch };
+  try { localStorage.setItem("ahg.sales", JSON.stringify(F)); } catch {}
+  R.sort = null;
+  go(filterHash());
+}
+function showSales(h) {
+  readFilters(h);
+  page("vSearch");
+  $("#q").value = F.q;
+  renderFilterBar();
+  runSearch();
+}
+
+function renderFilterBar() {
+  $("#views").innerHTML = VIEWS.map(([v, t]) => `<button type="button" data-view="${v}" class="${F.view === v ? "on" : ""}">${t}</button>`).join("");
+  $$("#views [data-view]").forEach(b => b.onclick = () => setFilters({ view: b.dataset.view, q: "" }));
+  $("#agentFilter").hidden = isAgent();
+  if (!isAgent()) {
+    const active = L.team.filter(t => L.activeIds.has(t.id)), past = L.team.filter(t => !L.activeIds.has(t.id));
+    $("#fAgent").innerHTML = `<option value="">All agents</option><optgroup label="Current team">${active.map(t => `<option value="${t.id}">${esc(t.team_member_name)}</option>`).join("")}</optgroup><optgroup label="Past team members">${past.map(t => `<option value="${t.id}">${esc(t.team_member_name)}</option>`).join("")}</optgroup>`;
+    $("#fAgent").value = F.agent;
+  }
+  $("#fType").innerHTML = TYPES.map(([v, t]) => `<button type="button" data-type="${v}" class="${F.type === v ? "on" : ""}">${t}</button>`).join("");
+  $$("#fType [data-type]").forEach(b => b.onclick = () => setFilters({ type: b.dataset.type }));
+  const dated = F.view === "closed" || F.view === "terminated" || F.view === "all";
+  $("#periodFilter").hidden = !dated;
+  $("#periodLabel").textContent = { closed: "Settled", terminated: "Terminated", all: "Contract date" }[F.view] || "Date";
+  $("#fPeriod").innerHTML = PERIODS.map(([v, t]) => `<button type="button" data-period="${v}" class="${F.period === v ? "on" : ""}">${t}</button>`).join("");
+  $$("#fPeriod [data-period]").forEach(b => b.onclick = () => setFilters({ period: b.dataset.period }));
+  // Active filters as chips, each with an x; the view itself is the tab, not a chip.
+  const chips = [];
+  if (F.q) chips.push(["q", `Search: “${F.q}”`]);
+  if (F.agent) chips.push(["agent", "Agent: " + (L.teamName[F.agent] || F.agent)]);
+  if (F.type) chips.push(["type", "Type: " + F.type]);
+  if (dated && F.period !== "any") chips.push(["period", PERIODS.find(p => p[0] === F.period)[1]]);
+  $("#activeChips").innerHTML = chips.map(([k, t]) => `<span class="chip-x">${esc(t)}<button type="button" data-clear="${k}" title="Remove">&#10005;</button></span>`).join("") +
+    (chips.length > 1 ? `<button type="button" class="clear" data-clear="*">Clear all</button>` : "");
+  $$("#activeChips [data-clear]").forEach(b => b.onclick = () => {
+    const k = b.dataset.clear;
+    setFilters(k === "*" ? { q: "", agent: "", type: "", period: "any" } : { [k]: k === "period" ? "any" : "" });
+  });
+}
+$("#fAgent").addEventListener("change", () => setFilters({ agent: $("#fAgent").value }));
+// Searching looks across every sale you can see (as the Access search did), so it switches to All.
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); const q = $("#q").value.trim(); setFilters(q ? { q, view: "all", period: "any" } : { q: "" }); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#searchForm").requestSubmit(); } });
+
+async function runSearch() {
+  const seq = ++searchSeq;
+  const today = new Date().toISOString().slice(0, 10), y = new Date().getFullYear();
+  let query = sb.from("sales_search").select("sale_id, status, address, city, sale_type, contract_date, current_projected_close_date, actual_settlement_date, termination_date, lead_name, agent, file_number");
+  if (F.view === "pending") query = query.eq("status", "Pending");
+  if (F.view === "soon") query = query.eq("status", "Pending").lte("current_projected_close_date", new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10));
+  if (F.view === "closed") query = query.eq("status", "Closed");
+  if (F.view === "terminated") query = query.eq("status", "Terminated");
+  const dateCol = VIEW_DATE[F.view];
+  if ((F.view === "closed" || F.view === "terminated" || F.view === "all") && F.period !== "any") {
+    const from = F.period === "thisyear" ? `${y}-01-01` : `${y - 1}-01-01`, to = F.period === "thisyear" ? `${y + 1}-01-01` : `${y}-01-01`;
+    query = query.gte(dateCol, from).lt(dateCol, to);
+  }
+  if (F.agent) query = query.eq("primary_sales_rep", F.agent);
+  if (F.type) query = query.eq("sale_type", F.type);
+  if (F.q) query = query.ilike("search", `%${F.q.replace(/[%_\\]/g, m => "\\" + m)}%`);
+  const [col, asc] = VIEW_SORT[F.view];
+  const { data, error } = await query.order(col, { ascending: asc, nullsFirst: false }).limit(1000);
+  if (seq !== searchSeq) return;   // a newer click already asked again
   if (error) return status(error.message, true);
-  if (!stay || !R.sort || R.pending !== wasPending) R.sort = defaultSort();   // a new search starts at its default order
-  R.rows = data; sortRows(); searched = true;
-  if (data.length === 1 && !stay) { R.pos = 0; return go("sale=" + data[0].sale_id); }
+  R.rows = data; searched = true;
+  if (!R.sort || R.sortView !== F.view) { R.sort = { key: col, asc }; R.sortView = F.view; }
   renderResults();
 }
+
 // List columns; click a heading to sort by it, click again to flip. Empty values sort last.
 const COLS = [["lead_name", "Client"], ["status", "Status"], ["address", "Address"], ["city", "City", "hide-sm"],
   ["sale_type", "Type"], ["agent", "Agent", "hide-sm"], ["contract_date", "Contract"],
-  ["current_projected_close_date", "Close"], ["file_number", "File #", "hide-sm"]];
-// Pending list: soonest closing first (Shawn, Oct 20, 2026). Searches: newest contract first, as in Access.
-const defaultSort = () => R.pending ? { key: "current_projected_close_date", asc: true } : { key: "contract_date", asc: false };
+  ["current_projected_close_date", "Close"], ["actual_settlement_date", "Settled", "hide-sm"], ["file_number", "File #", "hide-sm"]];
 function sortRows() {
   const { key, asc } = R.sort;
   R.rows.sort((a, b) => {
@@ -620,36 +731,21 @@ function sortRows() {
     const c = String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
     return asc ? c : -c;
   });
-  R.shown = R.agent ? R.rows.filter(r => r.agent === R.agent) : R.rows;
-  R.ids = R.shown.map(r => r.sale_id);
-}
-// Agent chips over the current list (Shawn, Oct 21, 2026): most sales first; click again to clear.
-function renderAgentPills() {
-  const el = $("#agentPills");
-  const counts = {};
-  for (const r of R.rows || []) if (r.agent) counts[r.agent] = (counts[r.agent] || 0) + 1;
-  if (R.agent && !counts[R.agent]) R.agent = "";
-  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
-  el.hidden = names.length < 2 && !R.agent;
-  el.innerHTML = [["", "All agents", R.rows?.length || 0], ...names.map(n => [n, n, counts[n]])].map(([v, t, c]) =>
-    `<button type="button" data-agent="${esc(v)}" class="${R.agent === v ? "on" : ""}">${esc(t)}<small>${c.toLocaleString()}</small></button>`).join("");
-  el.querySelectorAll("[data-agent]").forEach(b => b.onclick = () => { R.agent = R.agent === b.dataset.agent ? "" : b.dataset.agent; renderResults(); });
+  R.ids = R.rows.map(r => r.sale_id);
 }
 function renderResults() {
   const el = $("#results");
-  if (!searched) { el.innerHTML = ""; $("#agentPills").hidden = true; return; }
-  renderAgentPills();
-  const back = R.pending ? "" : ` <a href="#" data-pending>Show pending sales</a>`;
-  if (!R.rows.length) { el.innerHTML = `<p class="note">${R.pending ? "No pending sales." : "No sales match."}${back}</p>`; return; }
+  if (!searched) { el.innerHTML = ""; return; }
+  const viewName = VIEWS.find(v => v[0] === F.view)[1];
+  if (!R.rows.length) { el.innerHTML = `<p class="note">No sales match.${F.view !== "all" && !F.q ? "" : ""}</p>`; return; }
   sortRows();
-  const n = R.shown.length.toLocaleString();
-  const who = R.agent ? ` for ${esc(R.agent)}` : "";
+  const n = R.rows.length.toLocaleString();
   const label = COLS.find(c => c[0] === R.sort.key)[1].toLowerCase();
   const order = R.sort.key.endsWith("date") ? (R.sort.asc ? `soonest ${label} first` : `newest ${label} first`) : `by ${label}`;
-  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales${who}, ${order}.` : R.rows.length === 1000 && !R.agent ? "Showing the newest 1,000. Type more to narrow it down." : `${n} sales${who}, ${order}.`}${back}</p>
+  el.innerHTML = `<p class="note"><b>${viewName}</b> · ${R.rows.length === 1000 ? "the first 1,000 sales. Narrow it down with a filter or search." : `${n} sale${R.rows.length === 1 ? "" : "s"}, ${order}.`}</p>
   <div class="card scroll"><table class="grid list"><thead><tr>${COLS.map(([k, t, c]) =>
     `<th class="sortable${c ? " " + c : ""}${R.sort.key === k ? " on" : ""}" data-sort="${k}">${t}${R.sort.key === k ? (R.sort.asc ? " &#9650;" : " &#9660;") : ""}</th>`).join("")}</tr></thead><tbody>
-  ${R.shown.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
+  ${R.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${usDate(r.actual_settlement_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
   </tbody></table></div>`;
   el.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
     const k = th.dataset.sort;
@@ -710,6 +806,7 @@ function render() {
   renderSplits();
   renderLenders();
   for (const b of $$("#tabs button")) b.disabled = isNew && (b.dataset.tab === "cs" || b.dataset.tab === "le");
+  lockIfAgent("#vSale");
   $("#recNav").hidden = isNew || R.pos < 0;
   $("#recPos").textContent = R.pos >= 0 ? `${R.pos + 1} of ${R.ids.length.toLocaleString()}` : "";
 }
@@ -818,26 +915,29 @@ const ROLE_NAMES = { admin: "Admin", staff: "Staff", agent: "Agent" };
 let team = [];
 async function showTeam() {
   page("vTeam");
+  $("#nuMember").innerHTML = `<option value=""></option>` + L.team.filter(m => L.activeIds.has(m.id)).map(m => `<option value="${m.id}">${esc(m.team_member_name)}</option>`).join("");
   const { data, error } = await sb.from("app_users").select("*").order("name");
   if (error) return status(error.message, true);
   team = data; renderTeam();
 }
 function renderTeam() {
   const t = $("#teamTable");
-  t.innerHTML = `<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Access</th><th>Added</th><th></th></tr></thead><tbody>` +
+  const memberOpts = sel => `<option value=""></option>` + L.team.filter(m => L.activeIds.has(m.id) || m.id === sel).map(m => `<option value="${m.id}" ${m.id === sel ? "selected" : ""}>${esc(m.team_member_name)}</option>`).join("");
+  t.innerHTML = `<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team member</th><th>Access</th><th>Added</th><th></th></tr></thead><tbody>` +
     team.map((u, i) => {
       const me = u.email === ME.email;
       return `<tr data-i="${i}" class="${u.active ? "" : "off"}">
         <td data-label="Name"><input class="in" data-u="name" value="${esc(u.name)}"></td>
         <td data-label="Email">${esc(u.email)}${me ? `<span class="you">(you)</span>` : ""}</td>
         <td data-label="Role"><select class="in" data-u="role" ${me ? "disabled title=\"Another admin has to change your role\"" : ""}>${Object.entries(ROLE_NAMES).map(([v, n]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${n}</option>`).join("")}</select></td>
+        <td data-label="Team member"><select class="in" data-u="team_member_id">${memberOpts(u.team_member_id)}</select>${u.role === "agent" && !u.team_member_id ? `<div class="note" style="margin:4px 0 0;color:var(--accent)">Needed for agents</div>` : ""}</td>
         <td data-label="Access"><label class="chk"><input type="checkbox" data-u="active" ${u.active ? "checked" : ""} ${me ? "disabled" : ""}> ${u.active ? "On" : "Off"}</label></td>
         <td data-label="Added">${usDate(u.added_at)}</td>
         <td class="x">${me ? "" : `<button title="Remove from the team list" data-rm="${i}">&#10005;</button>`}</td></tr>`;
     }).join("") + `</tbody>`;
   t.querySelectorAll("[data-u]").forEach(el => el.addEventListener("change", async () => {
     const u = team[+el.closest("tr").dataset.i], k = el.dataset.u;
-    const v = el.type === "checkbox" ? el.checked : el.value.trim();
+    const v = el.type === "checkbox" ? el.checked : k === "team_member_id" ? (el.value ? +el.value : null) : el.value.trim();
     if (k === "name" && !v) { status("Name can't be empty.", true); return renderTeam(); }
     const { error } = await sb.from("app_users").update({ [k]: v }).eq("email", u.email);
     if (error) { status(error.message, true); return showTeam(); }
@@ -853,13 +953,14 @@ function renderTeam() {
 }
 $("#addUser").addEventListener("submit", async e => {
   e.preventDefault();
-  const name = $("#nuName").value.trim(), email = $("#nuEmail").value.trim().toLowerCase(), role = $("#nuRole").value;
+  const name = $("#nuName").value.trim(), email = $("#nuEmail").value.trim().toLowerCase(), role = $("#nuRole").value, team_member_id = $("#nuMember").value ? +$("#nuMember").value : null;
+  if (role === "agent" && !team_member_id) return status("Pick the agent's team member name, so we know which sales are theirs.", true);
   if (!name || !email) return status("Fill in the name and email.", true);
   if (!/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
   if (team.some(u => u.email === email)) return status("They're already on the list.", true);
-  const { error } = await sb.from("app_users").insert({ name, email, role });
+  const { error } = await sb.from("app_users").insert({ name, email, role, team_member_id });
   if (error) return status(error.message, true);
-  $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff";
+  $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff"; $("#nuMember").value = "";
   status(`${name} added`); showTeam();
 });
 
@@ -966,6 +1067,7 @@ function renderLeadForm() {
   }
   renderLeadHead();
   $("#leadNew").hidden = !leadNew;
+  lockIfAgent("#vLead");
   $("#leadNav").hidden = leadNew || LD.pos < 0;
   $("#leadPos").textContent = LD.pos >= 0 ? `${LD.pos + 1} of ${LD.ids.length.toLocaleString()}` : "";
 }
@@ -1188,6 +1290,7 @@ function renderSplits() {
   if (splits.length) t.querySelector("tr.total td").textContent = "Total";
   t.querySelectorAll("tr[data-i]").forEach(tr => { tr.querySelector("select").value = splits[+tr.dataset.i].team_level_sales_rep ?? ""; });
   wireGrid(t, splits, "sharedat_team_level", renderSplits);
+  lockIfAgent("#splits");
 }
 
 // ---------- Lenders (Access subform on LenderApprovals) ----------
@@ -1212,6 +1315,7 @@ function renderLenders() {
     tr.querySelector('[data-f="loan_officer_linked"]').value = r.loan_officer_linked ?? "";
   });
   wireGrid(t, lenders, "lender_approvals", renderLenders);
+  lockIfAgent("#lenders");
 }
 
 // One cell saves on change; the x deletes the row after asking.
@@ -1267,7 +1371,7 @@ $$("#recNav [data-go]").forEach(b => b.onclick = () => {
 $$("[data-new]").forEach(b => b.onclick = () => go("new"));
 $("#saveExit").onclick = () => {
   if (isNew && missing().length && !confirm("This new sale isn't saved yet (missing " + missing().join(", ") + "). Leave without saving?")) return;
-  go("sales");
+  go(filterHash());
 };
 
 // Defaults from the Access table, so the math shows right away on a new sale.

@@ -45,7 +45,7 @@ alter table public.sharedat_team_level
 drop view if exists public.sales_search;
 create view public.sales_search with (security_invoker = true) as
 select s.sale_id, s.address, s.city, s.sale_type, s.contract_date, s.current_projected_close_date,
-       s.termination_date, s.file_number, s.client_name as lead_id, l.lead_name,
+       s.termination_date, s.actual_settlement_date, s.primary_sales_rep, s.file_number, s.client_name as lead_id, l.lead_name,
        tm.team_member_name as agent,
        -- Status from the key dates, the rule Access's own queries use (Sales-Open-ForReport,
        -- HistoricalSalesReport): a termination date means Terminated, else a settlement date means
