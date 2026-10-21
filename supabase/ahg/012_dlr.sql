@@ -23,19 +23,8 @@ create or replace function public.sale_gpc(s public.sales) returns numeric langu
                    * s.projected_commission_percent + s.transaction_fees_bonuses end
 $$;
 
--- GCI by month: closed sales by settlement month, pending sales by projected close month,
--- terminated sales left out. Checked against the workbook Oct 21, 2026 (Oct 668,888.21).
-create or replace view public.gci_by_month with (security_invoker = true) as
-select date_trunc('month', coalesce(s.actual_settlement_date, s.current_projected_close_date))::date as month,
-  sum(public.sale_gpc(s)) as gci,
-  sum(public.sale_gpc(s)) filter (where s.actual_settlement_date is not null) as closed_gci,
-  sum(public.sale_gpc(s)) filter (where s.actual_settlement_date is null) as pending_gci,
-  count(*) as sales
-from public.sales s
-where s.termination_date is null and coalesce(s.actual_settlement_date, s.current_projected_close_date) is not null
-group by 1;
-revoke all on public.gci_by_month from anon;
-grant select on public.gci_by_month to authenticated;
+-- GCI by month (view gci_by_month) is defined in 013_projections.sql, which also leaves out sales
+-- switched off from projections. Run 013 after this file.
 
 -- Everything the DLR shows, for one day (default today), as JSON: the page and the daily email both
 -- read this, so they can't disagree. Rules from the workbook's DLR1 and Reference formulas:
@@ -73,7 +62,8 @@ begin
     'year_goal', (gj ->> 'Commission Dollars')::numeric,
     'month_goal', (gj ->> 'Commission Dollars')::numeric * (select share from season_allocation where month = extract(month from gci_m)),
     'months', (select jsonb_agg(jsonb_build_object('month', m, 'target', (gj ->> 'Commission Dollars')::numeric * (select share from season_allocation where month = extract(month from m)),
-                 'actual', coalesce((select gci from gci_by_month where month = m), 0), 'closed', coalesce((select closed_gci from gci_by_month where month = m), 0)) order by m)
+                 'actual', coalesce((select gci from gci_by_month where month = m), 0), 'closed', coalesce((select closed_gci from gci_by_month where month = m), 0),
+                 'excluded', coalesce((select excluded_gci from gci_by_month where month = m), 0), 'excluded_sales', coalesce((select excluded_sales from gci_by_month where month = m), 0)) order by m)
                from (select (gci_m + make_interval(months => i))::date m from generate_series(0, 2) i) x),
     'year', jsonb_build_object('target', (gj ->> 'Commission Dollars')::numeric,
                'pace', (gj ->> 'Commission Dollars')::numeric * prorate,

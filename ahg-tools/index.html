@@ -373,7 +373,7 @@ table.tracker th { font-size: 11.5px; }
     <section id="vSale" hidden>
       <div class="head">
         <div class="grow">
-          <h1><span id="hName"></span><span class="st" id="hStatus"></span><span class="chip" id="hType"></span><span class="chip gray" id="hId"></span></h1>
+          <h1><span id="hName"></span><span class="st" id="hStatus"></span><span class="chip" id="hType"></span><span class="chip gray" id="hProj" hidden>Not in projections</span><span class="chip gray" id="hId"></span></h1>
           <div class="sub" id="hSub"></div><div class="sub from-jot" id="hJot"></div>
         </div>
         <div class="acts">
@@ -450,6 +450,7 @@ table.tracker th { font-size: 11.5px; }
                 <span class="lbl">Commission fixed amount</span><input class="in num" data-k="projected_commission_flat_amount" data-t="money">
                 <span class="lbl">Transaction fees/bonuses</span><input class="in num" data-k="transaction_fees_bonuses" data-t="money">
                 <span class="lbl sum">Gross potential commission</span><span class="val sum" id="cGpc"></span>
+                <span class="lbl" id="projLbl" title="Turn off to leave this pending sale out of GCI projections. Once it closes it counts anyway. Admins only.">Include in projections</span><span class="chk-cell" id="projCell"><input type="checkbox" id="projChk"></span>
               </div>
             </div>
             <div>
@@ -871,6 +872,7 @@ async function openSale(id) {
   S = s.data; splits = sp.data || []; lenders = le.data || []; isNew = false;
   R.pos = R.ids.indexOf(id);
   fromJot("sale", id, $("#hJot"));
+  loadProjection(id);
   await loadLead(S.client_name);
   render();
   page("vSale");
@@ -1535,7 +1537,9 @@ function dlrTile(t, d) {
       ${y.pace ? `<div class="pace" style="left:${y.pace / ymax * 100}%" title="Where the year should be today: ${fmt(y.pace)}"></div>` : ""}
     </div></div><div class="ylabels"><span>${fmt(ytot)} so far</span><span>${y.pace ? "pace " + fmt(y.pace) + " · " : ""}goal ${fmt(y.target)}</span></div>`;
   const legend = t.parts ? `<div class="ylabels" style="margin:4px 0 0;justify-content:center;gap:14px"><span style="color:${shades[0]}">&#9632; ${t.parts[0]}</span><span style="color:${shades[1]}">&#9632; ${t.parts[1]}</span></div>` : "";
-  return `<section class="tile2" style="${style}"><h2>${head}</h2><div class="panel"><div class="mbars">${bars}</div>${legend}</div><div class="panel">${year}</div></section>`;
+  const left = t.money ? d.months.filter(m => m.excluded > 0) : [];
+  const leftNote = left.length ? `<div class="ylabels" style="margin:6px 0 0;justify-content:center;color:var(--ink-2)">${left.map(m => `${kfmt(m.excluded)} left out of ${new Date(m.month + "T00:00").toLocaleDateString([], { month: "short" })} projections (${m.excluded_sales} deal${m.excluded_sales === 1 ? "" : "s"})`).join(" · ")}</div>` : "";
+  return `<section class="tile2" style="${style}"><h2>${head}</h2><div class="panel"><div class="mbars">${bars}</div>${legend}${leftNote}</div><div class="panel">${year}</div></section>`;
 }
 
 // ---------- Pending tracker (the Excel "PendingTracker - East Idaho" workbook, rebuilt) ----------
@@ -1587,6 +1591,33 @@ function renderTracker() {
     }).join("") + `</tbody>`;
   $$("#trTable tbody tr").forEach(tr => tr.onclick = () => { const r = rows[+tr.dataset.i]; R.ids = rows.map(x => x.sale_id); R.pos = +tr.dataset.i; go("sale=" + r.sale_id); });
 }
+
+// ---------- "Include in projections" (Shawn, Oct 21, 2026) ----------
+// On by default. Off leaves a pending sale's GCI out of projections (big, soft deals). A closed sale
+// counts regardless. Stored in projection_exclusions so an Access refresh can't wipe it. Admins only.
+let projExcluded = false;
+async function loadProjection(id) {
+  if (isAgent()) { $("#projLbl").hidden = $("#projCell").hidden = true; return; }
+  const { data } = await sb.from("projection_exclusions").select("sale_id, excluded_by, excluded_at").eq("sale_id", id).maybeSingle();
+  showProjection(data);
+}
+function showProjection(row) {
+  projExcluded = !!row;
+  $("#projChk").checked = !projExcluded;
+  $("#projChk").disabled = ME.role !== "admin" || isNew;
+  $("#projLbl").hidden = $("#projCell").hidden = isAgent();
+  $("#hProj").hidden = !projExcluded;
+  $("#hProj").title = row ? `Left out by ${row.excluded_by} on ${new Date(row.excluded_at).toLocaleDateString()}` : "";
+}
+$("#projChk").addEventListener("change", async () => {
+  const include = $("#projChk").checked;
+  const { error } = include
+    ? await sb.from("projection_exclusions").delete().eq("sale_id", S.sale_id)
+    : await sb.from("projection_exclusions").insert({ sale_id: S.sale_id });
+  if (error) { status("Not saved: " + error.message, true); return loadProjection(S.sale_id); }
+  status(include ? "Back in projections" : "Left out of projections");
+  loadProjection(S.sale_id);
+});
 
 // ---------- Commission shares (Access subform on SharedatTeamLevelSubtableNew) ----------
 function renderSplits() {
@@ -1703,6 +1734,7 @@ $("#saveExit").onclick = () => {
 function newSale() {
   isNew = true; lead = null; splits = []; lenders = []; R.pos = -1;
   $("#hJot").innerHTML = "";
+  showProjection(null);
   S = { commissions_pd_on_concessions: true, commissionis_flat_amount: false, inspection: true, reo: false,
     inspection_on_calendar: false, transaction_fees_bonuses: 0, other_hud_commission_deduction: 0,
     outside_agent_referral_percent: 0, agent_concessions_not_on_hud: 0, referralon_hud_agent: "NA",
