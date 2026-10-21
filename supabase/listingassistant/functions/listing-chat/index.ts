@@ -39,7 +39,7 @@ You can also make changes with your tools: add a to-do, mark one done or not don
 - Use the to-do numbers and the form keys exactly as given. Make several tool calls when the message asks for several things.
 - After making changes, reply in one or two short sentences saying what you did. The page shows each change with an Undo button, so do not ask for permission first. If the request is ambiguous, ask one short question instead of guessing.
 - On the form, anything the agent tells you counts as confirmed. When checking a box that has options, a count, or a text blank, fill those only with what was given (empty strings and an empty list otherwise).
-- The Value card holds nine numbers: tax (tax assessed value), zest (Zestimate), wants (what the seller wants), loan (what they owe), cma_low and cma_high (the agent's CMA range), rec_low and rec_high (the list price range the agent recommends), and agreed (the list price agreed with the seller). Set one with set_value when the agent gives it ("Zestimate is 512k", "CMA came in 470 to 495"), in whole dollars, with a short note of where it came from if they said. An amount of 0 clears it. Never set one from your own estimate.
+- The Value card holds nine numbers: tax (tax assessed value), zest (Zestimate), wants (what the seller wants), loan (what they owe), cma_low and cma_high (the agent's CMA range), rec_low and rec_high (the list price range the agent recommends), and agreed (the list price agreed with the seller). Set one with set_value when the agent gives it ("Zestimate is 512k", "CMA came in 470 to 495"), in whole dollars, with a short note of where it came from if they said. An amount of 0 is a real value (a loan of 0 means the house is paid off); to remove a number, use clear true. Never set one from your own estimate.
 - Who on a to-do is one of: agent (Listing Agent: the agent's own work, and the default), seller (the seller or anyone on their side), team (the Success Team: office paperwork, MLS entry, title, photos, signs, lockboxes, marketing).
 
 Plain words. No markdown headings, tables, or bold. No em dashes or en dashes.`;
@@ -56,7 +56,7 @@ const TOOLS = [
   tool("set_form_field", "Fill a written blank on the form (top of the form, the two written lines, schools, irrigation company, well and septic blanks). An empty value clears it.", { key: { type: "string", enum: FIELDS }, value: str }),
   tool("set_room_count", "Fill one cell of the room count table. An empty value clears it.", { row: { type: "string", enum: ROOM_ROWS }, col: { type: "string", enum: ROOM_COLS }, value: str }),
   tool("set_stage", "Move the lead to another stage.", { stage: { type: "string", enum: STAGES } }),
-  tool("set_value", "Set one number on the Value card, in whole dollars. 0 clears it.", { key: { type: "string", enum: Object.keys(NUM) }, amount: { type: "integer" }, note: str }),
+  tool("set_value", "Set one number on the Value card, in whole dollars (0 is a real value). clear true removes it.", { key: { type: "string", enum: Object.keys(NUM) }, amount: { type: "integer" }, note: str, clear: { type: "boolean" } }),
 ];
 
 type Cat = Record<string, { t: string; g: string; i: Record<string, [string, string[], number, number]> }>;
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
   }).filter(Boolean).join("\n") || "(none)";
   const nums = (lead.numbers || {}) as Record<string, any>;
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
-  const numText = Object.keys(NUM).map((k) => `${k} (${NUM[k]}): ${nums[k]?.amount ? money(nums[k].amount) + (nums[k].note ? " (" + nums[k].note + ")" : "") : "not set"}${nums.hints?.[k] ? `; suggested from the material: ${money(nums.hints[k].amount)}` : ""}`).join("\n");
+  const numText = Object.keys(NUM).map((k) => `${k} (${NUM[k]}): ${nums[k] && nums[k].amount != null ? money(nums[k].amount) + (nums[k].note ? " (" + nums[k].note + ")" : "") : "not set"}${nums.hints?.[k] ? `; suggested from the material: ${money(nums.hints[k].amount)}` : ""}`).join("\n");
   const fieldText = Object.entries(form.fields).map(([k, v]) => `${k}: ${v}`).join("\n") || "(none)";
   const roomText = Object.entries(form.rooms).map(([k, v]) => `${k}: ${v}`).join("\n") || "(none)";
   const b = (lead.brief || {}) as Record<string, unknown>;
@@ -229,13 +229,13 @@ ${numText}
       lead.stage = st; return "Done.";
     }
     if (name === "set_value") {
-      const k = String(a.key), amt = Math.round(Number(a.amount) || 0); if (!NUM[k]) return "Unknown number.";
+      const k = String(a.key), amt = Math.max(0, Math.round(Number(a.amount) || 0)), clear = !!a.clear; if (!NUM[k]) return "Unknown number.";
       const prev = nums[k] ?? null, prevHint = nums.hints?.[k] ?? null;
-      if (amt > 0) nums[k] = { amount: amt, note: String(a.note || "").trim().slice(0, 120) || "From Ask", at: new Date().toISOString(), history: prev?.amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) };
+      if (!clear) nums[k] = { amount: amt, note: String(a.note || "").trim().slice(0, 120) || "From Ask", at: new Date().toISOString(), history: prev && prev.amount !== amt ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) };
       else delete nums[k];
       if (nums.hints) delete nums.hints[k];
       const { error } = await admin.from("listing_leads").update({ numbers: nums }).eq("id", lead.id); if (error) return "Couldn't save it: " + error.message;
-      actions.push({ label: amt > 0 ? `${NUM[k]}: ${money(amt)}` : `Cleared ${NUM[k]}`, undo: { t: "num", key: k, prev, prevHint } });
+      actions.push({ label: !clear ? `${NUM[k]}: ${money(amt)}` : `Cleared ${NUM[k]}`, undo: { t: "num", key: k, prev, prevHint } });
       return "Done.";
     }
     return "Unknown tool.";

@@ -45,7 +45,7 @@ Rules for numbers (only these nine, only about THIS property, and only when the 
 - tax: the county's assessed or taxable value of the property.
 - zest: Zillow's Zestimate for the property.
 - wants: the price the seller says they want or would list at.
-- loan: what the seller owes on the property (mortgage balance or payoff).
+- loan: what the seller owes on the property (mortgage balance or payoff). When the seller says the house is paid off or they owe nothing, loan is 0.
 - cma_low and cma_high: the low and high ends of the price range from the agent's CMA (comparable sales analysis).
 - rec_low and rec_high: the low and high ends of the list price range the agent recommends to the seller.
 - agreed: the list price the agent and seller agreed on.
@@ -164,7 +164,7 @@ Call save_todos.`;
     // a number it spotted waits on the Value card as a suggestion; it never overwrites one
     const nums = (lead.numbers || {}) as Record<string, any>; let numsDirty = false;
     for (const n of out.numbers || []) {
-      if (!["tax", "zest", "wants", "loan", "cma_low", "cma_high", "rec_low", "rec_high", "agreed"].includes(n.key) || !(n.amount > 0)) continue;
+      if (!["tax", "zest", "wants", "loan", "cma_low", "cma_high", "rec_low", "rec_high", "agreed"].includes(n.key) || !(n.amount > 0 || (n.key === "loan" && n.amount === 0))) continue;
       if (nums[n.key]?.amount === n.amount) continue;
       nums.hints = nums.hints || {};
       nums.hints[n.key] = { amount: n.amount, evidence: (n.evidence || "").trim().slice(0, 300), at: new Date().toISOString(), item_id: body.item_id ?? null };

@@ -606,9 +606,9 @@ const NUMS = { tax: "Tax assessed", zest: "Zestimate", wants: "Seller wants", lo
 const VGROUPS = [["Public", [["tax"], ["zest"]]], ["Seller", [["wants"], ["loan"]]], ["Our pricing", [["cma_low", "cma_high", "CMA range"], ["rec_low", "rec_high", "Recommended list price"], ["agreed"]]]];
 let numKeys = null;   // the key or keys open in the number dialog
 const money = n => "$" + Math.round(n).toLocaleString("en-US");
-const kmoney = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M" : "$" + Math.round(n / 1000) + "k";
-function parseMoney(t){   // "525k", "$525,000", "1.2m"; a bare number under 10,000 means thousands ("525" is $525,000)
-  t = String(t).toLowerCase().replace(/[$,\s]/g, ""); if (!t) return 0;
+const kmoney = n => n === 0 ? "$0" : n >= 1e6 ? "$" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M" : "$" + Math.round(n / 1000) + "k";
+function parseMoney(t){   // "525k", "$525,000", "1.2m"; a bare number under 10,000 means thousands ("525" is $525,000); blank is null, "0" is a real 0
+  t = String(t).toLowerCase().replace(/[$,\s]/g, ""); if (!t) return null;
   const m = t.match(/^(\d+(?:\.\d+)?)(k|m)?$/); if (!m) return NaN;
   let n = parseFloat(m[1]); if (m[2] === "k") n *= 1e3; else if (m[2] === "m") n *= 1e6; else if (n < 10000) n *= 1e3;
   return Math.round(n);
@@ -633,14 +633,15 @@ function renderValues(){
   else if (a("wants") && lo && a("wants") < lo) out.push(`Seller wants ${kmoney(lo - a("wants"))} under the bottom of ${what}`);
   else if (a("wants") && lo && hi) out.push(`Seller's number is inside ${what}`);
   const price = a("agreed") || (lo && hi ? (lo + hi) / 2 : hi || lo);
-  if (a("loan") && price) out.push(`Equity about ${kmoney(price - a("loan"))} (${a("agreed") ? "list price" : (lo && hi ? "midpoint of " : "") + what.replace("our ", "the ")} minus loan)`);
+  if (a("loan") === 0) out.push("No loan, owned free and clear");
+  else if (a("loan") && price) out.push(`Equity about ${kmoney(price - a("loan"))} (${a("agreed") ? "list price" : (lo && hi ? "midpoint of " : "") + what.replace("our ", "the ")} minus loan)`);
   $("#vread").textContent = out.join(" · "); $("#vread").hidden = !out.length;
 }
-async function saveNums(changes, note){   // changes: [[key, amount]], amount 0 clears
+async function saveNums(changes, note){   // changes: [[key, amount]]; null clears, 0 is kept (a loan of $0 means paid off; Shawn, Oct 21, 2026)
   const N = cur.numbers ||= {};
   for (const [k, amount] of changes){
     const prev = N[k];
-    if (amount > 0){ if (prev?.amount === amount && (prev.note || "") === note) continue; N[k] = { amount, note, at: new Date().toISOString(), history: prev?.amount && prev.amount !== amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) }; }
+    if (amount != null && amount >= 0){ if (prev?.amount === amount && (prev.note || "") === note) continue; N[k] = { amount, note, at: new Date().toISOString(), history: prev && prev.amount !== amount ? [...(prev.history || []), { amount: prev.amount, note: prev.note, at: prev.at }] : (prev?.history || []) }; }
     else delete N[k];
     if (N.hints) delete N.hints[k];
   }
@@ -672,7 +673,7 @@ $("#numForm").addEventListener("submit", e => {
   $("#numDlg").close(); saveNums(ch, "");   // typed by hand: no source label (Shawn dropped the "where it's from" box, Oct 20, 2026)
 });
 $("#numCancel").addEventListener("click", () => $("#numDlg").close());
-$("#numClear").addEventListener("click", () => { $("#numDlg").close(); saveNums(numKeys.map(k => [k, 0]), ""); });
+$("#numClear").addEventListener("click", () => { $("#numDlg").close(); saveNums(numKeys.map(k => [k, null]), ""); });
 $("#values").addEventListener("click", async e => {
   const t = e.target, N = cur.numbers || {};
   const open = t.closest("[data-num]"), use = t.closest("[data-numuse]"), dis = t.closest("[data-numdis]");
