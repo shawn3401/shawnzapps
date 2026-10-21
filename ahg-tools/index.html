@@ -210,6 +210,7 @@ body.notadmin .ge-admin { display: none !important; }
       <a href="#hustle" data-nav="hustle">Agent hustle board</a>
       <a href="#tracker" data-nav="tracker">Pending tracker</a>
       <a href="#distribution" data-nav="distribution" id="navDist" hidden>Report distribution</a>
+      <a href="#settings" data-nav="settings" id="navSettings" hidden style="margin-top:16px">Settings</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
   </aside>
@@ -304,7 +305,7 @@ body.notadmin .ge-admin { display: none !important; }
         <div class="card-h"><h3>Consultations</h3></div>
         <div class="card-b">
           <div class="fields cons-top">
-            <label class="fld"><span>Received</span><input class="in" type="date" data-l="lead_received_date"></label>
+            <label class="fld req"><span>Received</span><input class="in" type="date" data-l="lead_received_date"></label>
             <label class="fld req"><span>Appt trigger</span><select class="in" data-l="trigger" id="lfTrigger"></select></label>
             <label class="chk"><input type="checkbox" data-l="competing_y_n"> Competing</label>
           </div>
@@ -537,6 +538,31 @@ body.notadmin .ge-admin { display: none !important; }
         </div>
         <p class="note" id="geNote"></p>
       </div>
+    </section>
+
+    <!-- Settings (admins only): business-day holidays, Idaho Code 73-108 -->
+    <section id="vSettings" hidden>
+      <div class="head"><div class="grow"><h1>Settings</h1><div class="sub">Lists the whole team's tools rely on.</div></div></div>
+      <section class="card">
+        <div class="card-h"><h3>Business-day holidays</h3></div>
+        <div class="card-b">
+          <p class="note" style="margin-top:0">The purchase and sale agreement (Idaho REALTORS RE-21, section 26) counts business days as Monday to Friday, leaving out the legal holidays in Idaho Code 73-108. A holiday on a Saturday is observed the Friday before, one on a Sunday the Monday after. Juneteenth is a federal holiday but not an Idaho one, so it isn't here. The pending tracker's deadlines skip these days.</p>
+          <div class="banner" id="hoWarn" hidden></div>
+          <div class="filters" style="margin-top:0"><div class="fld"><span>Year</span><div class="seg small" id="hoYears"></div></div></div>
+          <div class="scroll" style="margin-top:12px"><table class="grid" id="hoTable"></table></div>
+          <div class="dist-acts" style="margin-top:16px">
+            <label class="fld"><span>Import holidays for year</span><input class="in" id="hoImpYear" type="number" min="2000" max="2100" style="width:120px"></label>
+            <button class="btn red" id="hoImport" style="align-self:end">Import</button>
+            <span class="note" style="margin:0;align-self:end">Adds that year's Idaho holidays by the 73-108 rules. Days added by hand stay.</span>
+          </div>
+          <div class="dist-acts" style="margin-top:12px">
+            <label class="fld"><span>Add a day by hand</span><input class="in" id="hoDay" type="date"></label>
+            <label class="fld" style="flex:1;min-width:220px"><span>Name</span><input class="in" id="hoName" autocomplete="off" placeholder="e.g. National day of mourning (President)"></label>
+            <button class="btn" id="hoAdd" style="align-self:end">Add</button>
+          </div>
+          <p class="note">73-108 also counts any day the President or the Governor appoints, so add those by hand when one is declared.</p>
+        </div>
+      </section>
     </section>
 
     <!-- one sale -->
@@ -807,8 +833,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals", "vSettings"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals", vSettings: "settings" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -820,6 +846,7 @@ async function start(session) {
   ME = { email: session.user.email.toLowerCase(), role };
   $("#navTeam").hidden = role !== "admin";
   $("#navDist").hidden = role !== "admin";
+  $("#navSettings").hidden = role !== "admin";
   document.body.classList.toggle("notadmin", role !== "admin");
   let agentOk = false;
   if (role === "agent") agentOk = (await sb.rpc("my_team_member")).data != null;
@@ -875,6 +902,7 @@ function route() {
   if (tmm && ME.role === "admin") return showMember(+tmm[1]);
   if (h === "distribution" && ME.role === "admin") return showDist();
   if (h === "goals" || h.startsWith("goals?")) return showGoals(h);
+  if (h === "settings" && ME.role === "admin") return showSettings();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
   if (h === "hustle") return showHustle();
@@ -1615,6 +1643,56 @@ $("#geRemove").onclick = async () => {
   status("Removed"); go("goals?year=" + GL.year);
 };
 
+// ---------- Settings (admins only): business-day holidays (Shawn, Oct 21, 2026) ----------
+// Idaho Code 73-108, which the RE-21 purchase and sale agreement points to; rules in 018_holidays.sql.
+let HO = { rows: [], year: new Date().getFullYear() };
+async function showSettings() {
+  page("vSettings");
+  const { data, error } = await sb.from("holidays").select("*").order("day");
+  if (error) return status(error.message, true);
+  HO.rows = data; renderHolidays();
+}
+function renderHolidays() {
+  const years = [...new Set(HO.rows.map(r => +r.day.slice(0, 4)))].sort((a, b) => a - b);
+  const thisYear = new Date().getFullYear(), last = years[years.length - 1];
+  const show = years.filter(y => y >= thisYear - 2);
+  if (!years.includes(HO.year)) HO.year = show[0] ?? thisYear;
+  $("#hoYears").innerHTML = show.map(y => `<button type="button" data-y="${y}" class="${y === HO.year ? "on" : ""}">${y}</button>`).join("") +
+    (years[0] < thisYear - 2 ? `<button type="button" data-y="older" class="${HO.year < thisYear - 2 ? "on" : ""}">Older</button>` : "");
+  $$("#hoYears [data-y]").forEach(b => b.onclick = () => { HO.year = b.dataset.y === "older" ? thisYear - 3 : +b.dataset.y; renderHolidays(); });
+  const missing = [thisYear, thisYear + 1, thisYear + 2].filter(y => !years.includes(y));
+  $("#hoWarn").hidden = !missing.length;
+  $("#hoWarn").textContent = missing.length ? `No holidays for ${missing.join(" and ")} yet. Import them below, or deadlines in those years will count holidays as business days.` : "";
+  $("#hoImpYear").value = $("#hoImpYear").value || (last ? last + 1 : thisYear);
+  const rows = HO.rows.filter(r => HO.year < thisYear - 2 ? +r.day.slice(0, 4) < thisYear - 2 : +r.day.slice(0, 4) === HO.year);
+  $("#hoTable").innerHTML = `<thead><tr><th>Date</th><th>Day</th><th>Holiday</th><th>Source</th><th></th></tr></thead><tbody>` +
+    (rows.length ? rows.map(r => `<tr><td>${usDate(r.day)}</td><td>${new Date(r.day + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" })}</td><td>${esc(r.name)}</td>
+      <td>${r.source === "idaho" ? "Idaho Code 73-108" : r.source === "workbook" ? "Old workbook" : "Added by hand" + (r.added_by ? ` (${esc(r.added_by.split("@")[0])})` : "")}</td>
+      <td class="x"><button title="Remove this day" data-hd="${r.day}">&#10005;</button></td></tr>`).join("")
+    : `<tr><td colspan="5" class="note">None.</td></tr>`) + `</tbody>`;
+  $$("#hoTable [data-hd]").forEach(b => b.onclick = async () => {
+    const r = HO.rows.find(x => x.day === b.dataset.hd);
+    if (!confirm(`Remove ${r.name} (${usDate(r.day)})? Deadlines will count it as a business day.`)) return;
+    const { error } = await sb.from("holidays").delete().eq("day", r.day);
+    if (error) return status(error.message, true);
+    HO.rows = HO.rows.filter(x => x.day !== r.day); status("Removed"); renderHolidays();
+  });
+}
+$("#hoImport").onclick = async () => {
+  const y = +$("#hoImpYear").value;
+  if (!(y >= 2000 && y <= 2100)) return status("Pick a year between 2000 and 2100.", true);
+  const { data, error } = await sb.rpc("holidays_import", { p_year: y });
+  if (error) return status(error.message, true);
+  status(`${data} Idaho holidays added for ${y}`); HO.year = y; $("#hoImpYear").value = ""; showSettings();
+};
+$("#hoAdd").onclick = async () => {
+  const day = $("#hoDay").value, name = $("#hoName").value.trim();
+  if (!day || !name) return status("Pick the date and give it a name.", true);
+  const { error } = await sb.from("holidays").insert({ day, name, source: "manual" });
+  if (error) return status(/duplicate/.test(error.message) ? usDate(day) + " is already a holiday." : error.message, true);
+  $("#hoDay").value = ""; $("#hoName").value = ""; HO.year = +day.slice(0, 4); status("Added"); showSettings();
+};
+
 // ---------- Report distribution (admins only; the database enforces it too) ----------
 // Shawn, Oct 21, 2026: pick a report, its recipients, how often, and when. The send-reports Edge
 // Function does the sending (pg_cron every 15 minutes) and the previews.
@@ -1858,7 +1936,15 @@ function makeList(cfg) {
 const LEAD_TYPES = ["Buyer", "Seller", "Referral"];
 const TRIGGERS = ["None", "Client Events", "Promise Script", "Vyral Marketing"];
 const QUALS = ["Qualified", "Disqualified"];
-const LEAD_REQUIRED = { lead_source: "Source", team_member_credit: "Lead generated by", trigger: "Appt trigger" };
+const LEAD_REQUIRED = { lead_received_date: "Received", lead_source: "Source", team_member_credit: "Lead generated by", trigger: "Appt trigger" };
+// The received date can't be after an appointment set date (AccessDB to-do, Oct 21, 2026).
+const SET_ON = ["first_appt_set_on_date", "second_appt_set_on_date", "third_appt_set_on_date"];
+function receivedProblem(lead) {
+  const r = day(lead.lead_received_date);
+  if (!r) return null;
+  const early = SET_ON.map(k => day(lead[k])).filter(d => d && d < r).sort()[0];
+  return early ? `The received date (${usDate(r)}) can't be after an appointment set date (${usDate(early)}).` : null;
+}
 let LEAD = null, leadNew = false;
 // Access query Leads-Search, FirstApptStatus and the rest; same as appt_status() in the database.
 function apptStatus(qual, setFor, appt, handoff) {
@@ -1927,7 +2013,7 @@ async function openLead(id) {
 function newLead() {
   leadNew = true; LD.pos = -1;
   $("#lJot").innerHTML = "";
-  LEAD = { lead_received_date: new Date().toISOString().slice(0, 10), price_estimate: 0, competing_y_n: false, appt_qualification: "Qualified" };
+  LEAD = { price_estimate: 0, competing_y_n: false, appt_qualification: "Qualified" };
   renderLeadForm(); page("vLead");
   $('[data-l="lead_name"]').focus();
 }
@@ -1973,6 +2059,10 @@ function renderLeadHead() {
 // Each field saves when it changes, like the Sales form; a new lead saves once the required ones are in.
 async function saveLeadField(k, v) {
   if (LEAD_REQUIRED[k] && (v == null || v === "")) { status(`${LEAD_REQUIRED[k]} is required.`, true); return renderLeadForm(); }
+  if (k === "lead_received_date" || SET_ON.includes(k)) {
+    const bad = receivedProblem({ ...LEAD, [k]: v });
+    if (bad) { status(bad + " Fix one of them.", true); return renderLeadForm(); }
+  }
   const old = LEAD[k]; LEAD[k] = v; renderLeadHead();
   if (leadNew) return tryInsertLead();
   const { error } = await sb.from("leads").update({ [k]: v }).eq("id", LEAD.id);

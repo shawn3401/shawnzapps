@@ -3,7 +3,7 @@ set client_min_messages = warning;
 
 -- Defaults from the Access Leads table.
 alter table public.leads
-  alter column lead_received_date set default (current_date),
+  alter column lead_received_date drop default,   -- no default: it must be typed (AccessDB to-do, Oct 21, 2026)
   alter column date_time_entered set default (now() at time zone 'America/Denver'),
   alter column price_estimate set default 0,
   alter column competing_y_n set default false,
