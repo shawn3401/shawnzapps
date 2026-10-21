@@ -56,6 +56,23 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
 .pills.agents button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .jot-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .jot-sec { margin-bottom: 16px; }
+.side-col { display: flex; flex-direction: column; gap: 16px; }
+.attention { margin-bottom: 16px; border-color: #e6cf7a; }
+.attention .card-h h3 { color: var(--warn); }
+.att-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--line); cursor: pointer; }
+.att-item:last-child { border-bottom: 0; }
+.att-item b { display: block; }
+.att-item span { color: var(--ink-2); font-size: 14px; }
+.att-item .btn { margin-left: auto; flex: none; }
+.link-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.link-row:last-child { border-bottom: 0; }
+.issue { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
+.issue p { margin: 0 0 8px; }
+.issue .cands { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.issue .cands button { text-align: left; }
+.nav-count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11.5px; padding: 1px 7px; margin-left: auto; }
+.from-jot { font-size: 13.5px; }
+.from-jot a { color: var(--accent-deep); }
 .jot-sec .kv > div { align-items: flex-start; }
 .jot-sec .kv span { flex: 0 0 42%; }
 .jot-sec .kv b { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 500; color: var(--ink); text-align: left; flex: 1; }
@@ -95,7 +112,7 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
       <h4>Tools</h4>
       <a href="#sales" data-nav="sales" class="on">Sales</a>
       <a href="#leads" data-nav="leads">Leads</a>
-      <a href="#jots" data-nav="jots">Jots</a>
+      <a href="#jots" data-nav="jots">Jots <span class="nav-count" id="attCount" hidden></span></a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
@@ -144,7 +161,7 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
       <div class="head">
         <div class="grow">
           <h1><span id="lName"></span><span class="chip" id="lTypeChip"></span><span class="chip gray" id="lId"></span></h1>
-          <div class="sub" id="lSub"></div>
+          <div class="sub" id="lSub"></div><div class="sub from-jot" id="lJot"></div>
         </div>
         <div class="acts">
           <button class="btn" data-newlead>+ New lead</button>
@@ -242,6 +259,7 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
         <div class="filters" id="jotFilters"></div>
         <div class="chips" id="jotChips"></div>
       </div>
+      <section class="card attention" id="jotAttention" hidden></section>
       <div id="jotResults"></div>
     </section>
 
@@ -255,7 +273,10 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
       </div>
       <div class="jot-grid">
         <div id="jAnswers"></div>
-        <section class="card"><div class="card-h"><h3>History</h3></div><div class="card-b" id="jHistory"></div></section>
+        <div class="side-col">
+          <section class="card" id="jLinksCard"><div class="card-h"><h3>In AHG Tools</h3></div><div class="card-b" id="jLinks"></div></section>
+          <section class="card"><div class="card-h"><h3>History</h3></div><div class="card-b" id="jHistory"></div></section>
+        </div>
       </div>
     </section>
 
@@ -286,7 +307,7 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
       <div class="head">
         <div class="grow">
           <h1><span id="hName"></span><span class="st" id="hStatus"></span><span class="chip" id="hType"></span><span class="chip gray" id="hId"></span></h1>
-          <div class="sub" id="hSub"></div>
+          <div class="sub" id="hSub"></div><div class="sub from-jot" id="hJot"></div>
         </div>
         <div class="acts">
           <button class="btn" data-new>+ New sale</button>
@@ -577,6 +598,7 @@ async function start(session) {
     $("#saveExit").textContent = "Back to list"; $("#leadExit").textContent = "Back to list";
   }
   await loadLookups();
+  refreshAttention();
   window.addEventListener("hashchange", route);
   route();
 }
@@ -778,6 +800,7 @@ async function openSale(id) {
   if (s.error || !s.data) { status(s.error?.message || "That sale wasn't found.", true); return go("sales"); }
   S = s.data; splits = sp.data || []; lenders = le.data || []; isNew = false;
   R.pos = R.ids.indexOf(id);
+  fromJot("sale", id, $("#hJot"));
   await loadLead(S.client_name);
   render();
   page("vSale");
@@ -1127,10 +1150,12 @@ async function openLead(id) {
   const { data, error } = await sb.from("leads").select("*").eq("id", id).maybeSingle();
   if (error || !data) { status(error?.message || "That lead wasn't found.", true); return go("leads"); }
   LEAD = data; leadNew = false; LD.pos = LD.ids.indexOf(id);
+  fromJot("lead", id, $("#lJot"));
   renderLeadForm(); page("vLead");
 }
 function newLead() {
   leadNew = true; LD.pos = -1;
+  $("#lJot").innerHTML = "";
   LEAD = { lead_received_date: new Date().toISOString().slice(0, 10), price_estimate: 0, competing_y_n: false, appt_qualification: "Qualified" };
   renderLeadForm(); page("vLead");
   $('[data-l="lead_name"]').focus();
@@ -1270,6 +1295,7 @@ async function showJots(h) {
     if (f?.last_sync_at) $("#jotSync").textContent = `Opportunity Path submissions from Jotform · checked ${new Date(f.last_sync_at).toLocaleString([], { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}, every 5 minutes`;
   }
   JOTS.show(h);
+  refreshAttention();
 }
 
 // Show any Jotform answer as text: dates, times, addresses, matrices, checkbox lists.
@@ -1289,23 +1315,28 @@ function jotText(v) {
 const safeJson = x => { try { return JSON.parse(x); } catch { return x; } };
 
 async function openJot(id) {
-  if (!J.questions) {
-    const { data } = await sb.from("jot_questions").select("qid, label, type, qorder").eq("form_id", OPP_FORM).order("qorder");
-    J.questions = data || [];
-  }
-  const [s, v] = await Promise.all([
+  const [s, v, lk, iss] = await Promise.all([
     sb.from("jot_submissions").select("*").eq("id", id).maybeSingle(),
     sb.from("jot_versions").select("id, jot_updated_at, answers, seen_at").eq("submission_id", id).order("id"),
+    sb.from("jot_links").select("*").eq("submission_id", id),
+    sb.from("jot_issues").select("*").eq("submission_id", id).is("resolved_at", null).order("id"),
   ]);
   if (!s.data) { status("That jot wasn't found.", true); return go("jots"); }
-  const a = s.data.answers, row = JOTS.st.rows.find(r => r.id === id);
+  J.qs = J.qs || {};
+  if (!J.qs[s.data.form_id]) {
+    const { data } = await sb.from("jot_questions").select("qid, label, type, qorder").eq("form_id", s.data.form_id).order("qorder");
+    J.qs[s.data.form_id] = data || [];
+  }
+  J.questions = J.qs[s.data.form_id];
+  const a = s.data.answers, row = JOTS.st.rows.find(r => r.id === id), isContract = s.data.form_id !== OPP_FORM;
   const label = qid => (J.questions.find(q => q.qid === qid)?.label || "Question " + qid).trim();
-  const name = [a["36"], a["37"]].filter(Boolean).join(" & ") || "Jot";
-  const stage = row?.stage || (await sb.from("jot_list").select("stage").eq("id", id).maybeSingle()).data?.stage || "";
+  const name = (isContract ? a["7"] : [a["36"], a["37"]].filter(Boolean).join(" & ")) || "Jot";
+  renderJotLinks(id, lk.data || [], iss.data || [], isContract);
+  const stage = isContract ? "Contract" : row?.stage || (await sb.from("jot_list").select("stage").eq("id", id).maybeSingle()).data?.stage || "";
   $("#jName").textContent = name;
   $("#jStage").textContent = stage; $("#jStage").className = "st " + stageClass(stage);
-  $("#jType").textContent = a["203"] || ""; $("#jType").hidden = !a["203"];
-  $("#jSub").textContent = [a["70"] && "Agent " + a["70"], [a["12"], a["44"]].filter(Boolean).join(", "),
+  $("#jType").textContent = a["203"] || a["48"] || ""; $("#jType").hidden = !(a["203"] || a["48"]);
+  $("#jSub").textContent = [isContract ? "Contract Cover Sheet" : "", (a["70"] || a["4"]) && "Agent " + (a["70"] || a["4"]), isContract ? a["9"] : [a["12"], a["44"]].filter(Boolean).join(", "),
     "Started " + jotDate(s.data.jot_created_at), s.data.jot_updated_at && "changed " + jotDate(s.data.jot_updated_at)].filter(Boolean).join(" · ");
 
   // Answers grouped under the jot's own section headings; unanswered questions and empty sections are left out.
@@ -1316,7 +1347,7 @@ async function openJot(id) {
     if (!cur) { cur = { title: "", rows: [] }; secs.push(cur); }
     cur.rows.push([q.label.trim(), jotText(a[q.qid])]);
   }
-  $("#jAnswers").innerHTML = secs.filter(x => x.rows.length && x.title !== "Opportunity Path").map(x => `<section class="card jot-sec">
+  $("#jAnswers").innerHTML = secs.filter(x => x.rows.length && x.title !== "Opportunity Path" && x.title !== "Contract Cover Sheet and Checklist").map(x => `<section class="card jot-sec">
     <div class="card-h"><h3>${esc(x.title)}</h3></div>
     <div class="card-b kv">${x.rows.map(([l, t]) => `<div><span>${esc(l)}</span><b>${esc(t)}</b></div>`).join("")}</div></section>`).join("");
 
@@ -1334,6 +1365,56 @@ async function openJot(id) {
   page("vJot");
 }
 $("#jBack").onclick = () => go("jots");
+
+// ---------- Jots -> leads and sales (automatic, Oct 21, 2026) ----------
+// What a jot made or matched, and anything that needs a person.
+const ISSUE_TITLE = { returning_client: "Returning client?", pick_lead: "Pick the lead", check_received: "Check the received date",
+  check_contract_date: "Check the contract date", unknown_value: "Fill in the blanks", missing_fields: "Add close dates and title company" };
+function renderJotLinks(id, links, issues, isContract) {
+  const rows = links.map(k => `<div class="link-row"><span>${k.kind === "sale" ? "Sale" : k.side + " lead"} #${k.record_id}<br><small class="note" style="margin:0">${k.created ? "Created from this jot" : "Matched to the one typed in"}</small></span>
+    <button class="btn" data-open="${k.kind === "sale" ? "sale=" : "lead="}${k.record_id}">Open</button></div>`).join("");
+  const iss = issues.map(i => `<div class="issue" data-issue="${i.id}"><p><b>${esc(ISSUE_TITLE[i.kind] || i.kind)}</b>${i.side !== "Sale" && !isContract ? ` (${esc(i.side)})` : ""}: ${esc(i.message)}</p>
+    ${i.candidates?.length ? `<div class="cands">${i.candidates.map(c => `<button class="btn" data-act="lead" data-lead="${c.id}">Use #${c.id} ${esc(c.name)} · ${esc(c.type || "")} · ${usDate(c.received)} · ${esc(c.owner || "")}</button>`).join("")}</div>` : ""}
+    ${i.kind === "returning_client" ? `<button class="btn red" data-act="new">Create a new lead</button> ` : ""}
+    ${i.kind === "pick_lead" ? `<button class="btn" data-act="search">Search for the lead</button> ` : ""}
+    <button class="btn" data-act="done">${i.kind === "pick_lead" || i.kind === "returning_client" ? "Dismiss" : "Done"}</button></div>`).join("");
+  const none = isContract ? "No sale yet." : "No lead yet. Jots submitted before Oct 20, 2026 link to their lead when an agent next edits them.";
+  $("#jLinks").innerHTML = (rows || `<p class="note" style="margin:0">${none}</p>`) + iss;
+  $$("#jLinks [data-open]").forEach(b => b.onclick = () => go(b.dataset.open));
+  $$("#jLinks [data-issue]").forEach(box => box.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+    let lead = b.dataset.lead ? +b.dataset.lead : null, act = b.dataset.act;
+    if (act === "search") {
+      const n = prompt("Lead number to use (it's on the lead's page, like #20944):");
+      if (!n || !/^\d+$/.test(n.replace("#", "").trim())) return;
+      lead = +n.replace("#", "").trim(); act = "lead";
+    }
+    if (act === "new" && !confirm("Create a new lead from this jot?")) return;
+    const { data, error } = await sb.rpc("jot_resolve", { p_issue: +box.dataset.issue, p_action: act, p_lead: lead });
+    if (error) return status(error.message, true);
+    status(data?.sale ? `Sale #${data.sale} created` : data?.lead ? `Linked to lead #${data.lead}` : "Done");
+    refreshAttention(); openJot(id);
+  }));
+}
+// The Needs attention list on the Jots page, and its count in the sidebar.
+async function refreshAttention() {
+  if (isAgent()) return;
+  const { data } = await sb.from("jot_attention").select("*").order("created_at", { ascending: false });
+  const items = data || [];
+  $("#attCount").textContent = items.length; $("#attCount").hidden = !items.length;
+  const el = $("#jotAttention");
+  el.hidden = !items.length;
+  el.innerHTML = `<div class="card-h"><h3>Needs attention (${items.length})</h3></div><div class="card-b">${items.map(i =>
+    `<div class="att-item" data-sub="${i.submission_id}" data-sale="${i.sale_id || ""}"><div><b>${esc(i.client || "Jot")} · ${esc(ISSUE_TITLE[i.kind] || i.kind)}</b><span>${esc(i.agent || "")}${i.agent ? " · " : ""}${esc(i.message)}</span></div>
+      <button class="btn">${i.sale_id ? "Open sale" : "Open jot"}</button></div>`).join("")}</div>`;
+  el.querySelectorAll(".att-item").forEach(r => r.onclick = () => go(r.dataset.sale ? "sale=" + r.dataset.sale : "jot=" + r.dataset.sub));
+}
+// On a lead or sale page: which jot it came from.
+async function fromJot(kind, id, el) {
+  el.innerHTML = "";
+  if (isAgent()) return;
+  const { data } = await sb.from("jot_links").select("submission_id, created").eq("kind", kind).eq("record_id", id).limit(1);
+  if (data?.length) el.innerHTML = `${data[0].created ? "Created from" : "Matched to"} <a href="#jot=${data[0].submission_id}">${kind === "sale" ? "the Contract Cover Sheet jot" : "the Opportunity Path jot"}</a>`;
+}
 
 // ---------- Commission shares (Access subform on SharedatTeamLevelSubtableNew) ----------
 function renderSplits() {
@@ -1449,6 +1530,7 @@ $("#saveExit").onclick = () => {
 // Defaults from the Access table, so the math shows right away on a new sale.
 function newSale() {
   isNew = true; lead = null; splits = []; lenders = []; R.pos = -1;
+  $("#hJot").innerHTML = "";
   S = { commissions_pd_on_concessions: true, commissionis_flat_amount: false, inspection: true, reo: false,
     inspection_on_calendar: false, transaction_fees_bonuses: 0, other_hud_commission_deduction: 0,
     outside_agent_referral_percent: 0, agent_concessions_not_on_hud: 0, referralon_hud_agent: "NA",

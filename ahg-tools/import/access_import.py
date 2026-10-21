@@ -16,7 +16,7 @@ sales.purchase_price, SharedatTeamLevel -> sharedat_team_level). Each copied
 table gets the comment 'access:<Access name>' and each column
 'access:<Access column>', which is how the policies file finds them.
 """
-import csv, io, os, re, subprocess, sys, tempfile, shutil
+import csv, datetime, io, os, re, subprocess, sys, tempfile, shutil, zoneinfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRIVATE = os.path.join(HERE, "..", "private")
@@ -161,6 +161,13 @@ def main():
         r = subprocess.run([PSQL, CONN, "-q", "-f", script], env=env, capture_output=True, text=True)
         if r.returncode:
             sys.exit("Load failed, nothing was changed:\n" + r.stderr[-2000:])
+
+        # Leads and sales were just replaced, so links from jots point at nothing (or the wrong rows).
+        # Start the automatic step over from when this copy of Access was taken (its file time, in
+        # Jotform's clock, Mountain time): jots after that create or link again.
+        copy_time = datetime.datetime.fromtimestamp(os.path.getmtime(BACKEND), zoneinfo.ZoneInfo("America/Boise")).strftime("%Y-%m-%d %H:%M:%S")
+        r = subprocess.run([PSQL, CONN, "-At", "-c", f"select jot_after_refresh('{copy_time}')"], env=env, capture_output=True, text=True)
+        print("jots since the copy (" + copy_time + "):", (r.stdout.strip() or r.stderr.strip()))
 
         counts = "select " + ", ".join(
             f"(select count(*) from public.{q(snake(t))})" for t in names)
