@@ -48,6 +48,28 @@ textarea.in { resize: vertical; font: inherit; }
 .chips .clear { border: 0; background: none; color: var(--ink-3); font-weight: 600; cursor: pointer; text-decoration: underline; font-size: 13.5px; }
 body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit, body.viewonly #addLender, body.viewonly td.x button { display: none !important; }
 .roles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dlr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.tile2 { border-radius: 22px; padding: 14px 16px 16px; color: #fff; }
+.tile2 h2 { margin: 0 0 10px; text-align: center; font-size: 18px; letter-spacing: .02em; text-transform: uppercase; }
+.tile2 .panel { background: #fff; color: var(--ink); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.tile2 .soon-note { color: var(--ink-2); font-size: 14px; padding: 18px 6px; text-align: center; }
+.mbars { display: flex; gap: 22px; justify-content: center; align-items: flex-end; height: 140px; }
+.mbar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 90px; }
+.mbar .stack { position: relative; width: 70px; display: flex; align-items: flex-end; justify-content: center; flex: 1; }
+.mbar .goal { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 3px 3px 0 0; opacity: .35; }
+.mbar .act { position: relative; width: 38px; display: flex; flex-direction: column-reverse; }
+.mbar .act i { display: block; color: #fff; font-style: normal; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.1; padding-top: 2px; overflow: hidden; }
+.mbar .over { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink); }
+.mbar span { margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.ybar { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+.ytrack { position: relative; height: 26px; }
+.ytrack .goal { position: absolute; inset: 0; border-radius: 3px; opacity: .3; }
+.ytrack .act { position: absolute; top: 4px; bottom: 4px; left: 0; display: flex; }
+.ytrack .act i { display: block; height: 100%; color: #fff; font-style: normal; font-size: 12px; font-weight: 700; text-align: center; line-height: 18px; overflow: hidden; white-space: nowrap; }
+.ytrack .pace { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.ylabels { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11.5px; margin: 2px 0 0 52px; }
+@media (max-width: 860px) { .dlr { grid-template-columns: 1fr; } }
+@media print { .dlr { grid-template-columns: repeat(2, 1fr); gap: 10px; } .tile2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; } #dlrDate { display: none; } }
 .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 13px; }
 .dl { border-radius: 6px; padding: 3px 8px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .dl.late { background: #FFC7CE; color: #9C0006; }
@@ -134,6 +156,7 @@ table.tracker th { font-size: 11.5px; }
       <a href="#jots" data-nav="jots">Jots <span class="nav-count" id="attCount" hidden></span></a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
       <h4 style="margin-top:16px">Reports</h4>
+      <a href="#dlr" data-nav="dlr" id="navDlr">Leadership dashboard</a>
       <a href="#tracker" data-nav="tracker">Pending tracker</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
@@ -299,6 +322,14 @@ table.tracker th { font-size: 11.5px; }
           <section class="card"><div class="card-h"><h3>History</h3></div><div class="card-b" id="jHistory"></div></section>
         </div>
       </div>
+    </section>
+
+    <!-- Daily Leadership Dashboard (DLR): rebuilt from the KPI platform workbook's DLR1 sheet -->
+    <section id="vDlr" hidden>
+      <div class="head"><div class="grow"><h1>Daily Leadership Dashboard</h1><div class="sub" id="dlrSub"></div></div>
+        <div class="acts"><input class="in" type="date" id="dlrDate" style="width:auto"><button class="btn" id="dlrPrint">Print</button></div></div>
+      <div class="dlr" id="dlrTiles"></div>
+      <p class="note">Month goals are the year goal spread by the workbook's season allocation. The year bar's line is where the year should be today. Light bars are the goal, dark bars the actual.</p>
     </section>
 
     <!-- Pending Tracker: rebuilt from the Excel workbook of the same name -->
@@ -605,8 +636,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -630,6 +661,7 @@ async function start(session) {
   if (role === "agent") {
     document.body.classList.add("viewonly");
     $('[data-nav="jots"]').hidden = true;
+    $("#navDlr").hidden = true;
     $("#salesTitle").textContent = "My sales";
     $("#saveExit").textContent = "Back to list"; $("#leadExit").textContent = "Back to list";
   }
@@ -667,6 +699,7 @@ function route() {
   if (h === "team" && ME.role === "admin") return showTeam();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
+  if (h === "dlr" && !isAgent()) return showDlr();
   if (h === "leads" || h.startsWith("leads?")) return showLeads(h);
   if (h === "newlead") return newLead();
   const lm = h.match(/^lead=(\d+)$/);
@@ -1451,6 +1484,58 @@ async function fromJot(kind, id, el) {
   if (isAgent()) return;
   const { data } = await sb.from("jot_links").select("submission_id, created").eq("kind", kind).eq("record_id", id).limit(1);
   if (data?.length) el.innerHTML = `${data[0].created ? "Created from" : "Matched to"} <a href="#jot=${data[0].submission_id}">${kind === "sale" ? "the Contract Cover Sheet jot" : "the Opportunity Path jot"}</a>`;
+}
+
+// ---------- Daily Leadership Dashboard (the KPI platform's DLR1 sheet, rebuilt) ----------
+// All numbers come from dlr_data() in the database (supabase/ahg/012_dlr.sql), checked against the
+// workbook's Oct 21, 2026 dashboard. New leads (Brivity) and profit (QuickBooks) aren't connected yet.
+const DLR_TILES = [
+  { key: "gci", title: "GCI", color: "#173a5e", money: true },
+  { key: "profit", title: "Profit", color: "#ef7b6c", later: "Profit comes from the QuickBooks financials, which aren't connected yet." },
+  { key: "closings", title: "Closings", color: "#3aa79c" },
+  { key: "contracts", title: "Contracts", color: "#f2c94c", ink: "#1f2124" },
+  { key: "reps", title: "Reps signed", color: "#eb5a3c", parts: ["Buyer", "Listing"] },
+  { key: "held", title: "Appts held", color: "#2a64a0", parts: ["Buyer", "Listing"] },
+  { key: "set", title: "Appts set", color: "#7d1f52", parts: ["Team gen", "Agent gen"] },
+  { key: "leads", title: "New leads", color: "#1d5a4c", later: "New leads come from Brivity, which isn't connected yet." },
+];
+const kfmt = n => n == null ? "" : Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + "M" : Math.abs(n) >= 1000 ? Math.round(n / 1000) + "K" : String(Math.round(n));
+async function showDlr() {
+  page("vDlr");
+  const day = $("#dlrDate").value || new Date().toLocaleDateString("en-CA");
+  $("#dlrDate").value = day;
+  const { data, error } = await sb.rpc("dlr_data", { p_today: day });
+  if (error) return status(error.message, true);
+  $("#dlrSub").textContent = new Date(day + "T00:00").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  $("#dlrTiles").innerHTML = DLR_TILES.map(t => dlrTile(t, data[t.key])).join("");
+}
+$("#dlrDate").onchange = () => showDlr();
+$("#dlrPrint").onclick = () => window.print();
+function dlrTile(t, d) {
+  const style = `background:${t.color};${t.ink ? "color:" + t.ink : ""}`;
+  if (t.later || !d) return `<section class="tile2" style="${style}"><h2>${t.title}</h2><div class="panel"><div class="soon-note">${t.later || "No data."}</div></div></section>`;
+  const fmt = t.money ? kfmt : n => (n ?? 0).toLocaleString();
+  const head = d.year_goal ? `${t.title} · ${fmt(d.month_goal)} / ${fmt(d.year_goal)}` : t.title;
+  const val = m => t.money ? [m.actual] : t.parts ? [m.a, m.b] : [m.a];
+  const max = Math.max(1, ...d.months.map(m => Math.max(m.target || 0, val(m).reduce((x, y) => x + y, 0))));
+  const shades = [t.color, "color-mix(in srgb, " + t.color + " 60%, #000)"];
+  const bars = d.months.map(m => {
+    const vs = val(m), tot = vs.reduce((x, y) => x + y, 0);
+    return `<div class="mbar"><div class="stack">
+      <div class="goal" style="height:${(m.target || 0) / max * 100}%;background:${t.color}"></div>
+      <div class="act" style="height:${tot / max * 100}%">${vs.map((v, i) => `<i style="height:${tot ? v / tot * 100 : 0}%;background:${shades[i]}">${v && v / max >= 0.12 ? fmt(v) : ""}</i>`).join("")}</div>
+      ${tot && vs.some(v => v && v / max < 0.12) ? `<div class="over" style="bottom:${Math.min(100, tot / max * 100)}%;top:auto">${fmt(tot)}</div>` : ""}
+    </div><span>${new Date(m.month + "T00:00").toLocaleDateString([], { month: "short" })}</span></div>`;
+  }).join("");
+  const y = d.year, yv = t.money ? [y.actual] : t.parts ? [y.a, y.b] : [y.a], ytot = yv.reduce((a, b) => a + b, 0);
+  const ymax = Math.max(1, y.target || 0, ytot);
+  const year = `<div class="ybar"><b>${new Date().getFullYear()}</b><div class="ytrack">
+      <div class="goal" style="width:${(y.target || 0) / ymax * 100}%;background:${t.color}"></div>
+      <div class="act" style="width:${ytot / ymax * 100}%">${yv.map((v, i) => `<i style="width:${ytot ? v / ytot * 100 : 0}%;background:${shades[i]}">${v ? fmt(v) : ""}</i>`).join("")}</div>
+      ${y.pace ? `<div class="pace" style="left:${y.pace / ymax * 100}%" title="Where the year should be today: ${fmt(y.pace)}"></div>` : ""}
+    </div></div><div class="ylabels"><span>${fmt(ytot)} so far</span><span>${y.pace ? "pace " + fmt(y.pace) + " · " : ""}goal ${fmt(y.target)}</span></div>`;
+  const legend = t.parts ? `<div class="ylabels" style="margin:4px 0 0;justify-content:center;gap:14px"><span style="color:${shades[0]}">&#9632; ${t.parts[0]}</span><span style="color:${shades[1]}">&#9632; ${t.parts[1]}</span></div>` : "";
+  return `<section class="tile2" style="${style}"><h2>${head}</h2><div class="panel"><div class="mbars">${bars}</div>${legend}</div><div class="panel">${year}</div></section>`;
 }
 
 // ---------- Pending tracker (the Excel "PendingTracker - East Idaho" workbook, rebuilt) ----------
