@@ -1,6 +1,6 @@
 /* AHG Tools shared look ("Look B", Shawn chose Oct 20, 2026): dark sidebar with the logo and
    the tool menu, a heading with the record's name, a row of summary tiles, then cards.
-   Team red and charcoal, Source Sans 3, follows the computer's light or dark setting.
+   Team red and charcoal, Source Sans 3, always light (Shawn, Oct 21, 2026).
    Every AHG Tools page links this file; keep page-specific CSS in the page. */
 
 :root {
@@ -9,14 +9,6 @@
   --good:#2F7A4B; --good-soft:#E1F0E6; --warn:#9A6A00; --warn-soft:#FBF1D6; --side:#25282C; --side-ink:#E9EAEB; --side-2:#9BA0A6;
   --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:#16181A; --paper:#1F2225; --ink:#EEF0F1; --ink-2:#BDC2C7; --ink-3:#8A9097;
-    --line:#34383D; --field:#24282B; --ro:#2A2E32; --accent:#EC6A60; --accent-deep:#F38F86; --soft:#3A2321;
-    --good:#86C79D; --good-soft:#1D3024; --warn:#E3B95A; --warn-soft:#352C14; --side:#111315; --side-ink:#E9EAEB; --side-2:#8A9097;
-    --shadow: none; color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
