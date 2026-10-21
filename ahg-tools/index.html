@@ -1189,7 +1189,7 @@ function renderDists() {
       <td data-label="List">${esc(d.name)}</td>
       <td data-label="Recipients">${d.recipients.length ? esc(d.recipients.slice(0, 3).join(", ")) + (d.recipients.length > 3 ? ` and ${d.recipients.length - 3} more` : "") : `<span class="note">None yet</span>`}</td>
       <td data-label="When">${when(d)}</td>
-      <td data-label="Mode"><span class="chip ${d.mode === "live" ? "mode-live" : "mode-test"}" style="margin:0">${d.mode === "live" ? "Live" : "Test: " + esc(d.test_to.split("@")[0])}</span></td>
+      <td data-label="Mode"><span class="chip ${d.mode === "live" ? "mode-live" : "mode-test"}" style="margin:0;white-space:nowrap">${d.mode === "live" ? "Live" : "Test: " + esc(d.test_to.split("@")[0])}</span></td>
       <td data-label="On"><label class="chk" style="min-height:0"><input type="checkbox" data-on="${i}" ${d.active ? "checked" : ""}></label></td>
       <td data-label="Last sent">${usDate(d.last_sent_on)}</td>
       <td><button class="btn" data-edit="${i}">Edit</button></td></tr>`).join("")
