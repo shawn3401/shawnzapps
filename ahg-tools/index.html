@@ -149,6 +149,17 @@ table.tracker th { font-size: 11.5px; }
 .back { display: inline-block; color: var(--ink-3); font-weight: 600; text-decoration: none; margin-bottom: 4px; }
 .back:hover { color: var(--accent); }
 .tm-signin { display: grid; gap: 12px; }
+.gl-row.team td { background: var(--soft); font-weight: 700; }
+.gl-sum td { color: var(--ink-2); font-style: italic; border-bottom: 0; }
+.ge-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+.ge-in { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.ge-in h4, .ge-out h4 { grid-column: 1/-1; margin: 6px 0 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.ge-out table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ge-out td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.ge-out td.n { text-align: right; font-weight: 700; }
+.ge-out tr.big td { font-size: 17px; }
+body.notadmin .ge-admin { display: none !important; }
+@media (max-width: 860px) { .ge-grid, .ge-in { grid-template-columns: 1fr; } }
 #tmRoles select { min-width: 180px; }
 #tmRoles input { min-width: 140px; }
 .tm-signin .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
@@ -192,6 +203,7 @@ table.tracker th { font-size: 11.5px; }
       <a href="#sales" data-nav="sales" class="on">Sales</a>
       <a href="#leads" data-nav="leads">Leads</a>
       <a href="#jots" data-nav="jots">Jots <span class="nav-count" id="attCount" hidden></span></a>
+      <a href="#goals" data-nav="goals" id="navGoals">Goals</a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
       <h4 style="margin-top:16px">Reports</h4>
       <a href="#dlr" data-nav="dlr" id="navDlr">Leadership dashboard</a>
@@ -453,6 +465,7 @@ table.tracker th { font-size: 11.5px; }
               <div class="rcpt-add"><input class="in" id="tmJotNew" autocomplete="off" placeholder="e.g. Riley or Mike J"><button class="btn" id="tmJotAdd">Add</button></div></div>
             <label class="chk" style="margin-top:12px"><input type="checkbox" id="tmHustle"> Show on the agent hustle board</label>
             <p class="note" style="margin:0">The hustle board lists active team members whose role is Agent, unless this is off.</p>
+            <p style="margin:12px 0 0"><a id="tmGoalsLink" href="#goals">Their goals</a></p>
           </div></section>
           <section class="card"><div class="card-h"><h3>Bonuses</h3><button class="btn" id="tmAddBonus">+ Add a bonus</button></div><div class="card-b scroll"><table class="grid" id="tmBonus"></table></div></section>
         </div>
@@ -501,6 +514,29 @@ table.tracker th { font-size: 11.5px; }
         <div class="card-h"><h3>Recent sends</h3></div>
         <div class="card-b scroll"><table class="grid sendlog" id="sendLog"></table></div>
       </section>
+    </section>
+
+    <!-- Goals: each person's yearly goals (replaces the Access Goals table and the goal Google Sheet) -->
+    <section id="vGoals" hidden>
+      <div id="glList">
+        <div class="head"><div class="grow"><h1 id="glTitle">Goals</h1><div class="sub" id="glSub"></div></div>
+          <div class="acts"><select class="in" id="glYear" style="width:auto"></select><button class="btn ge-admin" id="glNext" hidden></button></div></div>
+        <section class="card ge-admin" id="glAddBox" style="margin-bottom:16px"><div class="card-b dist-acts">
+          <label class="fld" style="min-width:240px"><span>Set goals for</span><select class="in" id="glAddWho"></select></label>
+          <button class="btn red" id="glAddGo" style="align-self:end">Start their goals</button>
+          <span class="note" style="margin:0;align-self:end">Starts from their goals last year, or the team's usual ratios.</span></div></section>
+        <div class="card scroll"><table class="grid list" id="glTable"></table></div>
+        <p class="note">Agents' income goal is their own pay, their 50% of gross commission; the GCI column is what that brings the team. The team's row is the team's own goal, with agents' goals added up under it for comparison.</p>
+      </div>
+      <div id="glOne" hidden>
+        <div class="head"><div class="grow"><a href="#goals" class="back" id="geBack">&lsaquo; Goals</a><h1><span id="geName"></span><span class="chip" id="geYear"></span></h1><div class="sub" id="geSub"></div></div>
+          <div class="acts ge-admin"><button class="btn" id="geRemove">Remove</button><button class="btn red" id="geSave">Save</button></div></div>
+        <div class="ge-grid">
+          <section class="card"><div class="card-h"><h3>What they're aiming for</h3></div><div class="card-b ge-in" id="geIn"></div></section>
+          <section class="card"><div class="card-h"><h3>What it takes</h3></div><div class="card-b ge-out" id="geOut"></div></section>
+        </div>
+        <p class="note" id="geNote"></p>
+      </div>
     </section>
 
     <!-- one sale -->
@@ -771,8 +807,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -784,6 +820,7 @@ async function start(session) {
   ME = { email: session.user.email.toLowerCase(), role };
   $("#navTeam").hidden = role !== "admin";
   $("#navDist").hidden = role !== "admin";
+  document.body.classList.toggle("notadmin", role !== "admin");
   let agentOk = false;
   if (role === "agent") agentOk = (await sb.rpc("my_team_member")).data != null;
   if (role !== "admin" && role !== "staff" && !agentOk) {
@@ -798,6 +835,7 @@ async function start(session) {
     document.body.classList.add("viewonly");
     $('[data-nav="jots"]').hidden = true;
     $("#navDlr").hidden = true;
+    $("#navGoals").textContent = "My goals";
     $("#salesTitle").textContent = "My sales";
     $("#saveExit").textContent = "Back to list"; $("#leadExit").textContent = "Back to list";
   }
@@ -836,6 +874,7 @@ function route() {
   const tmm = h.match(/^member=(\d+)$/);
   if (tmm && ME.role === "admin") return showMember(+tmm[1]);
   if (h === "distribution" && ME.role === "admin") return showDist();
+  if (h === "goals" || h.startsWith("goals?")) return showGoals(h);
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
   if (h === "hustle") return showHustle();
@@ -1284,6 +1323,7 @@ function renderMember(id) {
     TD.jots = TD.jots.filter(j => j.jot_name !== b.dataset.jrm); renderMember(id);
   });
   $("#tmHustle").checked = !TD.hidden.has(id);
+  $("#tmGoalsLink").href = `#goals?year=${new Date().getFullYear()}&member=${id}`;
   // sign-in
   const u = TD.users.find(x => x.team_member_id === id), me = u && u.email === ME.email;
   $("#tmSignin").innerHTML = u ? `<div class="tm-signin">
@@ -1407,6 +1447,172 @@ $("#tmBack").onclick = async () => {
   if (error) return status(error.message, true);
   m.active = "Yes"; await loadLookups(); renderMember(m.id);
   status("Back on the team. Add their role in the role history, and turn their sign-in back on if they need it.");
+};
+
+// ---------- Goals (Shawn, Oct 21, 2026) ----------
+// Replaces Access's Goals table and Shawn's "Agent Goal Verification and Upload Tool" Google Sheet.
+// The inputs are typed; goalCalc() works out the rest with the sheet's math and rounding, except
+// the appointment split: the sheet multiplied reps by each appointment-to-rep ratio and divided by
+// the same ratio (so appointments were always 2 x reps); here reps are split by the agent generated
+// share first (Shawn approved the fix). Stored in goal_values with Access's metric names.
+const GOAL_IN = [
+  ["Money", [["Commission Dollars", "money"], ["Average Purchase Price", "money"], ["Average Commission %", "pct"], ["Average Split %", "pct"], ["Profit Dollars", "money", "team"]]],
+  ["Business mix", [["Agent Generated Share of Business", "pct"], ["Listing Share of Business", "pct"]]],
+  ["Production", [["Closings", "int"]]],
+  ["Conversion ratios", [["Contract to Close Ratio", "pct"], ["Rep to Contract Ratio", "pct"], ["Appt to Rep Ratio - TeamGen", "pct"], ["Appt to Rep Ratio - AgtGen", "pct"], ["Appt Set to Taken - AgtGen", "pct"], ["Conversations per Contract", "int"]]],
+];
+const GOAL_LABEL = { "Commission Dollars": "Income goal (their 50%)", "Agent Generated Share of Business": "Agent generated share", "Listing Share of Business": "Listing share",
+  "Appt to Rep Ratio - TeamGen": "Appt to rep, team generated", "Appt to Rep Ratio - AgtGen": "Appt to rep, agent generated", "Appt Set to Taken - AgtGen": "Appt set to taken, agent generated" };
+const TEAM_NAME = "Anderson Hicks";
+const workdays = y => { let n = 0; for (let d = new Date(Date.UTC(y, 0, 1)); d.getUTCFullYear() === y; d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() % 6) n++; return n; };
+function goalCalc(v, year) {
+  const g = k => v[k] == null || v[k] === "" ? null : Number(v[k]);
+  const price = g("Average Purchase Price"), pctv = g("Average Commission %"), split = g("Average Split %"), share = g("Agent Generated Share of Business"),
+    C = g("Closings"), c2c = g("Contract to Close Ratio"), r2c = g("Rep to Contract Ratio"), a2rT = g("Appt to Rep Ratio - TeamGen"),
+    a2rA = g("Appt to Rep Ratio - AgtGen"), s2t = g("Appt Set to Taken - AgtGen"), cpc = g("Conversations per Contract");
+  const ok = (...a) => a.every(x => x != null && !isNaN(x)), out = {};
+  out["Commission Per Closing"] = ok(price, pctv, split) ? Math.round(price * pctv * split * 100) / 100 : null;
+  out["Closings"] = ok(C) ? Math.ceil(C) : null;
+  const ctu = ok(C, c2c) && c2c ? C / c2c : null, ru = ctu != null && ok(r2c) && r2c ? ctu / r2c : null;
+  out["Contracts"] = ctu == null ? null : Math.round(ctu);
+  out["Reps Signed"] = ru == null ? null : Math.round(ru);
+  const sh = ok(share) ? share : null;
+  out["Reps Signed - Team Gen"] = ru != null && sh != null ? Math.round(out["Reps Signed"] * (1 - sh)) : null;
+  out["Reps Signed - Agent Gen"] = out["Reps Signed - Team Gen"] != null ? out["Reps Signed"] - out["Reps Signed - Team Gen"] : null;
+  const atu = ru != null && sh != null && ok(a2rT) && a2rT ? ru * (1 - sh) / a2rT : null, aau = ru != null && sh != null && ok(a2rA) && a2rA ? ru * sh / a2rA : null;
+  out["Appointments Taken - TeamGen"] = atu == null ? null : Math.round(atu);
+  out["Appointments Taken - Agt"] = aau == null ? null : Math.round(aau);
+  out["Appointments Taken"] = atu != null && aau != null ? out["Appointments Taken - TeamGen"] + out["Appointments Taken - Agt"] : null;
+  out["Appointments Set - Agt"] = aau != null && ok(s2t) && s2t ? Math.ceil(aau / s2t) : null;
+  out["Conversations per Day"] = ctu != null && ok(cpc) ? Math.round(ctu * cpc / workdays(year)) : null;
+  return out;
+}
+const GOAL_OUT = [["Commission Per Closing", "money", "Their pay per closing"], ["Closings", "int", "Closings", "big"], ["Contracts", "int", "Contracts", "big"],
+  ["Reps Signed", "int", "Reps signed", "big"], ["Reps Signed - Agent Gen", "int", "  agent generated"], ["Reps Signed - Team Gen", "int", "  team generated"],
+  ["Appointments Taken", "int", "Appointments taken", "big"], ["Appointments Taken - Agt", "int", "  agent generated"], ["Appointments Taken - TeamGen", "int", "  team generated"],
+  ["Appointments Set - Agt", "int", "Appointments to set (agent generated)"], ["Conversations per Day", "int", "Conversations per day"]];
+const gfmt = (t, v) => v == null || v === "" ? "" : t === "money" ? "$" + Math.round(v).toLocaleString("en-US") : t === "pct" ? (+(v * 100).toFixed(2)) + "%" : Number(v).toLocaleString("en-US");
+let GL = { year: null, rows: [], plans: {}, members: [] }, GE = null;
+async function showGoals(h) {
+  page("vGoals");
+  const qs = new URLSearchParams(h.includes("?") ? h.slice(h.indexOf("?") + 1) : "");
+  const { data: yrs } = await sb.from("goal_values").select("goal_year").order("goal_year", { ascending: false }).limit(1);
+  const thisYear = new Date().getFullYear();
+  GL.year = +(qs.get("year") || (yrs?.[0]?.goal_year >= thisYear ? thisYear : yrs?.[0]?.goal_year) || thisYear);
+  const { data, error } = await sb.from("goal_values").select("team_member_id, metric, goal, updated_at, updated_by").eq("goal_year", GL.year);
+  if (error) return status(error.message, true);
+  GL.plans = {}; GL.updated = {};
+  for (const r of data) { (GL.plans[r.team_member_id] ||= {})[r.metric] = r.goal == null ? null : Number(r.goal);
+    if (!GL.updated[r.team_member_id] || r.updated_at > GL.updated[r.team_member_id].at) GL.updated[r.team_member_id] = { at: r.updated_at, by: r.updated_by }; }
+  GL.teamId = L.team.find(t => t.team_member_name === TEAM_NAME)?.id;
+  const member = qs.get("member");
+  if (member) return openGoal(+member);
+  $("#glList").hidden = false; $("#glOne").hidden = true;
+  renderGoals();
+}
+function renderGoals() {
+  const y = GL.year, admin = ME.role === "admin";
+  $("#glTitle").textContent = isAgent() ? "My goals" : "Goals";
+  $("#glYear").innerHTML = [y + 1, y, y - 1, y - 2, y - 3, y - 4, y - 5, y - 6, y - 7].filter(x => x >= 2019).map(x => `<option ${x === y ? "selected" : ""}>${x}</option>`).join("");
+  const ids = Object.keys(GL.plans).map(Number);
+  const nameOf = id => L.teamName[id] || "Team member " + id;
+  const agents = ids.filter(id => id !== GL.teamId).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  $("#glSub").textContent = ids.length ? `${agents.length} ${agents.length === 1 ? "person" : "people"} with goals for ${y}` : `No goals set for ${y} yet.`;
+  // next year
+  const ny = new Date().getFullYear() + 1;
+  $("#glNext").hidden = !admin || y !== ny - 1 || !ids.length;
+  $("#glNext").textContent = `Start ${ny} goals`;
+  // add someone
+  $("#glAddBox").hidden = !admin;
+  $("#glAddWho").innerHTML = `<option value=""></option>` + (GL.teamId && !GL.plans[GL.teamId] ? `<option value="${GL.teamId}">The team (${TEAM_NAME})</option>` : "") +
+    L.team.filter(t => L.activeIds.has(t.id) && !GL.plans[t.id] && t.id !== GL.teamId).map(t => `<option value="${t.id}">${esc(t.team_member_name)}</option>`).join("");
+  const row = (id, team) => { const v = GL.plans[id], c = goalCalc(v, y), inc = v["Commission Dollars"], sp = v["Average Split %"];
+    const gci = team ? inc : inc != null && sp ? inc / sp : null, u = GL.updated[id];
+    return `<tr data-id="${id}" class="gl-row ${team ? "team" : ""}"><td>${team ? "Team goal" : esc(nameOf(id))}</td><td class="n">${team ? "" : gfmt("money", inc)}</td><td class="n">${gfmt("money", gci)}</td>
+      <td class="n">${gfmt("int", v["Closings"] ?? c["Closings"])}</td><td class="n">${gfmt("int", v["Contracts"] ?? c["Contracts"])}</td><td class="n">${gfmt("int", v["Reps Signed"] ?? c["Reps Signed"])}</td>
+      <td class="n">${gfmt("int", v["Appointments Taken"] ?? c["Appointments Taken"])}</td><td class="n">${gfmt("int", v["Conversations per Day"] ?? c["Conversations per Day"])}</td>
+      <td class="hide-sm">${u ? (u.by === "access" ? "From Access" : usDate(u.at)) : ""}</td></tr>`; };
+  const sum = k => agents.reduce((a, id) => a + (Number(GL.plans[id][k]) || 0), 0);
+  const sumGci = agents.reduce((a, id) => { const v = GL.plans[id]; return a + (v["Commission Dollars"] && v["Average Split %"] ? v["Commission Dollars"] / v["Average Split %"] : 0); }, 0);
+  $("#glTable").innerHTML = `<thead><tr><th>Name</th><th class="n">Income goal</th><th class="n">GCI</th><th class="n">Closings</th><th class="n">Contracts</th><th class="n">Reps</th><th class="n">Appts taken</th><th class="n">Conv. per day</th><th class="hide-sm">Updated</th></tr></thead><tbody>` +
+    (GL.plans[GL.teamId] ? row(GL.teamId, true) : "") +
+    (agents.length > 1 && GL.plans[GL.teamId] ? `<tr class="gl-sum"><td>Agents' goals add up to</td><td class="n">${gfmt("money", sum("Commission Dollars"))}</td><td class="n">${gfmt("money", sumGci)}</td><td class="n">${gfmt("int", sum("Closings"))}</td><td class="n">${gfmt("int", sum("Contracts"))}</td><td class="n">${gfmt("int", sum("Reps Signed"))}</td><td class="n">${gfmt("int", sum("Appointments Taken"))}</td><td></td><td class="hide-sm"></td></tr>` : "") +
+    agents.map(id => row(id, false)).join("") + (ids.length ? "" : `<tr><td colspan="9" class="note">Nothing yet.</td></tr>`) + `</tbody>`;
+  $$("#glTable tr[data-id]").forEach(tr => tr.onclick = () => go(`goals?year=${y}&member=${tr.dataset.id}`));
+}
+$("#glYear").onchange = () => go("goals?year=" + $("#glYear").value);
+// A new plan starts from the person's goals last year, else the most common value among this year's agents.
+async function startingPlan(id) {
+  const { data } = await sb.from("goal_values").select("metric, goal").eq("team_member_id", id).eq("goal_year", GL.year - 1);
+  if (data?.length) return Object.fromEntries(data.map(r => [r.metric, Number(r.goal)]));
+  const v = {};
+  for (const [, items] of GOAL_IN) for (const [k] of items) {
+    if (k === "Commission Dollars" || k === "Closings" || k === "Profit Dollars") continue;
+    const cnt = {}; for (const [pid, p] of Object.entries(GL.plans)) if (+pid !== GL.teamId && p[k] != null) cnt[p[k]] = (cnt[p[k]] || 0) + 1;
+    const best = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+    if (best) v[k] = Number(best[0]);
+  }
+  return v;
+}
+$("#glAddGo").onclick = async () => {
+  const id = +$("#glAddWho").value;
+  if (!id) return status("Pick who to set goals for.", true);
+  GL.plans[id] = await startingPlan(id); GL.fresh = id;
+  go(`goals?year=${GL.year}&member=${id}`);
+};
+$("#glNext").onclick = async () => {
+  const ny = GL.year + 1, ids = Object.keys(GL.plans).map(Number);
+  if (!confirm(`Start ${ny} goals by copying ${GL.year}'s goals for ${ids.length} people? You can then adjust each one.`)) return;
+  const plans = ids.filter(id => id === GL.teamId || L.activeIds.has(id)).map(id => {
+    const v = {}; for (const [, items] of GOAL_IN) for (const [k] of items) if (GL.plans[id][k] != null) v[k] = GL.plans[id][k];
+    return { member: id, values: { ...v, ...(id === GL.teamId ? {} : goalCalc(v, ny)) } };
+  });
+  const { error } = await sb.rpc("goal_save", { p_year: ny, p_plans: plans });
+  if (error) return status(error.message, true);
+  status(`${ny} goals started for ${plans.length} people`); go("goals?year=" + ny);
+};
+async function openGoal(id) {
+  $("#glList").hidden = true; $("#glOne").hidden = false;
+  const team = id === GL.teamId, admin = ME.role === "admin";
+  if (!GL.plans[id]) { if (!admin) return status("No goals set for that year.", true); GL.plans[id] = await startingPlan(id); GL.fresh = id; }
+  GE = { id, team, v: { ...GL.plans[id] }, isNew: GL.fresh === id };
+  $("#geName").textContent = team ? "Team goal" : (L.teamName[id] || "Team member " + id);
+  $("#geYear").textContent = GL.year;
+  $("#geBack").href = "#goals?year=" + GL.year;
+  const u = GL.updated[id];
+  $("#geSub").textContent = GE.isNew ? "New, not saved yet." : u ? (u.by === "access" ? "From Access" : `Updated ${usDate(u.at)}${u.by ? " by " + u.by : ""}`) : "";
+  $("#geRemove").hidden = GE.isNew;
+  $("#geNote").textContent = team ? "The team's goal is typed on its own. Commission dollars here is the team's GCI goal, which the leadership dashboard and the hustle board use."
+    : admin ? "Type the inputs; everything under What it takes works out from them. Save when it looks right."
+    : "To change your goals, talk with Aaron, Trevor, Shawn, or Mike.";
+  $("#geIn").innerHTML = GOAL_IN.map(([h, items]) => `<h4>${h}</h4>` + items.filter(([, , only]) => !only || team).map(([k, t]) =>
+    `<label class="fld"><span>${team && k === "Commission Dollars" ? "Team GCI goal" : GOAL_LABEL[k] || k}</span><input class="in" data-gk="${esc(k)}" data-gt="${t}" value="${gfmt(t, GE.v[k])}" ${admin ? "" : "disabled"}></label>`).join("")).join("");
+  $$("#geIn [data-gk]").forEach(el => el.addEventListener("change", () => {
+    const t = el.dataset.gt, v = parse(t === "int" ? "money" : t, el.value);
+    if (v === undefined) { status("That isn't a number.", true); el.value = gfmt(t, GE.v[el.dataset.gk]); return; }
+    GE.v[el.dataset.gk] = v; el.value = gfmt(t, v); renderGoalOut();
+  }));
+  renderGoalOut();
+}
+function renderGoalOut() {
+  const c = goalCalc(GE.v, GL.year), v = GE.v, sp = v["Average Split %"];
+  const gci = !GE.team && v["Commission Dollars"] != null && sp ? v["Commission Dollars"] / sp : null;
+  const byClose = v["Commission Dollars"] != null && c["Commission Per Closing"] ? v["Commission Dollars"] / c["Commission Per Closing"] : null;
+  $("#geOut").innerHTML = `<table>${gci != null ? `<tr class="big"><td>GCI for the team</td><td class="n">${gfmt("money", gci)}</td></tr>` : ""}` +
+    GOAL_OUT.map(([k, t, label, big]) => `<tr class="${big || ""}"><td>${label.startsWith("  ") ? "&nbsp;&nbsp;&nbsp;" + label.trim() : (GE.team && k === "Commission Per Closing" ? "Agent pay per closing" : label)}</td><td class="n">${gfmt(t, c[k])}</td></tr>`).join("") + `</table>` +
+    (byClose && c["Closings"] && Math.abs(byClose - c["Closings"]) / c["Closings"] > 0.1 ? `<p class="note" style="margin:10px 0 0">At ${gfmt("money", c["Commission Per Closing"])} a closing, the income goal takes about ${Math.round(byClose)} closings, not ${c["Closings"]}.</p>` : "");
+}
+$("#geSave").onclick = async () => {
+  const values = { ...GE.v, ...goalCalc(GE.v, GL.year) };
+  const { error } = await sb.rpc("goal_save", { p_year: GL.year, p_plans: [{ member: GE.id, values }] });
+  if (error) return status(error.message, true);
+  GL.fresh = null; status("Goals saved"); go("goals?year=" + GL.year);
+};
+$("#geRemove").onclick = async () => {
+  if (!confirm(`Remove ${$("#geName").textContent}'s ${GL.year} goals?`)) return;
+  const { error } = await sb.rpc("goal_remove", { p_member: GE.id, p_year: GL.year });
+  if (error) return status(error.message, true);
+  status("Removed"); go("goals?year=" + GL.year);
 };
 
 // ---------- Report distribution (admins only; the database enforces it too) ----------

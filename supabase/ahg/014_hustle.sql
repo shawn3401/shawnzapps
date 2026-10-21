@@ -18,8 +18,8 @@ begin
 
   -- DAM "Contracts:" box: month goal = team contracts goal x season share; pace rounds up the share of
   -- the month passed; achieved = this month's contracts, referrals left out.
-  select round(g.goal * sa.share) into goal from goals g, season_allocation sa
-  where g.team_member = 'Anderson Hicks' and g.metric = 'Contracts' and g.goal_year = extract(year from t) and sa.month = extract(month from t);
+  select round(g.goal * sa.share) into goal from goal_values g, season_allocation sa
+  where g.team_member_id = (select id from team_members where team_member_name = 'Anderson Hicks') and g.metric = 'Contracts' and g.goal_year = extract(year from t) and sa.month = extract(month from t);
   select jsonb_build_object('goal', goal,
     'pace', ceil(coalesce(goal, 0) * (t - m0)::numeric / extract(day from m1)),
     'achieved', count(*),

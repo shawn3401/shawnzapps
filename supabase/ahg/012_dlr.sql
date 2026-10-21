@@ -55,7 +55,9 @@ begin
   into prorate from season_allocation;
 
   -- year goals for the team
-  select coalesce(jsonb_object_agg(metric, goal), '{}') into gj from goals where team_member = 'Anderson Hicks' and goal_year = y;
+  -- (goal_values, 017_goals.sql; the team's goals are on the "Anderson Hicks" team member)
+  select coalesce(jsonb_object_agg(metric, goal), '{}') into gj from goal_values
+  where team_member_id = (select id from team_members where team_member_name = 'Anderson Hicks') and goal_year = y;
 
   -- GCI
   out := out || jsonb_build_object('gci', jsonb_build_object(
