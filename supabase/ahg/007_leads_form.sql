@@ -25,7 +25,7 @@ $$;
 -- lead id. The most recent consultation is the third, else the second, else the first.
 drop view if exists public.leads_search;
 create view public.leads_search with (security_invoker = true) as
-select l.id, l.lead_name, l.lead_type, ls.lead_source as source, l.sales_rep,
+select l.id, l.lead_name, l.lead_type, l.lead_source, ls.lead_source as source, l.sales_rep,
   tm.team_member_name as owner, l.team_member_credit, l.lead_received_date, l.date_time_entered,
   coalesce(l.third_appt_set_for_date, l.second_appt_set_for_date, l.first_appt_set_for_date) as appt_for,
   case when l.third_appt_set_on_date is not null then appt_status(l.appt_qualification, l.third_appt_set_for_date, l.third_appt_date, l.third_appt_handoff_date)

@@ -53,7 +53,6 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
 .pills button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .pills button small { font-weight: 500; opacity: .7; margin-left: 3px; }
 .pills.agents { margin: 0 0 12px; }
-#jotAgents { margin: 8px 0 0; }
 .pills.agents button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .jot-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .jot-sec { margin-bottom: 16px; }
@@ -126,14 +125,18 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
 
     <!-- Leads: Access form "Leads - Search" -->
     <section id="vLeads" hidden>
-      <div class="head"><div class="grow"><h1>Leads</h1></div>
+      <div class="head"><div class="grow"><h1 id="leadsTitle">Leads</h1></div>
         <div class="acts"><button class="btn red" data-newlead>+ New lead</button></div></div>
-      <form class="card search-card" id="leadSearch">
-        <label class="fld"><span>Enter part or all of the lead name or note</span>
-          <div class="search-row"><input class="in" id="lq" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
-        </label>
-      </form>
-      <div class="pills agents" id="leadAgents"></div>
+      <div class="card search-card">
+        <form id="leadSearch">
+          <label class="fld"><span>Search part or all of the lead name or note</span>
+            <div class="search-row"><input class="in" id="lq" autocomplete="off" enterkeyhint="search" placeholder="Searches every lead you can see"><button class="btn red" type="submit">Search</button></div>
+          </label>
+        </form>
+        <div class="seg" id="leadViews"></div>
+        <div class="filters" id="leadFilters"></div>
+        <div class="chips" id="leadChips"></div>
+      </div>
       <div id="leadResults"></div>
     </section>
 
@@ -229,13 +232,16 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
     <!-- Opportunity Path jot submissions, read-only (synced from Jotform every 5 minutes) -->
     <section id="vJots" hidden>
       <div class="head"><div class="grow"><h1>Jots</h1><div class="sub" id="jotSync">Opportunity Path submissions from Jotform</div></div></div>
-      <form class="card search-card" id="jotSearch">
-        <label class="fld"><span>Search by client, address, phone, email, or agent</span>
-          <div class="search-row"><input class="in" id="jq" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
-        </label>
-        <div class="pills" id="jotStages"></div>
-        <div class="pills agents" id="jotAgents"></div>
-      </form>
+      <div class="card search-card">
+        <form id="jotSearch">
+          <label class="fld"><span>Search by client, address, phone, email, or agent</span>
+            <div class="search-row"><input class="in" id="jq" autocomplete="off" enterkeyhint="search" placeholder="Searches every jot"><button class="btn red" type="submit">Search</button></div>
+          </label>
+        </form>
+        <div class="seg" id="jotViews"></div>
+        <div class="filters" id="jotFilters"></div>
+        <div class="chips" id="jotChips"></div>
+      </div>
       <div id="jotResults"></div>
     </section>
 
@@ -601,8 +607,8 @@ function route() {
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
   if (h === "team" && ME.role === "admin") return showTeam();
-  if (h === "jots") return showJots();
-  if (h === "leads") return showLeads();
+  if (h === "jots" || h.startsWith("jots?")) return showJots(h);
+  if (h === "leads" || h.startsWith("leads?")) return showLeads(h);
   if (h === "newlead") return newLead();
   const lm = h.match(/^lead=(\d+)$/);
   if (lm) return openLead(+lm[1]);
@@ -964,14 +970,102 @@ $("#addUser").addEventListener("submit", async e => {
   status(`${name} added`); showTeam();
 });
 
+// ---------- Shared list page: view tabs, filter bar, removable chips, sortable columns ----------
+// The same pattern as the Sales list (Shawn, Oct 21, 2026), for Leads and Jots. State lives in the
+// address (#leads?view=...&agent=...) and the last one is remembered in the browser.
+function makeList(cfg) {
+  const st = { f: {}, rows: [], ids: [], pos: -1, sort: null, sortView: null, seq: 0, searched: false };
+  const D = { view: cfg.views[0][0], q: "", period: cfg.period ? "thisyear" : "", ...Object.fromEntries(cfg.filters.map(x => [x.key, ""])) };
+  const $id = k => $("#" + cfg.ids[k]);
+  const hash = () => { const p = new URLSearchParams(Object.entries(st.f).filter(([k, v]) => v && v !== D[k])); return cfg.base + (p.toString() ? "?" + p : ""); };
+  const set = patch => { st.f = { ...st.f, ...patch }; try { localStorage.setItem("ahg." + cfg.base, JSON.stringify(st.f)); } catch {} go(hash()); };
+  const dated = () => cfg.period && cfg.period.views.includes(st.f.view);
+  function read(h) {
+    const qs = h.includes("?") ? new URLSearchParams(h.slice(h.indexOf("?") + 1)) : null;
+    if (qs) st.f = { ...D, ...Object.fromEntries([...qs].filter(([k]) => k in D)) };
+    else { try { st.f = { ...D, ...JSON.parse(localStorage.getItem("ahg." + cfg.base) || "{}") }; } catch { st.f = { ...D }; } }
+    if (!cfg.views.some(v => v[0] === st.f.view)) st.f.view = D.view;
+    for (const x of cfg.filters) if (x.hidden?.()) st.f[x.key] = "";
+  }
+  function bar() {
+    $id("views").innerHTML = cfg.views.map(([v, t]) => `<button type="button" data-v="${v}" class="${st.f.view === v ? "on" : ""}">${t}</button>`).join("");
+    $id("views").querySelectorAll("[data-v]").forEach(b => b.onclick = () => set({ view: b.dataset.v, q: "" }));
+    const parts = cfg.filters.filter(x => !x.hidden?.()).map(x => x.kind === "select"
+      ? `<label class="fld" style="min-width:220px"><span>${x.label}</span><select class="in" data-f="${x.key}"><option value="">${x.all}</option>${x.options().map(o => o.group
+          ? `<optgroup label="${esc(o.group)}">${o.items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</optgroup>`
+          : `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join("")}</select></label>`
+      : `<div class="fld"><span>${x.label}</span><div class="seg small">${[["", "All"], ...x.options()].map(([v, t]) => `<button type="button" data-f="${x.key}" data-val="${esc(v)}" class="${st.f[x.key] === v ? "on" : ""}">${esc(t)}</button>`).join("")}</div></div>`);
+    if (dated()) parts.push(`<div class="fld"><span>${cfg.period.label(st.f.view)}</span><div class="seg small">${PERIODS.map(([v, t]) => `<button type="button" data-f="period" data-val="${v}" class="${st.f.period === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`);
+    $id("filters").innerHTML = parts.join("");
+    $id("filters").querySelectorAll("select[data-f]").forEach(el => { el.value = st.f[el.dataset.f]; el.onchange = () => set({ [el.dataset.f]: el.value }); });
+    $id("filters").querySelectorAll("button[data-f]").forEach(b => b.onclick = () => set({ [b.dataset.f]: b.dataset.val }));
+    const chips = [];
+    if (st.f.q) chips.push(["q", `Search: “${st.f.q}”`]);
+    for (const x of cfg.filters) if (st.f[x.key]) chips.push([x.key, `${x.label}: ${x.chip ? x.chip(st.f[x.key]) : st.f[x.key]}`]);
+    if (dated() && st.f.period !== "any") chips.push(["period", PERIODS.find(p => p[0] === st.f.period)[1]]);
+    $id("chips").innerHTML = chips.map(([k, t]) => `<span class="chip-x">${esc(t)}<button type="button" data-clear="${k}" title="Remove">&#10005;</button></span>`).join("") +
+      (chips.length > 1 ? `<button type="button" class="clear" data-clear="*">Clear all</button>` : "");
+    $id("chips").querySelectorAll("[data-clear]").forEach(b => b.onclick = () => {
+      const k = b.dataset.clear;
+      set(k === "*" ? { ...Object.fromEntries(cfg.filters.map(x => [x.key, ""])), q: "", period: "any" } : { [k]: k === "period" ? "any" : "" });
+    });
+  }
+  async function run() {
+    const seq = ++st.seq, y = new Date().getFullYear();
+    let q = cfg.query(st.f);
+    if (dated() && st.f.period !== "any") {
+      const col = cfg.period.col(st.f.view), from = st.f.period === "thisyear" ? `${y}-01-01` : `${y - 1}-01-01`, to = st.f.period === "thisyear" ? `${y + 1}-01-01` : `${y}-01-01`;
+      q = q.gte(col, from).lt(col, to);
+    }
+    if (st.f.q) q = cfg.search(q, st.f.q.replace(/[%_\\]/g, m => "\\" + m));
+    const [col, asc] = cfg.sort[st.f.view];
+    const { data, error } = await q.order(col, { ascending: asc, nullsFirst: false }).limit(1000);
+    if (seq !== st.seq) return;
+    if (error) return status(error.message, true);
+    st.rows = data; st.searched = true;
+    if (!st.sort || st.sortView !== st.f.view) { st.sort = { key: col, asc }; st.sortView = st.f.view; }
+    render();
+  }
+  function render() {
+    const el = $id("results");
+    const { key, asc } = st.sort;
+    st.rows.sort((a, b) => {
+      const x = a[key] ?? "", y = b[key] ?? "";
+      if (x === "" || y === "") return x === y ? 0 : x === "" ? 1 : -1;
+      const c = String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
+      return asc ? c : -c;
+    });
+    st.ids = st.rows.map(cfg.rowId);
+    const viewName = cfg.views.find(v => v[0] === st.f.view)[1];
+    if (!st.rows.length) { el.innerHTML = `<p class="note"><b>${viewName}</b> · no ${cfg.noun} match.</p>`; return; }
+    const label = cfg.columns.find(c => c[0] === key)[1].toLowerCase();
+    const order = /date|_at$|^updated$|^received$|_for$|signed/.test(key) ? (asc ? `soonest ${label} first` : `newest ${label} first`) : `by ${label}`;
+    el.innerHTML = `<p class="note"><b>${viewName}</b> · ${st.rows.length === 1000 ? `the first 1,000 ${cfg.noun}. Narrow it down with a filter or search.` : `${st.rows.length.toLocaleString()} ${st.rows.length === 1 ? cfg.one : cfg.noun}, ${order}.`}</p>
+    <div class="card scroll"><table class="grid list"><thead><tr>${cfg.columns.map(([k, t, c]) =>
+      `<th class="sortable${c ? " " + c : ""}${key === k ? " on" : ""}" data-sort="${k}">${t}${key === k ? (asc ? " &#9650;" : " &#9660;") : ""}</th>`).join("")}</tr></thead><tbody>
+    ${st.rows.map((r, i) => `<tr data-i="${i}">${cfg.columns.map(([k, , c, fmt]) => `<td${c ? ` class="${c}"` : ""}>${fmt ? fmt(r) : esc(r[k])}</td>`).join("")}</tr>`).join("")}
+    </tbody></table></div>`;
+    el.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+      const k = th.dataset.sort;
+      st.sort = st.sort.key === k ? { key: k, asc: !st.sort.asc } : { key: k, asc: !/date|_at$|updated|received|_for$|signed/.test(k) };
+      render();
+    });
+    el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { st.pos = +tr.dataset.i; go(cfg.rowHash(st.ids[st.pos])); });
+  }
+  $id("form").addEventListener("submit", e => { e.preventDefault(); const q = $id("q").value.trim(); set(q ? { q, view: cfg.searchView, period: "any" } : { q: "" }); });
+  $id("q").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $id("form").requestSubmit(); } });
+  return {
+    st, hash,
+    show(h) { read(h); page(cfg.page); $id("q").value = st.f.q; bar(); run(); },
+  };
+}
+
 // ---------- Leads (Access form "Leads - Search") ----------
 const LEAD_TYPES = ["Buyer", "Seller", "Referral"];
 const TRIGGERS = ["None", "Client Events", "Promise Script", "Vyral Marketing"];
 const QUALS = ["Qualified", "Disqualified"];
 const LEAD_REQUIRED = { lead_source: "Source", team_member_credit: "Lead generated by", trigger: "Appt trigger" };
-const LD = { q: "", recent: true, rows: [], shown: [], ids: [], pos: -1, agent: "", searched: false };
 let LEAD = null, leadNew = false;
-
 // Access query Leads-Search, FirstApptStatus and the rest; same as appt_status() in the database.
 function apptStatus(qual, setFor, appt, handoff) {
   const today = new Date().toISOString().slice(0, 10), f = day(setFor);
@@ -985,48 +1079,42 @@ function apptStatus(qual, setFor, appt, handoff) {
 const apptClass = st => ({ "Scheduled": "sched", "Appt Held": "held2", "Missing Interview": "miss", "No Show": "miss" }[st] || "none");
 const apptPill = st => st ? `<span class="st ${apptClass(st)}">${esc(st)}</span>` : "";
 
-async function showLeads() {
-  page("vLeads"); $("#lq").value = LD.q;
-  await runLeadSearch(true, LD.searched ? LD.recent : true);
-}
-$("#leadSearch").addEventListener("submit", e => { e.preventDefault(); runLeadSearch(false, false); });
-$("#lq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runLeadSearch(false, false); } });
-$("#leadResults").addEventListener("click", e => { if (e.target.closest("[data-recent]")) { e.preventDefault(); $("#lq").value = ""; runLeadSearch(true, true); } });
-// Opens on leads received in the last 30 days, newest first; a search covers every lead, as in Access.
-async function runLeadSearch(stay, recent) {
-  LD.q = recent ? "" : $("#lq").value.trim(); LD.recent = recent;
-  let query = sb.from("leads_search").select("id, lead_name, lead_type, source, owner, team_member_credit, lead_received_date, appt_for, appt_status, rep_signed")
-    .order("lead_received_date", { ascending: false }).order("id", { ascending: false }).limit(1000);
-  if (recent) query = query.gte("lead_received_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
-  else if (LD.q) query = query.ilike("search", `%${LD.q.replace(/[%_\\]/g, m => "\\" + m)}%`);
-  const { data, error } = await query;
-  if (error) return status(error.message, true);
-  LD.rows = data; LD.searched = true;
-  if (data.length === 1 && !stay) return go("lead=" + data[0].id);
-  renderLeads();
-}
-function renderLeads() {
-  const counts = {};
-  for (const r of LD.rows) if (r.owner) counts[r.owner] = (counts[r.owner] || 0) + 1;
-  if (LD.agent && !counts[LD.agent]) LD.agent = "";
-  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
-  const pills = $("#leadAgents");
-  pills.hidden = names.length < 2;
-  pills.innerHTML = [["", "All agents", LD.rows.length], ...names.map(n => [n, n, counts[n]])].map(([v, t, c]) =>
-    `<button type="button" data-agent="${esc(v)}" class="${LD.agent === v ? "on" : ""}">${esc(t)}<small>${c.toLocaleString()}</small></button>`).join("");
-  pills.querySelectorAll("[data-agent]").forEach(b => b.onclick = () => { LD.agent = LD.agent === b.dataset.agent ? "" : b.dataset.agent; renderLeads(); });
-  LD.shown = LD.agent ? LD.rows.filter(r => r.owner === LD.agent) : LD.rows;
-  LD.ids = LD.shown.map(r => r.id);
-  const el = $("#leadResults");
-  const back = LD.recent ? "" : ` <a href="#" data-recent>Show recent leads</a>`;
-  if (!LD.shown.length) { el.innerHTML = `<p class="note">${LD.recent ? "No leads in the last 30 days." : "No leads match."}${back}</p>`; return; }
-  const n = LD.shown.length.toLocaleString(), who = LD.agent ? ` for ${esc(LD.agent)}` : "";
-  el.innerHTML = `<p class="note">${LD.recent ? `<b>Last 30 days</b> · ${n} leads${who}, newest first.` : LD.rows.length === 1000 && !LD.agent ? "Showing the newest 1,000. Type more to narrow it down." : `${n} leads${who}, newest first.`}${back}</p>
-  <div class="card scroll"><table class="grid list"><thead><tr><th>Name</th><th>Type</th><th class="hide-sm">Source</th><th>Lead owner</th><th>Received</th><th class="hide-sm">Appointment</th><th>Appt status</th><th class="hide-sm">Rep signed</th></tr></thead><tbody>
-  ${LD.shown.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${esc(r.lead_type)}</td><td class="hide-sm">${esc(r.source)}</td><td>${esc(r.owner)}</td><td>${usDate(r.lead_received_date)}</td><td class="hide-sm">${usDate(r.appt_for)}</td><td>${apptPill(r.appt_status)}</td><td class="hide-sm">${usDate(r.rep_signed)}</td></tr>`).join("")}
-  </tbody></table></div>`;
-  el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { LD.pos = +tr.dataset.i; go("lead=" + LD.ids[LD.pos]); });
-}
+// Leads list (Shawn, Oct 21, 2026): the Sales pattern. Agents see only their own leads (the database
+// enforces it), so they get no agent filter.
+const LEADS = makeList({
+  base: "leads", page: "vLeads", noun: "leads", one: "lead", searchView: "all",
+  ids: { views: "leadViews", filters: "leadFilters", chips: "leadChips", results: "leadResults", q: "lq", form: "leadSearch" },
+  views: [["recent", "Last 30 days"], ["upcoming", "Upcoming appointments"], ["missing", "Missing interview"], ["rep", "Rep signed"], ["all", "All"]],
+  sort: { recent: ["lead_received_date", false], upcoming: ["appt_for", true], missing: ["appt_for", false], rep: ["rep_signed", false], all: ["lead_received_date", false] },
+  period: { views: ["rep", "all"], label: v => v === "rep" ? "Rep signed" : "Received", col: v => v === "rep" ? "rep_signed" : "lead_received_date" },
+  filters: [
+    { key: "agent", label: "Lead owner", kind: "select", all: "All agents", hidden: () => isAgent(), chip: v => L.teamName[v] || v,
+      options: () => [{ group: "Current team", items: L.team.filter(t => L.activeIds.has(t.id)).map(t => [t.id, t.team_member_name]) },
+                      { group: "Past team members", items: L.team.filter(t => !L.activeIds.has(t.id)).map(t => [t.id, t.team_member_name]) }] },
+    { key: "type", label: "Type", kind: "seg", options: () => LEAD_TYPES.map(v => [v, v]) },
+    { key: "source", label: "Source", kind: "select", all: "All sources", chip: v => L.source[v] || v,
+      options: () => Object.entries(L.source).sort((a, b) => a[1].localeCompare(b[1])).map(([v, t]) => [v, t]) },
+  ],
+  query: f => {
+    const today = new Date().toISOString().slice(0, 10);
+    let q = sb.from("leads_search").select("id, lead_name, lead_type, source, owner, team_member_credit, lead_received_date, appt_for, appt_status, rep_signed");
+    if (f.view === "recent") q = q.gte("lead_received_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
+    if (f.view === "upcoming") q = q.gte("appt_for", today);
+    if (f.view === "missing") q = q.eq("appt_status", "Missing Interview");
+    if (f.view === "rep") q = q.not("rep_signed", "is", null);
+    if (f.agent) q = q.eq("sales_rep", f.agent);
+    if (f.type) q = q.eq("lead_type", f.type);
+    if (f.source) q = q.eq("lead_source", f.source);
+    return q;
+  },
+  search: (q, t) => q.ilike("search", `%${t}%`),
+  columns: [["lead_name", "Name", "", r => `<b>${esc(r.lead_name)}</b>`], ["lead_type", "Type"], ["source", "Source", "hide-sm"], ["owner", "Lead owner"],
+    ["lead_received_date", "Received", "", r => usDate(r.lead_received_date)], ["appt_for", "Appointment", "hide-sm", r => usDate(r.appt_for)],
+    ["appt_status", "Appt status", "", r => apptPill(r.appt_status)], ["rep_signed", "Rep signed", "hide-sm", r => usDate(r.rep_signed)]],
+  rowId: r => r.id, rowHash: id => "lead=" + id,
+});
+const LD = LEADS.st;   // the list behind the lead form's Record arrows
+const showLeads = h => LEADS.show(h);
 
 const dtLocal = v => v ? String(v).replace(" ", "T").slice(0, 16) : "";
 function usDateTime(v) {
@@ -1143,61 +1231,45 @@ const STAGES = ["Appointment set", "Rescheduled", "Appointment held", "Cancelled
 const stageClass = st => ({ "Appointment held": "held", "Listing handoff": "listing", "Rep signed": "signed", "Rep requested": "requested",
   "Appointment set": "set", "New": "new", "Rescheduled": "rescheduled", "Cancelled": "cancelled" }[st] || "set");
 const stagePill = st => `<span class="st ${stageClass(st)}">${esc(st)}</span>`;
-const J = { q: "", stage: "", agent: "", rows: [], loaded: false, counts: null, questions: null };
-
-async function showJots() {
-  page("vJots");
-  $("#jq").value = J.q;
-  if (!J.counts) {
-    const { data } = await sb.from("jot_forms").select("last_sync_at, last_sync_note").eq("form_id", OPP_FORM).maybeSingle();
-    if (data?.last_sync_at) $("#jotSync").textContent = `Opportunity Path submissions from Jotform · checked ${new Date(data.last_sync_at).toLocaleString([], { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}, every 5 minutes`;
-    const counts = {};
-    await Promise.all(STAGES.map(async st => {
-      const { count } = await sb.from("jot_list").select("id", { count: "exact", head: true }).eq("form_id", OPP_FORM).eq("stage", st);
-      counts[st] = count || 0;
-    }));
-    J.counts = counts;
-  }
-  renderStagePills();
-  if (!J.loaded) await loadJots(); else renderJots();
-}
-function renderStagePills() {
-  $("#jotStages").innerHTML = [["", "All"], ...STAGES.filter(st => J.counts[st]).map(st => [st, st])].map(([v, t]) =>
-    `<button type="button" data-stage="${esc(v)}" class="${J.stage === v ? "on" : ""}">${esc(t)}${v ? `<small>${J.counts[v].toLocaleString()}</small>` : ""}</button>`).join("");
-  $$("#jotStages [data-stage]").forEach(b => b.onclick = () => { J.stage = b.dataset.stage; renderStagePills(); loadJots(); });
-}
-$("#jotSearch").addEventListener("submit", e => { e.preventDefault(); J.q = $("#jq").value.trim(); loadJots(); });
-async function loadJots() {
-  let query = sb.from("jot_list").select("id, client, client_type, agent, set_by, source, appt_for, stage, created, updated, versions")
-    .eq("form_id", OPP_FORM).order("updated", { ascending: false }).limit(300);
-  const filt = qy => {
-    if (J.stage) qy = qy.eq("stage", J.stage);
-    if (J.q) qy = qy.ilike("search", `%${J.q.toLowerCase().replace(/[%_\\]/g, m => "\\" + m)}%`);
-    return qy;
-  };
-  query = filt(query);
-  if (J.agent) query = query.eq("agent", J.agent);
-  const [{ data, error }, ag] = await Promise.all([query, sb.rpc("jot_agent_counts", { p_form: OPP_FORM, p_stage: J.stage, p_search: J.q })]);
-  if (error) return status(error.message, true);
-  J.agentCounts = Object.fromEntries((ag.data || []).map(r => [r.agent, Number(r.n)]));
-  J.rows = data; J.loaded = true; renderJotAgents(); renderJots();
-}
+const J = { questions: null };
 const jotDate = t => t ? usDate(t.slice(0, 10)) : "";
-function renderJotAgents() {
-  const c = J.agentCounts || {};
-  const names = Object.keys(c).sort((a, b) => c[b] - c[a] || a.localeCompare(b));
-  $("#jotAgents").innerHTML = [["", "All agents", null], ...names.map(n => [n, n, c[n]])].map(([v, t, n]) =>
-    `<button type="button" data-agent="${esc(v)}" class="${J.agent === v ? "on" : ""}">${esc(t)}${n != null ? `<small>${n.toLocaleString()}</small>` : ""}</button>`).join("");
-  $$("#jotAgents [data-agent]").forEach(b => b.onclick = () => { J.agent = J.agent === b.dataset.agent ? "" : b.dataset.agent; loadJots(); });
-}
-function renderJots() {
-  const el = $("#jotResults");
-  if (!J.rows.length) { el.innerHTML = `<p class="note">No jots match.</p>`; return; }
-  el.innerHTML = `<p class="note">${J.rows.length === 300 ? "The 300 most recently changed. Search or pick a stage to narrow it down." : J.rows.length.toLocaleString() + " jots, most recently changed first."}</p>
-  <div class="card scroll"><table class="grid list"><thead><tr><th>Client</th><th>Stage</th><th>Type</th><th>Agent</th><th class="hide-sm">Set by</th><th class="hide-sm">Appointment</th><th>Changed</th></tr></thead><tbody>
-  ${J.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.client)}</b></td><td>${stagePill(r.stage)}</td><td>${esc(r.client_type)}</td><td>${esc(r.agent)}</td><td class="hide-sm">${esc(r.set_by)}</td><td class="hide-sm">${jotDate(r.appt_for)}</td><td>${jotDate(r.updated)}</td></tr>`).join("")}
-  </tbody></table></div>`;
-  el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => go("jot=" + J.rows[+tr.dataset.i].id));
+// Jots list: the same pattern. Agents never see jots.
+const JOTS = makeList({
+  base: "jots", page: "vJots", noun: "jots", one: "jot", searchView: "all",
+  ids: { views: "jotViews", filters: "jotFilters", chips: "jotChips", results: "jotResults", q: "jq", form: "jotSearch" },
+  views: [["recent", "Changed in 30 days"], ["set", "Appointment set"], ["held", "Appointment held"], ["rep", "Rep stage"], ["listing", "Listing handoff"], ["cancelled", "Cancelled"], ["all", "All"]],
+  sort: { recent: ["updated", false], set: ["appt_for", true], held: ["updated", false], rep: ["updated", false], listing: ["updated", false], cancelled: ["updated", false], all: ["updated", false] },
+  period: null,
+  filters: [
+    { key: "agent", label: "Agent", kind: "select", all: "All agents", options: () => (J.people || []).map(n => [n, n]) },
+    { key: "type", label: "Type", kind: "seg", options: () => [["Buyer", "Buyer"], ["Seller", "Seller"], ["Buyer and Seller", "Buyer and Seller"]] },
+  ],
+  query: f => {
+    let q = sb.from("jot_list").select("id, client, client_type, agent, set_by, source, appt_for, stage, created, updated, versions").eq("form_id", OPP_FORM);
+    if (f.view === "recent") q = q.gte("updated", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
+    if (f.view === "set") q = q.in("stage", ["Appointment set", "Rescheduled"]);
+    if (f.view === "held") q = q.eq("stage", "Appointment held");
+    if (f.view === "rep") q = q.in("stage", ["Rep requested", "Rep signed"]);
+    if (f.view === "listing") q = q.eq("stage", "Listing handoff");
+    if (f.view === "cancelled") q = q.eq("stage", "Cancelled");
+    if (f.agent) q = q.eq("agent", f.agent);
+    if (f.type) q = q.eq("client_type", f.type);
+    return q;
+  },
+  search: (q, t) => q.ilike("search", `%${t.toLowerCase()}%`),
+  columns: [["client", "Client", "", r => `<b>${esc(r.client)}</b>`], ["stage", "Stage", "", r => stagePill(r.stage)], ["client_type", "Type"], ["agent", "Agent"],
+    ["set_by", "Set by", "hide-sm"], ["appt_for", "Appointment", "hide-sm", r => jotDate(r.appt_for)], ["updated", "Changed", "", r => jotDate(r.updated)]],
+  rowId: r => r.id, rowHash: id => "jot=" + id,
+});
+async function showJots(h) {
+  if (!J.people) {
+    const [{ data: f }, { data: p }] = await Promise.all([
+      sb.from("jot_forms").select("last_sync_at").eq("form_id", OPP_FORM).maybeSingle(),
+      sb.from("jot_people").select("jot_name").order("jot_name")]);
+    J.people = (p || []).map(x => x.jot_name);
+    if (f?.last_sync_at) $("#jotSync").textContent = `Opportunity Path submissions from Jotform · checked ${new Date(f.last_sync_at).toLocaleString([], { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}, every 5 minutes`;
+  }
+  JOTS.show(h);
 }
 
 // Show any Jotform answer as text: dates, times, addresses, matrices, checkbox lists.
@@ -1226,7 +1298,7 @@ async function openJot(id) {
     sb.from("jot_versions").select("id, jot_updated_at, answers, seen_at").eq("submission_id", id).order("id"),
   ]);
   if (!s.data) { status("That jot wasn't found.", true); return go("jots"); }
-  const a = s.data.answers, row = J.rows.find(r => r.id === id);
+  const a = s.data.answers, row = JOTS.st.rows.find(r => r.id === id);
   const label = qid => (J.questions.find(q => q.qid === qid)?.label || "Question " + qid).trim();
   const name = [a["36"], a["37"]].filter(Boolean).join(" & ") || "Jot";
   const stage = row?.stage || (await sb.from("jot_list").select("stage").eq("id", id).maybeSingle()).data?.stage || "";
