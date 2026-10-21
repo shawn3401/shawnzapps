@@ -14,7 +14,7 @@ declare
   r90 date := p_today - 90; yest date := p_today - 1;
   goal numeric; box jsonb; rows jsonb;
 begin
-  if public.my_role() is null then raise exception 'Not on the team list.'; end if;
+  if not public.can_read_reports() then raise exception 'Not on the team list.'; end if;
 
   -- DAM "Contracts:" box: month goal = team contracts goal x season share; pace rounds up the share of
   -- the month passed; achieved = this month's contracts, referrals left out.

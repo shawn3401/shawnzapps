@@ -148,6 +148,18 @@ table.tracker th { font-size: 11.5px; }
 .off td { opacity: .55; }
 .search-row { display: flex; gap: 8px; }
 .search-row .in { flex: 1; }
+.dist-form { display: grid; gap: 16px; }
+.dist-form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.dist-form .seg { margin-top: 0; }
+.rcpt-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.rcpt-add .in { flex: 1; min-width: 200px; }
+.dist-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dist-acts .grow { flex: 1; }
+.preview-frame { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 10px; background: #f4f4f2; }
+.sendlog .bad { color: var(--accent); }
+.mode-test { background: var(--warn-soft); color: var(--warn); }
+.mode-live { background: var(--good-soft); color: var(--good); }
+@media (max-width: 700px) { .dist-form .row2 { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .ci { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 860px) {
   .top { grid-template-columns: 1fr; }
@@ -176,6 +188,7 @@ table.tracker th { font-size: 11.5px; }
       <a href="#dlr" data-nav="dlr" id="navDlr">Leadership dashboard</a>
       <a href="#hustle" data-nav="hustle">Agent hustle board</a>
       <a href="#tracker" data-nav="tracker">Pending tracker</a>
+      <a href="#distribution" data-nav="distribution" id="navDist" hidden>Report distribution</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
   </aside>
@@ -394,6 +407,49 @@ table.tracker th { font-size: 11.5px; }
       </section>
       <div class="card scroll"><table class="grid cards" id="teamTable"></table></div>
       <p class="note">They sign in with Google using that andersonhicks.com address. Switching someone off keeps them on the list but stops their access.</p>
+    </section>
+
+    <!-- Report distribution (admins only): who gets which report emails, how often, and when -->
+    <section id="vDist" hidden>
+      <div class="head"><div class="grow"><h1>Report distribution</h1><div class="sub">Report emails sent from reports@andersonhicks.com. Times are Mountain time; each goes out within 15 minutes of its time.</div></div>
+        <div class="acts"><button class="btn red" id="distNew">+ New distribution</button></div></div>
+      <section class="card" id="distEdit" hidden style="margin-bottom:16px">
+        <div class="card-h"><h3 id="deTitle">New distribution</h3></div>
+        <form class="card-b dist-form" id="distForm">
+          <div class="fld"><span>Report</span><div class="seg small" id="deReport"></div></div>
+          <label class="fld req"><span>Name of this list</span><input class="in" id="deName" autocomplete="off" placeholder="e.g. Leadership team, All agents"></label>
+          <div class="fld"><span>Recipients</span>
+            <div class="chips" id="deRcpts" style="margin:0 0 8px"></div>
+            <div class="rcpt-add">
+              <input class="in" id="deEmail" type="email" autocomplete="off" placeholder="name@andersonhicks.com or a group like execs@andersonhicks.com">
+              <button class="btn" type="button" id="deAddEmail">Add</button>
+              <select class="in" id="dePick" style="flex:0 1 240px"></select>
+            </div></div>
+          <div class="fld"><span>How often</span><div class="seg small" id="deFreq"></div></div>
+          <div class="fld" id="deDaysF" hidden><span>On these days</span><div class="seg small" id="deDays"></div></div>
+          <label class="fld" id="deMonthF" hidden style="max-width:260px"><span>Day of the month (31 means the last day)</span><input class="in" id="deMonthDay" type="number" min="1" max="31"></label>
+          <div class="row2">
+            <label class="fld"><span>Send time</span><input class="in" id="deTime" type="time" step="900"></label>
+            <label class="chk" style="align-self:end"><input type="checkbox" id="deActive"> On (uncheck to pause it)</label>
+          </div>
+          <div class="fld"><span>Mode</span><div class="seg small" id="deMode"></div><div class="note" id="deModeNote" style="margin:6px 0 0"></div></div>
+          <label class="fld" id="deTestF"><span>Test emails go to</span><input class="in" id="deTestTo" type="email" autocomplete="off"></label>
+          <div class="dist-acts">
+            <button class="btn red" type="submit">Save</button>
+            <button class="btn" type="button" id="dePreview">Preview</button>
+            <button class="btn" type="button" id="deSendMe">Send me one now</button>
+            <button class="btn" type="button" id="deCancel">Cancel</button>
+            <span class="grow"></span>
+            <button class="btn" type="button" id="deDelete">Delete</button>
+          </div>
+          <iframe class="preview-frame" id="dePrevFrame" hidden title="Email preview"></iframe>
+        </form>
+      </section>
+      <div class="card scroll"><table class="grid cards" id="distTable"></table></div>
+      <section class="card" style="margin-top:16px">
+        <div class="card-h"><h3>Recent sends</h3></div>
+        <div class="card-b scroll"><table class="grid sendlog" id="sendLog"></table></div>
+      </section>
     </section>
 
     <!-- one sale -->
@@ -664,8 +720,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -676,6 +732,7 @@ async function start(session) {
   const { data: role } = await sb.rpc("my_role");
   ME = { email: session.user.email.toLowerCase(), role };
   $("#navTeam").hidden = role !== "admin";
+  $("#navDist").hidden = role !== "admin";
   let agentOk = false;
   if (role === "agent") agentOk = (await sb.rpc("my_team_member")).data != null;
   if (role !== "admin" && role !== "staff" && !agentOk) {
@@ -725,6 +782,7 @@ function route() {
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
   if (h === "team" && ME.role === "admin") return showTeam();
+  if (h === "distribution" && ME.role === "admin") return showDist();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
   if (h === "hustle") return showHustle();
@@ -1092,6 +1150,155 @@ $("#addUser").addEventListener("submit", async e => {
   $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff"; $("#nuMember").value = "";
   status(`${name} added`); showTeam();
 });
+
+// ---------- Report distribution (admins only; the database enforces it too) ----------
+// Shawn, Oct 21, 2026: pick a report, its recipients, how often, and when. The send-reports Edge
+// Function does the sending (pg_cron every 15 minutes) and the previews.
+const REPORTS = { dlr: "Leadership dashboard", hustle: "Agent hustle board", tracker: "Pending tracker" };
+const FREQ = { weekdays: "Every weekday", daily: "Every day", days: "Certain days", monthly: "Monthly" };
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+let dists = [], DE = null;   // the list, and the one being edited
+const hm = t => { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`; };
+const ordinal = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+function when(d) {
+  const f = d.frequency === "days" ? (d.days.length ? [...d.days].sort().map(i => DOW[i - 1]).join(", ") : "No days picked")
+    : d.frequency === "monthly" ? (d.month_day >= 31 ? "Last day of the month" : `Monthly on the ${ordinal(d.month_day || 1)}`) : FREQ[d.frequency];
+  return `${f} at ${hm(d.send_time)}`;
+}
+async function callSend(body) {
+  const { data, error } = await sb.functions.invoke("send-reports", { body });
+  if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} throw new Error(m); }
+  return data;
+}
+async function showDist() {
+  page("vDist");
+  $("#distEdit").hidden = true;
+  const [d, s, u] = await Promise.all([
+    sb.from("report_distributions").select("*").order("report").order("name"),
+    sb.from("report_sends").select("*").order("sent_at", { ascending: false }).limit(40),
+    sb.from("app_users").select("name, email, active").order("name"),
+  ]);
+  if (d.error) return status(d.error.message, true);
+  dists = d.data; L.users = (u.data || []).filter(x => x.active);
+  renderDists(); renderSendLog(s.data || []);
+}
+function renderDists() {
+  $("#distTable").innerHTML = `<thead><tr><th>Report</th><th>List</th><th>Recipients</th><th>When</th><th>Mode</th><th>On</th><th>Last sent</th><th></th></tr></thead><tbody>` +
+    (dists.length ? dists.map((d, i) => `<tr data-i="${i}" class="${d.active ? "" : "off"}">
+      <td data-label="Report"><b>${REPORTS[d.report]}</b></td>
+      <td data-label="List">${esc(d.name)}</td>
+      <td data-label="Recipients">${d.recipients.length ? esc(d.recipients.slice(0, 3).join(", ")) + (d.recipients.length > 3 ? ` and ${d.recipients.length - 3} more` : "") : `<span class="note">None yet</span>`}</td>
+      <td data-label="When">${when(d)}</td>
+      <td data-label="Mode"><span class="chip ${d.mode === "live" ? "mode-live" : "mode-test"}" style="margin:0">${d.mode === "live" ? "Live" : "Test: " + esc(d.test_to.split("@")[0])}</span></td>
+      <td data-label="On"><label class="chk" style="min-height:0"><input type="checkbox" data-on="${i}" ${d.active ? "checked" : ""}></label></td>
+      <td data-label="Last sent">${usDate(d.last_sent_on)}</td>
+      <td><button class="btn" data-edit="${i}">Edit</button></td></tr>`).join("")
+    : `<tr><td colspan="8" class="note">No report emails set up yet.</td></tr>`) + `</tbody>`;
+  $$("#distTable [data-edit]").forEach(b => b.onclick = () => editDist(dists[+b.dataset.edit]));
+  $$("#distTable [data-on]").forEach(c => c.onchange = async () => {
+    const d = dists[+c.dataset.on];
+    const { error } = await sb.from("report_distributions").update({ active: c.checked }).eq("id", d.id);
+    if (error) return status(error.message, true);
+    d.active = c.checked; status(c.checked ? "Turned on" : "Paused"); renderDists();
+  });
+}
+function renderSendLog(rows) {
+  const name = id => dists.find(d => d.id === id)?.name;
+  $("#sendLog").innerHTML = `<thead><tr><th>Sent</th><th>Report</th><th>Mode</th><th>To</th><th>Result</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(r => `<tr><td style="white-space:nowrap">${new Date(r.sent_at).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+      <td>${REPORTS[r.report] || esc(r.report)}${name(r.distribution_id) ? `<small> &middot; ${esc(name(r.distribution_id))}</small>` : ""}</td>
+      <td>${r.mode === "manual" ? "Sent by hand" : r.mode === "live" ? "Live" : "Test"}</td>
+      <td>${esc(r.recipients.join(", "))}</td>
+      <td class="${r.ok ? "" : "bad"}">${r.ok ? "Sent" : "Failed: " + esc(r.detail)}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="note">Nothing sent yet.</td></tr>`) + `</tbody>`;
+}
+function editDist(d) {
+  DE = d ? { ...d, recipients: [...d.recipients], days: [...d.days] }
+    : { report: "dlr", name: "", recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", mode: "test", test_to: ME.email, active: true };
+  $("#deTitle").textContent = d ? "Edit distribution" : "New distribution";
+  $("#deName").value = DE.name; $("#deTime").value = DE.send_time.slice(0, 5); $("#deActive").checked = DE.active;
+  $("#deMonthDay").value = DE.month_day || 1; $("#deTestTo").value = DE.test_to; $("#deEmail").value = "";
+  $("#deDelete").hidden = !d; $("#dePrevFrame").hidden = true;
+  $("#dePick").innerHTML = `<option value="">Add someone from the team list</option>` + (L.users || []).map(u => `<option value="${esc(u.email)}">${esc(u.name)}</option>`).join("");
+  renderDE();
+  $("#distEdit").hidden = false;
+  $("#distEdit").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function renderDE() {
+  const seg = (el, opts, on, cb) => {
+    $(el).innerHTML = Object.entries(opts).map(([v, t]) => `<button type="button" data-v="${v}" class="${on(v) ? "on" : ""}">${t}</button>`).join("");
+    $$(el + " [data-v]").forEach(b => b.onclick = () => { cb(b.dataset.v); renderDE(); });
+  };
+  seg("#deReport", REPORTS, v => DE.report === v, v => DE.report = v);
+  seg("#deFreq", FREQ, v => DE.frequency === v, v => DE.frequency = v);
+  seg("#deDays", Object.fromEntries(DOW.map((t, i) => [i + 1, t])), v => DE.days.includes(+v),
+    v => DE.days = DE.days.includes(+v) ? DE.days.filter(x => x !== +v) : [...DE.days, +v].sort());
+  seg("#deMode", { test: "Test", live: "Live" }, v => DE.mode === v, v => DE.mode = v);
+  $("#deDaysF").hidden = DE.frequency !== "days";
+  $("#deMonthF").hidden = DE.frequency !== "monthly";
+  $("#deTestF").hidden = DE.mode !== "test";
+  $("#deModeNote").textContent = DE.mode === "test" ? "Test: only the address below gets it, with (test) in the subject. The recipients get nothing yet."
+    : `Live: all ${DE.recipients.length} recipient${DE.recipients.length === 1 ? "" : "s"} get it.`;
+  $("#deRcpts").innerHTML = DE.recipients.map((e, i) => `<span class="chip-x">${esc(e)}<button type="button" data-rm="${i}" title="Remove">&#10005;</button></span>`).join("")
+    + (DE.recipients.length > 1 ? `<button type="button" class="clear" id="deClear">Remove all</button>` : "");
+  $$("#deRcpts [data-rm]").forEach(b => b.onclick = () => { DE.recipients.splice(+b.dataset.rm, 1); renderDE(); });
+  $("#deClear")?.addEventListener("click", () => { DE.recipients = []; renderDE(); });
+}
+function addRecipients(text) {
+  const bad = [];
+  for (const e of text.split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(Boolean)) {
+    if (!/^[^@\s]+@andersonhicks\.com$/.test(e)) { bad.push(e); continue; }
+    if (!DE.recipients.includes(e)) DE.recipients.push(e);
+  }
+  renderDE();
+  if (bad.length) status("Only andersonhicks.com addresses: " + bad.join(", "), true);
+  return !bad.length;
+}
+$("#distNew").onclick = () => editDist(null);
+$("#deCancel").onclick = () => { $("#distEdit").hidden = true; };
+$("#deAddEmail").onclick = () => { if (addRecipients($("#deEmail").value)) $("#deEmail").value = ""; };
+$("#deEmail").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); $("#deAddEmail").click(); } });
+$("#deEmail").addEventListener("paste", () => setTimeout(() => { if (/[\s,;]/.test($("#deEmail").value.trim())) $("#deAddEmail").click(); }));
+$("#dePick").onchange = () => { if ($("#dePick").value) addRecipients($("#dePick").value); $("#dePick").value = ""; };
+$("#distForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if ($("#deEmail").value.trim() && !addRecipients($("#deEmail").value)) return;
+  $("#deEmail").value = "";
+  const row = { report: DE.report, name: $("#deName").value.trim(), recipients: DE.recipients, frequency: DE.frequency,
+    days: DE.frequency === "days" ? DE.days : [], month_day: DE.frequency === "monthly" ? Math.min(31, Math.max(1, +$("#deMonthDay").value || 1)) : null,
+    send_time: $("#deTime").value || "07:00", mode: DE.mode, test_to: $("#deTestTo").value.trim().toLowerCase() || ME.email, active: $("#deActive").checked };
+  if (!row.name) return status("Give the list a name.", true);
+  if (row.frequency === "days" && !row.days.length) return status("Pick at least one day.", true);
+  if (row.mode === "live" && !row.recipients.length) return status("Add recipients before switching it to live.", true);
+  if (row.mode === "live" && DE.id && dists.find(d => d.id === DE.id)?.mode !== "live" &&
+    !confirm(`Switch "${row.name}" to live? ${row.recipients.length} people will get ${REPORTS[row.report]} ${when(row).toLowerCase()}.`)) return;
+  // Changing the time to later today should still send today, so a new time clears today's mark.
+  if (DE.id && DE.send_time.slice(0, 5) !== row.send_time) row.last_sent_on = null;
+  const { error } = DE.id ? await sb.from("report_distributions").update(row).eq("id", DE.id)
+    : await sb.from("report_distributions").insert(row);
+  if (error) return status(error.message, true);
+  status("Saved"); showDist();
+});
+$("#deDelete").onclick = async () => {
+  if (!confirm(`Delete "${DE.name}"? Nobody on it will get ${REPORTS[DE.report]} anymore.`)) return;
+  const { error } = await sb.from("report_distributions").delete().eq("id", DE.id);
+  if (error) return status(error.message, true);
+  status("Deleted"); showDist();
+};
+$("#dePreview").onclick = async () => {
+  const b = $("#dePreview"); b.disabled = true; b.textContent = "Building…";
+  try { const { html } = await callSend({ report: DE.report, action: "preview" }); $("#dePrevFrame").srcdoc = html; $("#dePrevFrame").hidden = false; }
+  catch (e) { status(e.message, true); }
+  b.disabled = false; b.textContent = "Preview";
+};
+$("#deSendMe").onclick = async () => {
+  const b = $("#deSendMe"); b.disabled = true; b.textContent = "Sending…";
+  try { await callSend({ report: DE.report, action: "send", to: [ME.email] }); status("Sent to " + ME.email); }
+  catch (e) { status(e.message, true); }
+  b.disabled = false; b.textContent = "Send me one now";
+  const s = await sb.from("report_sends").select("*").order("sent_at", { ascending: false }).limit(40);
+  renderSendLog(s.data || []);
+};
 
 // ---------- Shared list page: view tabs, filter bar, removable chips, sortable columns ----------
 // The same pattern as the Sales list (Shawn, Oct 21, 2026), for Leads and Jots. State lives in the
