@@ -28,3 +28,18 @@ from public.jot_submissions s;
 revoke all on public.jot_list from anon;
 grant select on public.jot_list to authenticated;
 notify pgrst, 'reload schema';
+
+-- Agent chips on the Jots page: how many jots each agent has for the current stage and search.
+-- Only names on the jot's current agent list (jot_people); past agents (74 names over the years)
+-- would crowd the chips, and search still finds their jots.
+create or replace function public.jot_agent_counts(p_form text, p_stage text default null, p_search text default null)
+returns table (agent text, n bigint) language sql stable security invoker set search_path = public as $$
+  select agent, count(*) from jot_list
+  where form_id = p_form and agent in (select jot_name from jot_people)
+    and (p_stage is null or p_stage = '' or stage = p_stage)
+    and (p_search is null or p_search = '' or search like '%' || lower(p_search) || '%')
+  group by agent
+$$;
+revoke all on function public.jot_agent_counts(text, text, text) from public, anon;
+grant execute on function public.jot_agent_counts(text, text, text) to authenticated;
+notify pgrst, 'reload schema';

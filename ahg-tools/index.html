@@ -29,6 +29,9 @@
 .pills button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
 .pills button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .pills button small { font-weight: 500; opacity: .7; margin-left: 3px; }
+.pills.agents { margin: 0 0 12px; }
+#jotAgents { margin: 8px 0 0; }
+.pills.agents button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .jot-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .jot-sec { margin-bottom: 16px; }
 .jot-sec .kv > div { align-items: flex-start; }
@@ -82,6 +85,7 @@
           <div class="search-row"><input class="in" id="q" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
         </label>
       </form>
+      <div class="pills agents" id="agentPills"></div>
       <div id="results"></div>
     </section>
 
@@ -93,6 +97,7 @@
           <div class="search-row"><input class="in" id="jq" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
         </label>
         <div class="pills" id="jotStages"></div>
+        <div class="pills agents" id="jotAgents"></div>
       </form>
       <div id="jotResults"></div>
     </section>
@@ -495,21 +500,36 @@ function sortRows() {
     const c = String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" });
     return asc ? c : -c;
   });
-  R.ids = R.rows.map(r => r.sale_id);
+  R.shown = R.agent ? R.rows.filter(r => r.agent === R.agent) : R.rows;
+  R.ids = R.shown.map(r => r.sale_id);
+}
+// Agent chips over the current list (Shawn, Oct 21, 2026): most sales first; click again to clear.
+function renderAgentPills() {
+  const el = $("#agentPills");
+  const counts = {};
+  for (const r of R.rows || []) if (r.agent) counts[r.agent] = (counts[r.agent] || 0) + 1;
+  if (R.agent && !counts[R.agent]) R.agent = "";
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  el.hidden = names.length < 2 && !R.agent;
+  el.innerHTML = [["", "All agents", R.rows?.length || 0], ...names.map(n => [n, n, counts[n]])].map(([v, t, c]) =>
+    `<button type="button" data-agent="${esc(v)}" class="${R.agent === v ? "on" : ""}">${esc(t)}<small>${c.toLocaleString()}</small></button>`).join("");
+  el.querySelectorAll("[data-agent]").forEach(b => b.onclick = () => { R.agent = R.agent === b.dataset.agent ? "" : b.dataset.agent; renderResults(); });
 }
 function renderResults() {
   const el = $("#results");
-  if (!searched) { el.innerHTML = ""; return; }
+  if (!searched) { el.innerHTML = ""; $("#agentPills").hidden = true; return; }
+  renderAgentPills();
   const back = R.pending ? "" : ` <a href="#" data-pending>Show pending sales</a>`;
   if (!R.rows.length) { el.innerHTML = `<p class="note">${R.pending ? "No pending sales." : "No sales match."}${back}</p>`; return; }
   sortRows();
-  const n = R.rows.length.toLocaleString();
+  const n = R.shown.length.toLocaleString();
+  const who = R.agent ? ` for ${esc(R.agent)}` : "";
   const label = COLS.find(c => c[0] === R.sort.key)[1].toLowerCase();
   const order = R.sort.key.endsWith("date") ? (R.sort.asc ? `soonest ${label} first` : `newest ${label} first`) : `by ${label}`;
-  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales, ${order}.` : R.rows.length === 1000 ? "Showing the newest 1,000. Type more to narrow it down." : `${n} sales, ${order}.`}${back}</p>
+  el.innerHTML = `<p class="note">${R.pending ? `<b>Pending</b> · ${n} sales${who}, ${order}.` : R.rows.length === 1000 && !R.agent ? "Showing the newest 1,000. Type more to narrow it down." : `${n} sales${who}, ${order}.`}${back}</p>
   <div class="card scroll"><table class="grid list"><thead><tr>${COLS.map(([k, t, c]) =>
     `<th class="sortable${c ? " " + c : ""}${R.sort.key === k ? " on" : ""}" data-sort="${k}">${t}${R.sort.key === k ? (R.sort.asc ? " &#9650;" : " &#9660;") : ""}</th>`).join("")}</tr></thead><tbody>
-  ${R.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
+  ${R.shown.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${pill(r.status)}</td><td>${esc(r.address)}</td><td class="hide-sm">${esc(r.city)}</td><td>${esc(r.sale_type)}</td><td class="hide-sm">${esc(r.agent)}</td><td>${usDate(r.contract_date)}</td><td>${usDate(r.current_projected_close_date)}</td><td class="hide-sm">${esc(r.file_number)}</td></tr>`).join("")}
   </tbody></table></div>`;
   el.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
     const k = th.dataset.sort;
@@ -729,7 +749,7 @@ const STAGES = ["Appointment set", "Rescheduled", "Appointment held", "Cancelled
 const stageClass = st => ({ "Appointment held": "held", "Listing handoff": "listing", "Rep signed": "signed", "Rep requested": "requested",
   "Appointment set": "set", "New": "new", "Rescheduled": "rescheduled", "Cancelled": "cancelled" }[st] || "set");
 const stagePill = st => `<span class="st ${stageClass(st)}">${esc(st)}</span>`;
-const J = { q: "", stage: "", rows: [], loaded: false, counts: null, questions: null };
+const J = { q: "", stage: "", agent: "", rows: [], loaded: false, counts: null, questions: null };
 
 async function showJots() {
   page("vJots");
@@ -756,13 +776,26 @@ $("#jotSearch").addEventListener("submit", e => { e.preventDefault(); J.q = $("#
 async function loadJots() {
   let query = sb.from("jot_list").select("id, client, client_type, agent, set_by, source, appt_for, stage, created, updated, versions")
     .eq("form_id", OPP_FORM).order("updated", { ascending: false }).limit(300);
-  if (J.stage) query = query.eq("stage", J.stage);
-  if (J.q) query = query.ilike("search", `%${J.q.toLowerCase().replace(/[%_\\]/g, m => "\\" + m)}%`);
-  const { data, error } = await query;
+  const filt = qy => {
+    if (J.stage) qy = qy.eq("stage", J.stage);
+    if (J.q) qy = qy.ilike("search", `%${J.q.toLowerCase().replace(/[%_\\]/g, m => "\\" + m)}%`);
+    return qy;
+  };
+  query = filt(query);
+  if (J.agent) query = query.eq("agent", J.agent);
+  const [{ data, error }, ag] = await Promise.all([query, sb.rpc("jot_agent_counts", { p_form: OPP_FORM, p_stage: J.stage, p_search: J.q })]);
   if (error) return status(error.message, true);
-  J.rows = data; J.loaded = true; renderJots();
+  J.agentCounts = Object.fromEntries((ag.data || []).map(r => [r.agent, Number(r.n)]));
+  J.rows = data; J.loaded = true; renderJotAgents(); renderJots();
 }
 const jotDate = t => t ? usDate(t.slice(0, 10)) : "";
+function renderJotAgents() {
+  const c = J.agentCounts || {};
+  const names = Object.keys(c).sort((a, b) => c[b] - c[a] || a.localeCompare(b));
+  $("#jotAgents").innerHTML = [["", "All agents", null], ...names.map(n => [n, n, c[n]])].map(([v, t, n]) =>
+    `<button type="button" data-agent="${esc(v)}" class="${J.agent === v ? "on" : ""}">${esc(t)}${n != null ? `<small>${n.toLocaleString()}</small>` : ""}</button>`).join("");
+  $$("#jotAgents [data-agent]").forEach(b => b.onclick = () => { J.agent = J.agent === b.dataset.agent ? "" : b.dataset.agent; loadJots(); });
+}
 function renderJots() {
   const el = $("#jotResults");
   if (!J.rows.length) { el.innerHTML = `<p class="note">No jots match.</p>`; return; }
