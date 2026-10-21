@@ -24,6 +24,11 @@
 .pick li small { color: var(--ink-3); margin-left: auto; white-space: nowrap; }
 .pick li:hover, .pick li.on { background: var(--ro); }
 .search-card { padding: 18px; margin-bottom: 16px; }
+.roles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.roles .tile span { display: block; color: var(--ink-2); margin-top: 2px; }
+.add-row { display: grid; grid-template-columns: 1fr 1.4fr 160px auto; gap: 12px; align-items: end; }
+.you { color: var(--ink-3); font-size: 13px; margin-left: 6px; }
+.off td { opacity: .55; }
 .search-row { display: flex; gap: 8px; }
 .search-row .in { flex: 1; }
 @media (max-width: 1100px) { .ci { grid-template-columns: 1fr 1fr; } }
@@ -32,6 +37,7 @@
   .ci { grid-template-columns: 1fr; gap: 22px; }
   .deadlines { grid-template-columns: minmax(0, 1fr) 70px 140px; }
   .list .hide-sm { display: none; }
+  .roles, .add-row { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -42,7 +48,8 @@
     <button class="menu-btn" id="menuBtn" aria-label="Menu">&#9776;</button>
     <nav>
       <h4>Tools</h4>
-      <a href="#sales" class="on">Sales</a>
+      <a href="#sales" data-nav="sales" class="on">Sales</a>
+      <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
   </aside>
@@ -58,6 +65,27 @@
         </label>
       </form>
       <div id="results"></div>
+    </section>
+
+    <!-- team list: who can sign in and what they see (admins only) -->
+    <section id="vTeam" hidden>
+      <div class="head"><div class="grow"><h1>Team</h1><div class="sub">Who can sign in to AHG Tools and what they can see.</div></div></div>
+      <div class="strip roles">
+        <div class="tile"><small>Admin</small><span>Sees every sale and manages this list.</span></div>
+        <div class="tile"><small>Staff</small><span>Sees and edits every sale.</span></div>
+        <div class="tile"><small>Agent</small><span>Not turned on yet. Will see only their own sales.</span></div>
+      </div>
+      <section class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>Add someone</h3></div>
+        <form class="card-b add-row" id="addUser">
+          <label class="fld req"><span>Name</span><input class="in" id="nuName" autocomplete="off"></label>
+          <label class="fld req"><span>Email</span><input class="in" id="nuEmail" type="email" autocomplete="off" placeholder="name@andersonhicks.com"></label>
+          <label class="fld req"><span>Role</span><select class="in" id="nuRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="agent">Agent</option></select></label>
+          <button class="btn red" type="submit">Add</button>
+        </form>
+      </section>
+      <div class="card scroll"><table class="grid cards" id="teamTable"></table></div>
+      <p class="note">They sign in with Google using that andersonhicks.com address. Switching someone off keeps them on the list but stops their access.</p>
     </section>
 
     <!-- one sale -->
@@ -255,6 +283,7 @@ let S = null;          // the sale on screen
 let lead = null;       // its lead
 let splits = [], lenders = [];
 let isNew = false;
+let ME = {};          // who is signed in: email, role
 
 // ---------- formatting ----------
 const money = n => n == null || isNaN(n) ? "" : (n < 0 ? "($" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (n < 0 ? ")" : "");
@@ -326,7 +355,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale"]) $("#" + v).hidden = v !== id;
+  for (const v of ["vSearch", "vSale", "vTeam"]) $("#" + v).hidden = v !== id;
+  $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === (id === "vTeam" ? "team" : "sales")));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
 }
@@ -334,8 +364,11 @@ function page(id) {
 async function start(session) {
   $("#whoEmail").textContent = session.user.email;
   const { data: role } = await sb.rpc("my_role");
+  ME = { email: session.user.email.toLowerCase(), role };
+  $("#navTeam").hidden = role !== "admin";
   if (role !== "admin" && role !== "staff") {
     $("#deniedEmail").textContent = session.user.email;
+    if (role === "agent") $("#vDenied h1").textContent = "Not turned on for agents yet";
     page("vDenied");
     return;
   }
@@ -368,6 +401,7 @@ function route() {
   const m = h.match(/^sale=(\d+)$/);
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
+  if (h === "team" && ME.role === "admin") return showTeam();
   page("vSearch"); $("#q").value = R.q; renderResults(); $("#q").focus();
   runSearch(true, searched ? R.pending : true);   // pending sales until something is searched; fresh each time
 }
@@ -590,6 +624,56 @@ for (const el of $$("#vSale [data-k]")) {
   });
   input.addEventListener("blur", () => setTimeout(() => { close(); input.value = lead?.lead_name ?? ""; }, 150));
 })();
+
+// ---------- Team (admins only; the database enforces it too) ----------
+const ROLE_NAMES = { admin: "Admin", staff: "Staff", agent: "Agent" };
+let team = [];
+async function showTeam() {
+  page("vTeam");
+  const { data, error } = await sb.from("app_users").select("*").order("name");
+  if (error) return status(error.message, true);
+  team = data; renderTeam();
+}
+function renderTeam() {
+  const t = $("#teamTable");
+  t.innerHTML = `<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Access</th><th>Added</th><th></th></tr></thead><tbody>` +
+    team.map((u, i) => {
+      const me = u.email === ME.email;
+      return `<tr data-i="${i}" class="${u.active ? "" : "off"}">
+        <td data-label="Name"><input class="in" data-u="name" value="${esc(u.name)}"></td>
+        <td data-label="Email">${esc(u.email)}${me ? `<span class="you">(you)</span>` : ""}</td>
+        <td data-label="Role"><select class="in" data-u="role" ${me ? "disabled title=\"Another admin has to change your role\"" : ""}>${Object.entries(ROLE_NAMES).map(([v, n]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${n}</option>`).join("")}</select></td>
+        <td data-label="Access"><label class="chk"><input type="checkbox" data-u="active" ${u.active ? "checked" : ""} ${me ? "disabled" : ""}> ${u.active ? "On" : "Off"}</label></td>
+        <td data-label="Added">${usDate(u.added_at)}</td>
+        <td class="x">${me ? "" : `<button title="Remove from the team list" data-rm="${i}">&#10005;</button>`}</td></tr>`;
+    }).join("") + `</tbody>`;
+  t.querySelectorAll("[data-u]").forEach(el => el.addEventListener("change", async () => {
+    const u = team[+el.closest("tr").dataset.i], k = el.dataset.u;
+    const v = el.type === "checkbox" ? el.checked : el.value.trim();
+    if (k === "name" && !v) { status("Name can't be empty.", true); return renderTeam(); }
+    const { error } = await sb.from("app_users").update({ [k]: v }).eq("email", u.email);
+    if (error) { status(error.message, true); return showTeam(); }
+    u[k] = v; status("Saved"); renderTeam();
+  }));
+  t.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
+    const u = team[+b.dataset.rm];
+    if (!confirm(`Remove ${u.name} (${u.email}) from the team list? They won't be able to sign in.`)) return;
+    const { error } = await sb.from("app_users").delete().eq("email", u.email);
+    if (error) return status(error.message, true);
+    status("Removed"); showTeam();
+  });
+}
+$("#addUser").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("#nuName").value.trim(), email = $("#nuEmail").value.trim().toLowerCase(), role = $("#nuRole").value;
+  if (!name || !email) return status("Fill in the name and email.", true);
+  if (!/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
+  if (team.some(u => u.email === email)) return status("They're already on the list.", true);
+  const { error } = await sb.from("app_users").insert({ name, email, role });
+  if (error) return status(error.message, true);
+  $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff";
+  status(`${name} added`); showTeam();
+});
 
 // ---------- Commission shares (Access subform on SharedatTeamLevelSubtableNew) ----------
 function renderSplits() {
