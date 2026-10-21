@@ -47,6 +47,8 @@ begin
     select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
       and obj_description(c.oid, 'pg_class') like 'access:%'
+      -- the team tables are admin-only to change; 016_team_members.sql sets their policies
+      and c.relname not in ('team_members', 'team_membersin_roles', 'team_member_settings')
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon', t);

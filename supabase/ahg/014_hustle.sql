@@ -36,8 +36,9 @@ begin
     from team_members tm join roles r on r.id = tm.current_role
     where tm.active = 'Yes' and r.role_name = 'Agent'
       -- the workbook's active-agent list leaves out the owner (Mike is on the leadership owner
-      -- scorecard instead) and the "Anderson Hicks" house account, both set up as agents in Access
-      and tm.team_member_name not in ('Mike Hicks', 'Anderson Hicks')),
+      -- scorecard instead) and the "Anderson Hicks" house account, both set up as agents in Access;
+      -- now a switch on the Team page (hustle_hidden, 016_team_members.sql)
+      and not exists (select 1 from hustle_hidden h where h.team_member_id = tm.id)),
   s as (select primary_sales_rep a, sale_type, contract_date::date c, actual_settlement_date::date st, termination_date, checkto_team_date, purchase_price from sales),
   l as (select sales_rep a, representation_contract_signed_date::date rep,
           (case when third_appt_set_on_date is not null then third_appt_date when second_appt_set_on_date is not null then second_appt_date else first_appt_date end)::date held,

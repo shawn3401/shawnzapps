@@ -143,7 +143,14 @@ table.tracker th { font-size: 11.5px; }
 .st.requested, .st.set, .st.new, .st.rescheduled { background: var(--warn-soft); color: var(--warn); }
 .st.cancelled { background: var(--ro); color: var(--ink-3); }
 .roles .tile span { display: block; color: var(--ink-2); margin-top: 2px; }
-.add-row { display: grid; grid-template-columns: 1fr 1.4fr 140px 1fr auto; gap: 12px; align-items: end; }
+.tm-add { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 14px; align-items: end; }
+.tm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.tm-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.back { display: inline-block; color: var(--ink-3); font-weight: 600; text-decoration: none; margin-bottom: 4px; }
+.back:hover { color: var(--accent); }
+.tm-signin { display: grid; gap: 12px; }
+.tm-signin .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+@media (max-width: 860px) { .tm-add, .tm-grid, .tm-fields { grid-template-columns: 1fr; } }
 .you { color: var(--ink-3); font-size: 13px; margin-left: 6px; }
 .off td { opacity: .55; }
 .search-row { display: flex; gap: 8px; }
@@ -387,26 +394,68 @@ table.tracker th { font-size: 11.5px; }
       <div class="card scroll"><table class="grid list tracker" id="trTable"></table></div>
     </section>
 
-    <!-- team list: who can sign in and what they see (admins only) -->
+    <!-- Team (admins only): every team member, past and present, with role history, bonuses,
+         Jotform name, sign-in, and hustle board switch (Shawn, Oct 21, 2026) -->
     <section id="vTeam" hidden>
-      <div class="head"><div class="grow"><h1>Team</h1><div class="sub">Who can sign in to AHG Tools and what they can see.</div></div></div>
-      <div class="strip roles">
-        <div class="tile"><small>Admin</small><span>Sees every sale and manages this list.</span></div>
-        <div class="tile"><small>Staff</small><span>Sees and edits every sale.</span></div>
-        <div class="tile"><small>Agent</small><span>Views only their own sales (primary agent or on the split) and their leads. Can't change anything. Pick their team member name.</span></div>
+      <div id="tmList">
+        <div class="head"><div class="grow"><h1>Team</h1><div class="sub">Everyone on the team, past and present, and who can sign in to AHG Tools.</div></div>
+          <div class="acts"><button class="btn red" id="tmAddBtn">+ Add team member</button></div></div>
+        <section class="card" id="tmAdd" hidden style="margin-bottom:16px">
+          <div class="card-h"><h3>Add team member</h3></div>
+          <form class="card-b tm-add" id="tmAddForm">
+            <label class="fld req"><span>Name</span><input class="in" id="naName" autocomplete="off" placeholder="First and last name"></label>
+            <label class="fld req"><span>Role</span><select class="in" id="naRole"></select></label>
+            <label class="fld"><span>Start date</span><input class="in" type="date" id="naStart"></label>
+            <label class="fld"><span>Split level</span><input class="in" id="naSplit" list="splitLevels" autocomplete="off"></label>
+            <label class="fld"><span>Jotform name</span><input class="in" id="naJot" autocomplete="off" placeholder="As in the jot's agent list, e.g. Riley"></label>
+            <label class="fld"><span>Sign-in email (optional)</span><input class="in" id="naEmail" type="email" autocomplete="off" placeholder="name@andersonhicks.com"></label>
+            <label class="fld"><span>Sign-in access</span><select class="in" id="naAccess"><option value="agent">Agent</option><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
+            <label class="chk"><input type="checkbox" id="naHustle" checked> Show on the agent hustle board</label>
+            <div class="dist-acts" style="grid-column:1/-1"><button class="btn red" type="submit">Add</button><button class="btn" type="button" id="naCancel">Cancel</button>
+              <span class="note" style="margin:0">Also add them to the agent list on the jots in Jotform.</span></div>
+          </form>
+        </section>
+        <div class="card search-card">
+          <div class="search-row"><input class="in" id="tmQ" autocomplete="off" placeholder="Search by name, email, or Jotform name"></div>
+          <div class="seg" id="tmTabs"></div>
+        </div>
+        <div class="card scroll"><table class="grid list" id="teamTable"></table></div>
+        <section class="card" id="tmLoose" hidden style="margin-top:16px">
+          <div class="card-h"><h3>Sign-ins not linked to a team member</h3></div><div class="card-b" id="tmLooseB"></div>
+        </section>
+        <div class="strip roles" style="margin-top:16px">
+          <div class="tile"><small>Admin sign-in</small><span>Sees and edits everything, and manages this page and report emails.</span></div>
+          <div class="tile"><small>Staff sign-in</small><span>Sees and edits every sale and lead.</span></div>
+          <div class="tile"><small>Agent sign-in</small><span>Views only their own sales (primary agent or on the split) and their leads. Can't change anything.</span></div>
+        </div>
       </div>
-      <section class="card" style="margin-bottom:16px">
-        <div class="card-h"><h3>Add someone</h3></div>
-        <form class="card-b add-row" id="addUser">
-          <label class="fld req"><span>Name</span><input class="in" id="nuName" autocomplete="off"></label>
-          <label class="fld req"><span>Email</span><input class="in" id="nuEmail" type="email" autocomplete="off" placeholder="name@andersonhicks.com"></label>
-          <label class="fld req"><span>Role</span><select class="in" id="nuRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="agent">Agent</option></select></label>
-          <label class="fld"><span>Team member (agents)</span><select class="in" id="nuMember"></select></label>
-          <button class="btn red" type="submit">Add</button>
-        </form>
-      </section>
-      <div class="card scroll"><table class="grid cards" id="teamTable"></table></div>
-      <p class="note">They sign in with Google using that andersonhicks.com address. Switching someone off keeps them on the list but stops their access.</p>
+      <div id="tmOne" hidden>
+        <div class="head"><div class="grow"><a href="#team" class="back">&lsaquo; Team</a><h1><span id="tmName"></span><span class="chip" id="tmRoleChip"></span><span class="chip gray" id="tmGone" hidden>Former</span></h1><div class="sub" id="tmSub"></div></div>
+          <div class="acts"><button class="btn" id="tmLeave">Left the team</button><button class="btn" id="tmBack" hidden>Back on the team</button></div></div>
+        <section class="card" id="tmLeaveBox" hidden style="margin-bottom:16px"><div class="card-b dist-acts">
+          <label class="fld"><span>Last day</span><input class="in" type="date" id="tmLeaveDay"></label>
+          <button class="btn red" id="tmLeaveGo" style="align-self:end">Mark as left</button><button class="btn" id="tmLeaveNo" style="align-self:end">Cancel</button>
+          <span class="note" style="flex-basis:100%;margin:0">Their roles end that day, they drop off the reports, and their sign-in turns off. Their sales, leads, and history stay.</span></div></section>
+        <div class="tm-grid">
+          <section class="card"><div class="card-h"><h3>Details</h3></div><div class="card-b tm-fields">
+            <label class="fld"><span>Name</span><input class="in" data-tm="team_member_name"></label>
+            <label class="fld"><span>Role</span><select class="in" data-tm="current_role" id="tmRole"></select></label>
+            <label class="fld"><span>Start date</span><input class="in" type="date" data-tm="company_start_date"></label>
+            <label class="fld"><span>Split level</span><input class="in" data-tm="agent_split_level" list="splitLevels" autocomplete="off"></label>
+            <p class="note" style="grid-column:1/-1;margin:0">Changing the role here also ends the old role and starts the new one in the role history, as of today.</p>
+          </div></section>
+          <section class="card"><div class="card-h"><h3>Sign-in to AHG Tools</h3></div><div class="card-b" id="tmSignin"></div></section>
+          <section class="card"><div class="card-h"><h3>Role history</h3><button class="btn" id="tmAddRole">+ Add a role</button></div><div class="card-b scroll"><table class="grid" id="tmRoles"></table></div></section>
+          <section class="card"><div class="card-h"><h3>Jotform and reports</h3></div><div class="card-b">
+            <div class="fld"><span>Jotform name (how the jots spell them)</span><div class="chips" id="tmJots" style="margin:0 0 8px"></div>
+              <div class="rcpt-add"><input class="in" id="tmJotNew" autocomplete="off" placeholder="e.g. Riley or Mike J"><button class="btn" id="tmJotAdd">Add</button></div></div>
+            <label class="chk" style="margin-top:12px"><input type="checkbox" id="tmHustle"> Show on the agent hustle board</label>
+            <p class="note" style="margin:0">The hustle board lists active team members whose role is Agent, unless this is off.</p>
+          </div></section>
+          <section class="card"><div class="card-h"><h3>Bonuses</h3><button class="btn" id="tmAddBonus">+ Add a bonus</button></div><div class="card-b scroll"><table class="grid" id="tmBonus"></table></div></section>
+        </div>
+      </div>
+      <datalist id="splitLevels"></datalist>
     </section>
 
     <!-- Report distribution (admins only): who gets which report emails, how often, and when -->
@@ -782,6 +831,8 @@ function route() {
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
   if (h === "team" && ME.role === "admin") return showTeam();
+  const tmm = h.match(/^member=(\d+)$/);
+  if (tmm && ME.role === "admin") return showMember(+tmm[1]);
   if (h === "distribution" && ME.role === "admin") return showDist();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
@@ -1098,58 +1149,256 @@ for (const el of $$("#vSale [data-k]")) {
 })();
 
 // ---------- Team (admins only; the database enforces it too) ----------
+// Shawn, Oct 21, 2026: one page for every team member, past and present (the Access TeamMembers,
+// TeamMembersinRoles, and TeamMemberSettings tables), merged with sign-ins (app_users), Jotform
+// names (jot_people), and the hustle board switch (hustle_hidden). Adding someone is one step
+// (team_member_add); "Left the team" is team_member_leave. Until switchover an Access refresh
+// rewrites the three Access tables, so add people in Access too until then.
 const ROLE_NAMES = { admin: "Admin", staff: "Staff", agent: "Agent" };
-let team = [];
+let TM = { tab: "active", q: "" }, TD = {};
+const tmDate = v => v ? String(v).slice(0, 10) : "";
+async function loadTeamData() {
+  const [m, r, h, u, j, hid, b, bt] = await Promise.all([
+    sb.from("team_members").select("*").order("team_member_name"),
+    sb.from("roles").select("id, role_name").order("role_name"),
+    sb.from("team_membersin_roles").select("*").order("role_start_date"),
+    sb.from("app_users").select("*").order("name"),
+    sb.from("jot_people").select("*").order("jot_name"),
+    sb.from("hustle_hidden").select("team_member_id"),
+    sb.from("team_member_settings").select("*"),
+    sb.from("bonus_types").select("bonus_type_id, bonus_name").order("bonus_type_id"),
+  ]);
+  const err = [m, r, h, u, j, hid, b, bt].find(x => x.error);
+  if (err) { status(err.error.message, true); return false; }
+  TD = { members: m.data, roles: r.data, roleName: Object.fromEntries(r.data.map(x => [x.id, x.role_name])), hist: h.data, users: u.data,
+    jots: j.data, hidden: new Set(hid.data.map(x => x.team_member_id)), bonus: b.data, bonusTypes: bt.data };
+  const levels = [...new Set(TD.members.map(x => x.agent_split_level).filter(Boolean))].sort();
+  $("#splitLevels").innerHTML = levels.map(v => `<option value="${esc(v)}">`).join("");
+  return true;
+}
+const roleOpts = sel => TD.roles.map(r => `<option value="${r.id}" ${r.id === sel ? "selected" : ""}>${esc(r.role_name)}</option>`).join("");
 async function showTeam() {
-  page("vTeam");
-  $("#nuMember").innerHTML = `<option value=""></option>` + L.team.filter(m => L.activeIds.has(m.id)).map(m => `<option value="${m.id}">${esc(m.team_member_name)}</option>`).join("");
-  const { data, error } = await sb.from("app_users").select("*").order("name");
-  if (error) return status(error.message, true);
-  team = data; renderTeam();
+  page("vTeam"); $("#tmList").hidden = false; $("#tmOne").hidden = true;
+  if (!(await loadTeamData())) return;
+  renderTeam();
 }
 function renderTeam() {
-  const t = $("#teamTable");
-  const memberOpts = sel => `<option value=""></option>` + L.team.filter(m => L.activeIds.has(m.id) || m.id === sel).map(m => `<option value="${m.id}" ${m.id === sel ? "selected" : ""}>${esc(m.team_member_name)}</option>`).join("");
-  t.innerHTML = `<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team member</th><th>Access</th><th>Added</th><th></th></tr></thead><tbody>` +
-    team.map((u, i) => {
-      const me = u.email === ME.email;
-      return `<tr data-i="${i}" class="${u.active ? "" : "off"}">
-        <td data-label="Name"><input class="in" data-u="name" value="${esc(u.name)}"></td>
-        <td data-label="Email">${esc(u.email)}${me ? `<span class="you">(you)</span>` : ""}</td>
-        <td data-label="Role"><select class="in" data-u="role" ${me ? "disabled title=\"Another admin has to change your role\"" : ""}>${Object.entries(ROLE_NAMES).map(([v, n]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${n}</option>`).join("")}</select></td>
-        <td data-label="Team member"><select class="in" data-u="team_member_id">${memberOpts(u.team_member_id)}</select>${u.role === "agent" && !u.team_member_id ? `<div class="note" style="margin:4px 0 0;color:var(--accent)">Needed for agents</div>` : ""}</td>
-        <td data-label="Access"><label class="chk"><input type="checkbox" data-u="active" ${u.active ? "checked" : ""} ${me ? "disabled" : ""}> ${u.active ? "On" : "Off"}</label></td>
-        <td data-label="Added">${usDate(u.added_at)}</td>
-        <td class="x">${me ? "" : `<button title="Remove from the team list" data-rm="${i}">&#10005;</button>`}</td></tr>`;
-    }).join("") + `</tbody>`;
-  t.querySelectorAll("[data-u]").forEach(el => el.addEventListener("change", async () => {
-    const u = team[+el.closest("tr").dataset.i], k = el.dataset.u;
-    const v = el.type === "checkbox" ? el.checked : k === "team_member_id" ? (el.value ? +el.value : null) : el.value.trim();
-    if (k === "name" && !v) { status("Name can't be empty.", true); return renderTeam(); }
-    const { error } = await sb.from("app_users").update({ [k]: v }).eq("email", u.email);
-    if (error) { status(error.message, true); return showTeam(); }
-    u[k] = v; status("Saved"); renderTeam();
-  }));
-  t.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
-    const u = team[+b.dataset.rm];
-    if (!confirm(`Remove ${u.name} (${u.email}) from the team list? They won't be able to sign in.`)) return;
-    const { error } = await sb.from("app_users").delete().eq("email", u.email);
+  const user = id => TD.users.find(u => u.team_member_id === id), jotsOf = id => TD.jots.filter(j => j.team_member_id === id).map(j => j.jot_name);
+  const n = { active: TD.members.filter(m => m.active === "Yes").length, former: TD.members.filter(m => m.active !== "Yes").length, all: TD.members.length };
+  $("#tmTabs").innerHTML = [["active", "Active"], ["former", "Former"], ["all", "All"]].map(([v, t]) => `<button type="button" data-v="${v}" class="${TM.tab === v ? "on" : ""}">${t} (${n[v]})</button>`).join("");
+  $$("#tmTabs [data-v]").forEach(b => b.onclick = () => { TM.tab = b.dataset.v; renderTeam(); });
+  const q = TM.q.toLowerCase();
+  const rows = TD.members.filter(m => (TM.tab === "all" || (TM.tab === "active") === (m.active === "Yes")) &&
+    (!q || [m.team_member_name, user(m.id)?.email, ...jotsOf(m.id)].some(x => (x || "").toLowerCase().includes(q))));
+  $("#teamTable").innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Started</th><th>Split level</th><th>Jotform name</th><th>Sign-in</th><th>Hustle board</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(m => { const u = user(m.id), agent = TD.roleName[m.current_role] === "Agent";
+      return `<tr data-id="${m.id}" class="${m.active === "Yes" ? "" : "off"}"><td><b>${esc(m.team_member_name)}</b></td><td>${esc(TD.roleName[m.current_role] || "")}</td>
+        <td>${usDate(m.company_start_date)}</td><td>${esc(m.agent_split_level || "")}</td><td>${esc(jotsOf(m.id).join(", "))}</td>
+        <td>${u ? `${esc(u.email)} <span class="chip gray" style="margin-left:4px">${ROLE_NAMES[u.role]}${u.active ? "" : ", off"}</span>` : ""}</td>
+        <td>${m.active === "Yes" && agent ? (TD.hidden.has(m.id) ? "Hidden" : "Shown") : ""}</td></tr>`; }).join("")
+    : `<tr><td colspan="7" class="note">No one matches.</td></tr>`) + `</tbody>`;
+  $$("#teamTable tr[data-id]").forEach(tr => tr.onclick = () => go("member=" + tr.dataset.id));
+  // sign-ins with no team member (shouldn't happen; offer to link them)
+  const loose = TD.users.filter(u => !u.team_member_id);
+  $("#tmLoose").hidden = !loose.length;
+  $("#tmLooseB").innerHTML = loose.map(u => `<div class="dist-acts" style="margin-bottom:8px"><b>${esc(u.name)}</b> ${esc(u.email)}
+    <select class="in" data-link="${esc(u.email)}" style="width:auto"><option value="">Link to a team member</option>${TD.members.filter(m => m.active === "Yes").map(m => `<option value="${m.id}">${esc(m.team_member_name)}</option>`).join("")}</select></div>`).join("");
+  $$("#tmLooseB [data-link]").forEach(el => el.onchange = async () => {
+    if (!el.value) return;
+    const { error } = await sb.from("app_users").update({ team_member_id: +el.value }).eq("email", el.dataset.link);
     if (error) return status(error.message, true);
-    status("Removed"); showTeam();
+    status("Linked"); showTeam();
   });
 }
-$("#addUser").addEventListener("submit", async e => {
+$("#tmQ").addEventListener("input", () => { TM.q = $("#tmQ").value.trim(); renderTeam(); });
+$("#tmAddBtn").onclick = () => {
+  $("#tmAdd").hidden = false; $("#tmAddForm").reset();
+  $("#naRole").innerHTML = roleOpts(TD.roles.find(r => r.role_name === "Agent")?.id);
+  $("#naStart").value = new Date().toLocaleDateString("en-CA"); $("#naHustle").checked = true; $("#naName").focus();
+};
+$("#naCancel").onclick = () => { $("#tmAdd").hidden = true; };
+$("#tmAddForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const name = $("#nuName").value.trim(), email = $("#nuEmail").value.trim().toLowerCase(), role = $("#nuRole").value, team_member_id = $("#nuMember").value ? +$("#nuMember").value : null;
-  if (role === "agent" && !team_member_id) return status("Pick the agent's team member name, so we know which sales are theirs.", true);
-  if (!name || !email) return status("Fill in the name and email.", true);
-  if (!/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
-  if (team.some(u => u.email === email)) return status("They're already on the list.", true);
-  const { error } = await sb.from("app_users").insert({ name, email, role, team_member_id });
+  const email = $("#naEmail").value.trim().toLowerCase();
+  if (!$("#naName").value.trim()) return status("Fill in the name.", true);
+  if (email && !/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
+  if (email && TD.users.some(u => u.email === email)) return status(email + " already has a sign-in.", true);
+  const { data: id, error } = await sb.rpc("team_member_add", { p: { name: $("#naName").value, role: +$("#naRole").value, start: $("#naStart").value,
+    split: $("#naSplit").value.trim(), jot: $("#naJot").value, email, access: $("#naAccess").value, hide_hustle: !$("#naHustle").checked } });
   if (error) return status(error.message, true);
-  $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff"; $("#nuMember").value = "";
-  status(`${name} added`); showTeam();
+  $("#tmAdd").hidden = true; status($("#naName").value.trim() + " added");
+  await loadLookups(); go("member=" + id);
 });
+
+async function showMember(id) {
+  page("vTeam"); $("#tmList").hidden = true; $("#tmOne").hidden = false; $("#tmLeaveBox").hidden = true;
+  if (!TD.members || !TD.members.some(m => m.id === id)) { if (!(await loadTeamData())) return; }
+  renderMember(id);
+}
+function renderMember(id) {
+  const m = TD.members.find(x => x.id === id);
+  if (!m) { $("#tmName").textContent = "Not found"; return; }
+  TD.cur = m;
+  const gone = m.active !== "Yes";
+  $("#tmName").textContent = m.team_member_name; $("#tmRoleChip").textContent = TD.roleName[m.current_role] || "No role";
+  $("#tmGone").hidden = !gone; $("#tmLeave").hidden = gone; $("#tmBack").hidden = !gone;
+  $("#tmSub").textContent = [m.company_start_date && "Started " + usDate(m.company_start_date), "Team member " + m.id].filter(Boolean).join(" · ");
+  $("#tmRole").innerHTML = `<option value=""></option>` + roleOpts(m.current_role);
+  $$("#tmOne [data-tm]").forEach(el => { const v = m[el.dataset.tm]; el.value = el.type === "date" ? tmDate(v) : (v ?? ""); });
+  // role history
+  const hist = TD.hist.filter(h => h.team_member === id);
+  $("#tmRoles").innerHTML = `<thead><tr><th>Role</th><th>Start</th><th>End</th><th></th></tr></thead><tbody>` +
+    (hist.length ? hist.map(h => `<tr data-h="${h.id}"><td><select class="in" data-hk="role">${roleOpts(h.role)}</select></td>
+      <td><input class="in" type="date" data-hk="role_start_date" value="${tmDate(h.role_start_date)}"></td>
+      <td><input class="in" type="date" data-hk="role_end_date" value="${tmDate(h.role_end_date)}"></td>
+      <td class="x"><button title="Remove this role" data-hrm="${h.id}">&#10005;</button></td></tr>`).join("")
+    : `<tr><td colspan="4" class="note">No roles recorded.</td></tr>`) + `</tbody>`;
+  $$("#tmRoles [data-hk]").forEach(el => el.onchange = async () => {
+    const hid = +el.closest("tr").dataset.h, k = el.dataset.hk, v = k === "role" ? +el.value : (el.value || null);
+    const { error } = await sb.from("team_membersin_roles").update({ [k]: v }).eq("id", hid);
+    if (error) return status(error.message, true);
+    TD.hist.find(h => h.id === hid)[k] = v; status("Saved");
+  });
+  $$("#tmRoles [data-hrm]").forEach(b => b.onclick = async () => {
+    if (!confirm("Remove this role from their history?")) return;
+    const { error } = await sb.from("team_membersin_roles").delete().eq("id", +b.dataset.hrm);
+    if (error) return status(error.message, true);
+    TD.hist = TD.hist.filter(h => h.id !== +b.dataset.hrm); renderMember(id);
+  });
+  // Jotform names
+  const jots = TD.jots.filter(j => j.team_member_id === id);
+  $("#tmJots").innerHTML = jots.length ? jots.map(j => `<span class="chip-x">${esc(j.jot_name)}<button type="button" data-jrm="${esc(j.jot_name)}" title="Remove">&#10005;</button></span>`).join("")
+    : `<span class="note" style="margin:0">None. Their jots won't link to them until one is added.</span>`;
+  $$("#tmJots [data-jrm]").forEach(b => b.onclick = async () => {
+    const { error } = await sb.from("jot_people").delete().eq("jot_name", b.dataset.jrm);
+    if (error) return status(error.message, true);
+    TD.jots = TD.jots.filter(j => j.jot_name !== b.dataset.jrm); renderMember(id);
+  });
+  $("#tmHustle").checked = !TD.hidden.has(id);
+  // sign-in
+  const u = TD.users.find(x => x.team_member_id === id), me = u && u.email === ME.email;
+  $("#tmSignin").innerHTML = u ? `<div class="tm-signin">
+      <div><b>${esc(u.email)}</b>${me ? `<span class="you">(you)</span>` : ""}</div>
+      <div class="row"><label class="fld"><span>Access</span><select class="in" id="tmAccess" ${me ? "disabled title=\"Another admin has to change your access\"" : ""}>${Object.entries(ROLE_NAMES).map(([v, n]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label class="chk"><input type="checkbox" id="tmOn" ${u.active ? "checked" : ""} ${me ? "disabled" : ""}> Can sign in</label>
+        ${me ? "" : `<button class="btn" id="tmNoSign">Remove sign-in</button>`}</div>
+      <p class="note" style="margin:0">Added ${usDate(u.added_at)}.</p></div>`
+    : `<div class="tm-signin"><p class="note" style="margin:0">No sign-in yet.</p><div class="row">
+      <label class="fld" style="flex:1;min-width:220px"><span>Email</span><input class="in" id="tmNewEmail" type="email" placeholder="name@andersonhicks.com"></label>
+      <label class="fld"><span>Access</span><select class="in" id="tmNewAccess"><option value="agent">Agent</option><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
+      <button class="btn red" id="tmGiveSign">Give sign-in</button></div></div>`;
+  if (u) {
+    const upd = async patch => { const { error } = await sb.from("app_users").update(patch).eq("email", u.email); if (error) { status(error.message, true); return renderMember(id); } Object.assign(u, patch); status("Saved"); renderMember(id); };
+    $("#tmAccess").onchange = () => upd({ role: $("#tmAccess").value });
+    $("#tmOn").onchange = () => upd({ active: $("#tmOn").checked });
+    $("#tmNoSign")?.addEventListener("click", async () => {
+      if (!confirm(`Remove ${u.email}'s sign-in? They won't be able to open AHG Tools.`)) return;
+      const { error } = await sb.from("app_users").delete().eq("email", u.email);
+      if (error) return status(error.message, true);
+      TD.users = TD.users.filter(x => x.email !== u.email); status("Sign-in removed"); renderMember(id);
+    });
+  } else $("#tmGiveSign").onclick = async () => {
+    const email = $("#tmNewEmail").value.trim().toLowerCase();
+    if (!/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
+    const row = { email, name: m.team_member_name, role: $("#tmNewAccess").value, team_member_id: id };
+    const { error } = await sb.from("app_users").insert(row);
+    if (error) return status(/duplicate/.test(error.message) ? email + " already has a sign-in." : error.message, true);
+    TD.users.push({ ...row, active: true, added_at: new Date().toISOString() }); status("Sign-in added"); renderMember(id);
+  };
+  // bonuses
+  const bon = TD.bonus.filter(x => x.team_member_id === id);
+  const btOpts = sel => TD.bonusTypes.map(t => `<option value="${t.bonus_type_id}" ${t.bonus_type_id === sel ? "selected" : ""}>${esc(t.bonus_name)}</option>`).join("");
+  $("#tmBonus").innerHTML = `<thead><tr><th>Bonus</th><th class="n">Amount</th><th></th></tr></thead><tbody>` +
+    (bon.length ? bon.map(x => `<tr data-bt="${x.bonus_type_id}"><td>${esc(TD.bonusTypes.find(t => t.bonus_type_id === x.bonus_type_id)?.bonus_name ?? x.bonus_type_id)}</td>
+      <td class="n"><input class="in" data-bamt style="text-align:right;max-width:120px" value="${money(num(x.bonus_amount))}"></td>
+      <td class="x"><button title="Remove this bonus" data-brm>&#10005;</button></td></tr>`).join("")
+    : `<tr><td colspan="3" class="note">None.</td></tr>`) + `</tbody>` +
+    `<tfoot id="tmBonusNew" hidden><tr><td><select class="in" id="tmBonusType">${btOpts()}</select></td><td class="n"><input class="in" id="tmBonusAmt" placeholder="$0.00" style="text-align:right;max-width:120px"></td><td><button class="btn" id="tmBonusSave">Add</button></td></tr></tfoot>`;
+  $$("#tmBonus [data-bamt]").forEach(el => el.onchange = async () => {
+    const bt = +el.closest("tr").dataset.bt, v = parse("money", el.value);
+    if (v === undefined) return status("That isn't an amount.", true);
+    const { error } = await sb.from("team_member_settings").update({ bonus_amount: v }).eq("team_member_id", id).eq("bonus_type_id", bt);
+    if (error) return status(error.message, true);
+    TD.bonus.find(x => x.team_member_id === id && x.bonus_type_id === bt).bonus_amount = v; el.value = money(v); status("Saved");
+  });
+  $$("#tmBonus [data-brm]").forEach(b => b.onclick = async () => {
+    const bt = +b.closest("tr").dataset.bt;
+    if (!confirm("Remove this bonus?")) return;
+    const { error } = await sb.from("team_member_settings").delete().eq("team_member_id", id).eq("bonus_type_id", bt);
+    if (error) return status(error.message, true);
+    TD.bonus = TD.bonus.filter(x => !(x.team_member_id === id && x.bonus_type_id === bt)); renderMember(id);
+  });
+  $("#tmBonusSave").onclick = async () => {
+    const bt = +$("#tmBonusType").value, v = parse("money", $("#tmBonusAmt").value);
+    if (v == null) return status("Fill in the amount.", true);
+    if (bon.some(x => x.bonus_type_id === bt)) return status("They already have that bonus; change its amount instead.", true);
+    const row = { team_member_id: id, bonus_type_id: bt, bonus_amount: v };
+    const { error } = await sb.from("team_member_settings").insert(row);
+    if (error) return status(error.message, true);
+    TD.bonus.push(row); status("Bonus added"); renderMember(id);
+  };
+}
+// Details save on change, like the other forms.
+$$("#tmOne [data-tm]").forEach(el => el.addEventListener("change", async () => {
+  const m = TD.cur, k = el.dataset.tm;
+  let v = el.value.trim() || null;
+  if (k === "team_member_name" && !v) { status("Name can't be empty.", true); return renderMember(m.id); }
+  if (k === "team_member_name" && TD.members.some(x => x.id !== m.id && x.team_member_name.toLowerCase() === v.toLowerCase())) { status(v + " is already on the team list.", true); return renderMember(m.id); }
+  if (k === "current_role") v = v ? +v : null;
+  const old = m[k];
+  const { error } = await sb.from("team_members").update({ [k]: v }).eq("id", m.id);
+  if (error) { status(error.message, true); return renderMember(m.id); }
+  m[k] = v;
+  if (k === "team_member_name") await sb.from("app_users").update({ name: v }).eq("team_member_id", m.id);
+  if (k === "current_role" && v && v !== old) {
+    // end the old role and start the new one in the history, as of today
+    const today = new Date().toLocaleDateString("en-CA");
+    const open = TD.hist.filter(h => h.team_member === m.id && !h.role_end_date && h.role === old);
+    for (const h of open) { await sb.from("team_membersin_roles").update({ role_end_date: today }).eq("id", h.id); h.role_end_date = today; }
+    const { data, error: e2 } = await sb.from("team_membersin_roles").insert({ team_member: m.id, role: v, role_start_date: today }).select().single();
+    if (e2) status(e2.message, true); else TD.hist.push(data);
+  }
+  status("Saved"); await loadLookups(); renderMember(m.id);
+}));
+$("#tmAddRole").onclick = async () => {
+  const m = TD.cur, today = new Date().toLocaleDateString("en-CA");
+  const { data, error } = await sb.from("team_membersin_roles").insert({ team_member: m.id, role: m.current_role || TD.roles[0].id, role_start_date: today }).select().single();
+  if (error) return status(error.message, true);
+  TD.hist.push(data); renderMember(m.id); status("Role added; pick the role and dates");
+};
+$("#tmAddBonus").onclick = () => { $("#tmBonusNew").hidden = false; $("#tmBonusAmt").focus(); };
+$("#tmJotAdd").onclick = async () => {
+  const m = TD.cur, name = $("#tmJotNew").value.trim();
+  if (!name) return;
+  const taken = TD.jots.find(j => j.jot_name.toLowerCase() === name.toLowerCase());
+  if (taken) return status(`"${taken.jot_name}" already belongs to ${TD.members.find(x => x.id === taken.team_member_id)?.team_member_name || "someone"}.`, true);
+  const { error } = await sb.from("jot_people").insert({ jot_name: name, team_member_id: m.id });
+  if (error) return status(error.message, true);
+  TD.jots.push({ jot_name: name, team_member_id: m.id }); $("#tmJotNew").value = ""; status("Jotform name added"); renderMember(m.id);
+};
+$("#tmJotNew").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#tmJotAdd").click(); } });
+$("#tmHustle").onchange = async () => {
+  const m = TD.cur, show = $("#tmHustle").checked;
+  const { error } = show ? await sb.from("hustle_hidden").delete().eq("team_member_id", m.id) : await sb.from("hustle_hidden").insert({ team_member_id: m.id });
+  if (error) return status(error.message, true);
+  show ? TD.hidden.delete(m.id) : TD.hidden.add(m.id); status(show ? "Shown on the hustle board" : "Hidden from the hustle board");
+};
+$("#tmLeave").onclick = () => { $("#tmLeaveBox").hidden = false; $("#tmLeaveDay").value = new Date().toLocaleDateString("en-CA"); };
+$("#tmLeaveNo").onclick = () => { $("#tmLeaveBox").hidden = true; };
+$("#tmLeaveGo").onclick = async () => {
+  const m = TD.cur, day = $("#tmLeaveDay").value;
+  if (!day) return status("Pick their last day.", true);
+  const { error } = await sb.rpc("team_member_leave", { p_id: m.id, p_day: day });
+  if (error) return status(error.message, true);
+  status(m.team_member_name + " marked as left"); await loadTeamData(); await loadLookups(); renderMember(m.id); $("#tmLeaveBox").hidden = true;
+};
+$("#tmBack").onclick = async () => {
+  const m = TD.cur;
+  const { error } = await sb.from("team_members").update({ active: "Yes" }).eq("id", m.id);
+  if (error) return status(error.message, true);
+  m.active = "Yes"; await loadLookups(); renderMember(m.id);
+  status("Back on the team. Add their role in the role history, and turn their sign-in back on if they need it.");
+};
 
 // ---------- Report distribution (admins only; the database enforces it too) ----------
 // Shawn, Oct 21, 2026: pick a report, its recipients, how often, and when. The send-reports Edge
