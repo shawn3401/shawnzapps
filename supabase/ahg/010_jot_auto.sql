@@ -3,8 +3,8 @@
 --  * Opportunity Path: one lead per side ("Buyer and Seller" makes two). A jot submitted after the
 --    form's auto_from creates its lead(s); an older jot that gets edited is matched to the lead the
 --    success team typed into Access (same type, close name, received within 4 days) and only fills
---    that lead's blank fields. A jot whose "lead received" date is over a year old is probably a
---    returning client: no lead is created, it goes on the Needs attention list.
+--    that lead's blank fields. A repeat client gets a new lead every time (Trevor); a "lead received"
+--    date over a year old still creates the lead and is flagged to check.
 --  * Contract Cover Sheet: one sale. The lead is the single clear match (same type, same agent,
 --    close name, received in the last 2 years); none or several -> Needs attention, no sale yet.
 --  * Later edits update only fields nobody changed by hand: jot_links.written remembers what the jot
@@ -143,11 +143,12 @@ begin
         end if;
         continue;
       end if;
+      -- A repeat client gets a new lead for every opportunity (Trevor, Oct 21, 2026: "that's why AHG
+      -- Cap has a million lead entries"), so an old received date still creates the lead; it's only
+      -- flagged, since it's usually the first lead's date copied over.
       if recv is not null and recv < submitted - 365 then
-        perform jot_issue(p_sub, sd, 'returning_client',
-          format('The lead received date is %s, over a year before this jot. This may be a returning client with a lead already in AHG Tools. Pick their lead, or create a new one.', to_char(recv, 'FMMM/FMDD/YYYY')),
-          jot_lead_candidates(v ->> 'lead_name', sd, null, null, null));
-        continue;
+        perform jot_issue(p_sub, sd, 'check_received',
+          format('The lead received date is %s, over a year before this jot. A repeat client gets a new lead, so it was created; check whether the date should be when this opportunity came in.', to_char(recv, 'FMMM/FMDD/YYYY')));
       end if;
       -- the success team may have typed this lead in already (sometimes before the jot): same type,
       -- same lead owner, a close name, received within 4 days -> link to it instead of a duplicate

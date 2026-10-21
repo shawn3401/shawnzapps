@@ -70,6 +70,23 @@ body.viewonly [data-new], body.viewonly [data-newlead], body.viewonly #addSplit,
 .ylabels { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11.5px; margin: 2px 0 0 52px; }
 @media (max-width: 860px) { .dlr { grid-template-columns: 1fr; } }
 @media print { .dlr { grid-template-columns: repeat(2, 1fr); gap: 10px; } .tile2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; } #dlrDate { display: none; } }
+.hb-box { display: grid; grid-template-columns: auto repeat(4, minmax(90px, 1fr)) minmax(200px, 1.4fr); align-items: stretch; margin-bottom: 16px; overflow: hidden; }
+.hb-box > div { padding: 12px 14px; text-align: center; border-right: 1px solid var(--line); }
+.hb-box .lbl { font-size: 26px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.hb-box small { display: block; background: #6b6b6b; color: #fff; margin: -12px -14px 10px; padding: 6px; font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+.hb-box b { font-size: 46px; line-height: 1; font-variant-numeric: tabular-nums; }
+.hb-box .neg { background: #d00000; color: #fff; } .hb-box .pos { background: #2f7a4b; color: #fff; }
+.hb-box .per { display: flex; flex-direction: column; justify-content: center; gap: 10px; font-size: 18px; font-weight: 700; border-right: 0; }
+table.hb { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+table.hb th { font-size: 11.5px; font-weight: 600; padding: 6px 4px; line-height: 1.15; color: #fff; text-align: center; border: 1px solid rgba(0,0,0,.15); }
+table.hb td { padding: 5px 6px; text-align: center; border: 1px solid var(--line); white-space: nowrap; }
+table.hb td:first-child { text-align: left; font-weight: 700; background: var(--ro); }
+table.hb tr:nth-child(even) td { background: #f6f6f4; } table.hb tr:nth-child(even) td:first-child { background: #e4e4e1; }
+table.hb tr.me td { box-shadow: inset 0 0 0 9999px rgba(200,50,43,.08); }
+table.hb .g { color: #00a344; font-weight: 600; } table.hb .r { color: #b00000; font-weight: 600; }
+.hb-pend { background: #93c47d; color: #1f2124 !important; } .hb-clos { background: #3b58c4; } .hb-cont { background: #3aa3b8; } .hb-reps { background: #e07a3f; } .hb-appt { background: #f1c75b; color: #1f2124 !important; }
+@media (max-width: 860px) { .hb-box { grid-template-columns: repeat(2, 1fr); } .hb-box .lbl, .hb-box .per { grid-column: 1 / -1; } .hb-box b { font-size: 34px; } }
+@media print { .hb-box .neg, .hb-box .pos, table.hb th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } #hbDate { display: none; } table.hb { font-size: 10px; } }
 .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 13px; }
 .dl { border-radius: 6px; padding: 3px 8px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .dl.late { background: #FFC7CE; color: #9C0006; }
@@ -157,6 +174,7 @@ table.tracker th { font-size: 11.5px; }
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
       <h4 style="margin-top:16px">Reports</h4>
       <a href="#dlr" data-nav="dlr" id="navDlr">Leadership dashboard</a>
+      <a href="#hustle" data-nav="hustle">Agent hustle board</a>
       <a href="#tracker" data-nav="tracker">Pending tracker</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
@@ -330,6 +348,15 @@ table.tracker th { font-size: 11.5px; }
         <div class="acts"><input class="in" type="date" id="dlrDate" style="width:auto"><button class="btn" id="dlrPrint">Print</button></div></div>
       <div class="dlr" id="dlrTiles"></div>
       <p class="note">Month goals are the year goal spread by the workbook's season allocation. The year bar's line is where the year should be today. Light bars are the goal, dark bars the actual.</p>
+    </section>
+
+    <!-- Agent Hustle Board: the KPI platform's AGTHUSTLE scoreboard and DAM contracts box -->
+    <section id="vHustle" hidden>
+      <div class="head"><div class="grow"><h1>Agent Hustle Board</h1><div class="sub" id="hbSub"></div></div>
+        <div class="acts"><input class="in" type="date" id="hbDate" style="width:auto"><button class="btn" id="hbPrint">Print</button></div></div>
+      <div class="hb-box card" id="hbBox"></div>
+      <div class="card scroll"><table class="hb" id="hbTable"></table></div>
+      <p class="note">Green and red follow the KPI platform's thresholds for each column. R90 is the last 90 days; MTD is this month to date. Contracts leave out referrals.</p>
     </section>
 
     <!-- Pending Tracker: rebuilt from the Excel workbook of the same name -->
@@ -637,8 +664,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -700,6 +727,7 @@ function route() {
   if (h === "team" && ME.role === "admin") return showTeam();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
+  if (h === "hustle") return showHustle();
   if (h === "dlr" && !isAgent()) return showDlr();
   if (h === "leads" || h.startsWith("leads?")) return showLeads(h);
   if (h === "newlead") return newLead();
@@ -1541,6 +1569,56 @@ function dlrTile(t, d) {
   const leftNote = left.length ? `<div class="ylabels" style="margin:6px 0 0;justify-content:center;color:var(--ink-2)">${left.map(m => `${kfmt(m.excluded)} left out of ${new Date(m.month + "T00:00").toLocaleDateString([], { month: "short" })} projections (${m.excluded_sales} deal${m.excluded_sales === 1 ? "" : "s"})`).join(" · ")}</div>` : "";
   return `<section class="tile2" style="${style}"><h2>${head}</h2><div class="panel"><div class="mbars">${bars}</div>${legend}${leftNote}</div><div class="panel">${year}</div></section>`;
 }
+
+// ---------- Agent Hustle Board (KPI platform AGTHUSTLE + DAM, rebuilt) ----------
+// Numbers come from hustle_board() in the database (supabase/ahg/014_hustle.sql). Every agent sees the
+// whole board, as in the daily email. Colors: the workbook's thresholds, red below / green above.
+const pctf = v => v == null ? "NA" : Math.round(v * 100) + "%";
+const HB_COLS = [
+  ["pendings", "Current Pendings", "hb-pend", v => v, [1, 1, "eqnone"]],
+  ["closings_year", "Closings This Year", "hb-clos", v => v],
+  ["closed_volume", "YTD Closed Vol", "hb-clos", v => "$" + (v / 1e6).toFixed(1) + " M"],
+  ["closings_r90", "Closings R90", "hb-clos", v => v, [3, 5]],
+  ["contract_to_close", "Contract to Close YTD", "hb-clos", pctf, [0.8, 0.84]],
+  ["contracts_ytd", "Contracts YTD &#9660;", "hb-cont", v => v],
+  ["contracts_r90", "Contracts R90", "hb-cont", v => v, [4, 5]],
+  ["contracts_month", "Contracts This Month", "hb-cont", v => v, [1, 1]],
+  ["days_since_contract", "Days Since Last Contract", "hb-cont", v => v == null ? "NA" : v, [30, 15, "reverse"]],
+  ["rep_to_contract", "Rep to Cont - All (Last 90)", "hb-cont", pctf, [0.5, 0.85]],
+  ["reps_r90", "Reps Signed R90", "hb-reps", v => v, [4, 8]],
+  ["reps_month", "Reps Signed This Month", "hb-reps", v => v, [1, 1]],
+  ["appt_to_rep", "Appt to Rep R90", "hb-reps", pctf, [0.4, 0.5]],
+  ["taken_r90", "Appt Taken R90", "hb-appt", v => v, [9, 17]],
+  ["taken_month", "Appt Taken MTD", "hb-appt", v => v, [4, 5]],
+  ["take_rate", "Appt Take Rate % R90", "hb-appt", pctf, [0.7, 0.79]],
+  ["set_r90", "Appt Set R90", "hb-appt", v => v, [13, 23]],
+  ["set_month", "Appt Set MTD", "hb-appt", v => v, [5, 7]],
+];
+// red below the first number, green above the second; "reverse" for days (red above 30, green below 15)
+function hbClass(v, rule) {
+  if (!rule || v == null) return "";
+  const [lo, hi, mode] = rule;
+  if (mode === "reverse") return v > lo ? "r" : v < hi ? "g" : "";
+  return v < lo ? "r" : v > hi ? "g" : "";
+}
+async function showHustle() {
+  page("vHustle");
+  const day = $("#hbDate").value || new Date().toLocaleDateString("en-CA");
+  $("#hbDate").value = day;
+  const { data, error } = await sb.rpc("hustle_board", { p_today: day });
+  if (error) return status(error.message, true);
+  $("#hbSub").textContent = "As of " + new Date(day + "T00:00").toLocaleDateString();
+  const b = data.box;
+  $("#hbBox").innerHTML = `<div class="lbl">Contracts:</div>
+    <div><small>Goal</small><b>${b.goal ?? 0}</b></div><div><small>Goal Pace</small><b>${b.pace}</b></div>
+    <div><small>Achieved</small><b>${b.achieved}</b></div><div class="${b.gap < 0 ? "neg" : "pos"}"><small>Gap</small><b>${b.gap > 0 ? "+" : ""}${b.gap}</b></div>
+    <div class="per"><span>Achieved Per Day: ${b.per_day ?? 0}</span><span>Daily Goal: ${b.daily_goal ?? 0}</span></div>`;
+  const me = ME.role === "agent" ? (await sb.rpc("my_team_member")).data : null;
+  $("#hbTable").innerHTML = `<thead><tr><th style="background:none"></th>${HB_COLS.map(c => `<th class="${c[2]}">${c[1]}</th>`).join("")}</tr></thead><tbody>` +
+    data.agents.map(a => `<tr class="${a.id === me ? "me" : ""}"><td>${esc(a.first)}</td>${HB_COLS.map(([k, , , f, rule]) => `<td class="${hbClass(a[k], rule)}">${f(a[k])}</td>`).join("")}</tr>`).join("") + `</tbody>`;
+}
+$("#hbDate").onchange = () => showHustle();
+$("#hbPrint").onclick = () => window.print();
 
 // ---------- Pending tracker (the Excel "PendingTracker - East Idaho" workbook, rebuilt) ----------
 // Deadlines come from view pending_tracker (business days, skipping holidays, same as the workbook's
