@@ -25,6 +25,23 @@
 .pick li:hover, .pick li.on { background: var(--ro); }
 .search-card { padding: 18px; margin-bottom: 16px; }
 .roles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.pills button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.pills button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.pills button small { font-weight: 500; opacity: .7; margin-left: 3px; }
+.jot-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.jot-sec { margin-bottom: 16px; }
+.jot-sec .kv > div { align-items: flex-start; }
+.jot-sec .kv span { flex: 0 0 42%; }
+.jot-sec .kv b { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 500; color: var(--ink); text-align: left; flex: 1; }
+.ver { border-bottom: 1px dashed var(--line); padding: 8px 0; }
+.ver:last-child { border-bottom: 0; }
+.ver h4 { margin: 0 0 4px; font-size: 13.5px; }
+.ver li { font-size: 13.5px; color: var(--ink-2); margin: 2px 0; overflow-wrap: anywhere; }
+.ver li b { color: var(--ink); font-weight: 600; }
+.st.held, .st.listing, .st.signed { background: var(--good-soft); color: var(--good); }
+.st.requested, .st.set, .st.new, .st.rescheduled { background: var(--warn-soft); color: var(--warn); }
+.st.cancelled { background: var(--ro); color: var(--ink-3); }
 .roles .tile span { display: block; color: var(--ink-2); margin-top: 2px; }
 .add-row { display: grid; grid-template-columns: 1fr 1.4fr 160px auto; gap: 12px; align-items: end; }
 .you { color: var(--ink-3); font-size: 13px; margin-left: 6px; }
@@ -37,7 +54,7 @@
   .ci { grid-template-columns: 1fr; gap: 22px; }
   .deadlines { grid-template-columns: minmax(0, 1fr) 70px 140px; }
   .list .hide-sm { display: none; }
-  .roles, .add-row { grid-template-columns: 1fr; }
+  .roles, .add-row, .jot-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -49,6 +66,7 @@
     <nav>
       <h4>Tools</h4>
       <a href="#sales" data-nav="sales" class="on">Sales</a>
+      <a href="#jots" data-nav="jots">Jots</a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
     </nav>
     <div class="me"><span id="whoEmail"></span><br><a href="#" id="signout">Sign out</a></div>
@@ -65,6 +83,32 @@
         </label>
       </form>
       <div id="results"></div>
+    </section>
+
+    <!-- Opportunity Path jot submissions, read-only (synced from Jotform every 5 minutes) -->
+    <section id="vJots" hidden>
+      <div class="head"><div class="grow"><h1>Jots</h1><div class="sub" id="jotSync">Opportunity Path submissions from Jotform</div></div></div>
+      <form class="card search-card" id="jotSearch">
+        <label class="fld"><span>Search by client, address, phone, email, or agent</span>
+          <div class="search-row"><input class="in" id="jq" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
+        </label>
+        <div class="pills" id="jotStages"></div>
+      </form>
+      <div id="jotResults"></div>
+    </section>
+
+    <section id="vJot" hidden>
+      <div class="head">
+        <div class="grow">
+          <h1><span id="jName"></span><span class="st" id="jStage"></span><span class="chip" id="jType"></span></h1>
+          <div class="sub" id="jSub"></div>
+        </div>
+        <div class="acts"><button class="btn" id="jBack">&lsaquo; Back to jots</button></div>
+      </div>
+      <div class="jot-grid">
+        <div id="jAnswers"></div>
+        <section class="card"><div class="card-h"><h3>History</h3></div><div class="card-b" id="jHistory"></div></section>
+      </div>
     </section>
 
     <!-- team list: who can sign in and what they see (admins only) -->
@@ -355,8 +399,9 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam"]) $("#" + v).hidden = v !== id;
-  $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === (id === "vTeam" ? "team" : "sales")));
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots" }[id] || "sales";
+  $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
 }
@@ -402,6 +447,9 @@ function route() {
   if (m) return openSale(+m[1]);
   if (h === "new") return newSale();
   if (h === "team" && ME.role === "admin") return showTeam();
+  if (h === "jots") return showJots();
+  const j = h.match(/^jot=(\d+)$/);
+  if (j) return openJot(j[1]);
   page("vSearch"); $("#q").value = R.q; renderResults(); $("#q").focus();
   runSearch(true, searched ? R.pending : true);   // pending sales until something is searched; fresh each time
 }
@@ -674,6 +722,119 @@ $("#addUser").addEventListener("submit", async e => {
   $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff";
   status(`${name} added`); showTeam();
 });
+
+// ---------- Jots: Opportunity Path submissions, read-only ----------
+const OPP_FORM = "210986480612155";
+const STAGES = ["Appointment set", "Rescheduled", "Appointment held", "Cancelled", "Rep requested", "Rep signed", "Listing handoff", "New"];
+const stageClass = st => ({ "Appointment held": "held", "Listing handoff": "listing", "Rep signed": "signed", "Rep requested": "requested",
+  "Appointment set": "set", "New": "new", "Rescheduled": "rescheduled", "Cancelled": "cancelled" }[st] || "set");
+const stagePill = st => `<span class="st ${stageClass(st)}">${esc(st)}</span>`;
+const J = { q: "", stage: "", rows: [], loaded: false, counts: null, questions: null };
+
+async function showJots() {
+  page("vJots");
+  $("#jq").value = J.q;
+  if (!J.counts) {
+    const { data } = await sb.from("jot_forms").select("last_sync_at, last_sync_note").eq("form_id", OPP_FORM).maybeSingle();
+    if (data?.last_sync_at) $("#jotSync").textContent = `Opportunity Path submissions from Jotform · checked ${new Date(data.last_sync_at).toLocaleString([], { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}, every 5 minutes`;
+    const counts = {};
+    await Promise.all(STAGES.map(async st => {
+      const { count } = await sb.from("jot_list").select("id", { count: "exact", head: true }).eq("form_id", OPP_FORM).eq("stage", st);
+      counts[st] = count || 0;
+    }));
+    J.counts = counts;
+  }
+  renderStagePills();
+  if (!J.loaded) await loadJots(); else renderJots();
+}
+function renderStagePills() {
+  $("#jotStages").innerHTML = [["", "All"], ...STAGES.filter(st => J.counts[st]).map(st => [st, st])].map(([v, t]) =>
+    `<button type="button" data-stage="${esc(v)}" class="${J.stage === v ? "on" : ""}">${esc(t)}${v ? `<small>${J.counts[v].toLocaleString()}</small>` : ""}</button>`).join("");
+  $$("#jotStages [data-stage]").forEach(b => b.onclick = () => { J.stage = b.dataset.stage; renderStagePills(); loadJots(); });
+}
+$("#jotSearch").addEventListener("submit", e => { e.preventDefault(); J.q = $("#jq").value.trim(); loadJots(); });
+async function loadJots() {
+  let query = sb.from("jot_list").select("id, client, client_type, agent, set_by, source, appt_for, stage, created, updated, versions")
+    .eq("form_id", OPP_FORM).order("updated", { ascending: false }).limit(300);
+  if (J.stage) query = query.eq("stage", J.stage);
+  if (J.q) query = query.ilike("search", `%${J.q.toLowerCase().replace(/[%_\\]/g, m => "\\" + m)}%`);
+  const { data, error } = await query;
+  if (error) return status(error.message, true);
+  J.rows = data; J.loaded = true; renderJots();
+}
+const jotDate = t => t ? usDate(t.slice(0, 10)) : "";
+function renderJots() {
+  const el = $("#jotResults");
+  if (!J.rows.length) { el.innerHTML = `<p class="note">No jots match.</p>`; return; }
+  el.innerHTML = `<p class="note">${J.rows.length === 300 ? "The 300 most recently changed. Search or pick a stage to narrow it down." : J.rows.length.toLocaleString() + " jots, most recently changed first."}</p>
+  <div class="card scroll"><table class="grid list"><thead><tr><th>Client</th><th>Stage</th><th>Type</th><th>Agent</th><th class="hide-sm">Set by</th><th class="hide-sm">Appointment</th><th>Changed</th></tr></thead><tbody>
+  ${J.rows.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.client)}</b></td><td>${stagePill(r.stage)}</td><td>${esc(r.client_type)}</td><td>${esc(r.agent)}</td><td class="hide-sm">${esc(r.set_by)}</td><td class="hide-sm">${jotDate(r.appt_for)}</td><td>${jotDate(r.updated)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+  el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => go("jot=" + J.rows[+tr.dataset.i].id));
+}
+
+// Show any Jotform answer as text: dates, times, addresses, matrices, checkbox lists.
+function jotText(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(jotText).filter(Boolean).join(", ");
+  if (typeof v === "object") {
+    if (v.datetime) {
+      const d = usDate(v.datetime.slice(0, 10));
+      return v.hour ? `${d} ${v.hour}:${v.min || "00"} ${v.ampm || ""}`.trim() : d;
+    }
+    if (v.addr_line1 !== undefined || v.city !== undefined) return [v.addr_line1, v.addr_line2, v.city, v.state, v.postal].filter(Boolean).join(", ");
+    return Object.entries(v).filter(([, x]) => x !== "" && x != null).map(([k, x]) => `${k}: ${jotText(typeof x === "string" && x.startsWith("[") ? safeJson(x) : x)}`).join("\n");
+  }
+  return String(v);
+}
+const safeJson = x => { try { return JSON.parse(x); } catch { return x; } };
+
+async function openJot(id) {
+  if (!J.questions) {
+    const { data } = await sb.from("jot_questions").select("qid, label, type, qorder").eq("form_id", OPP_FORM).order("qorder");
+    J.questions = data || [];
+  }
+  const [s, v] = await Promise.all([
+    sb.from("jot_submissions").select("*").eq("id", id).maybeSingle(),
+    sb.from("jot_versions").select("id, jot_updated_at, answers, seen_at").eq("submission_id", id).order("id"),
+  ]);
+  if (!s.data) { status("That jot wasn't found.", true); return go("jots"); }
+  const a = s.data.answers, row = J.rows.find(r => r.id === id);
+  const label = qid => (J.questions.find(q => q.qid === qid)?.label || "Question " + qid).trim();
+  const name = [a["36"], a["37"]].filter(Boolean).join(" & ") || "Jot";
+  const stage = row?.stage || (await sb.from("jot_list").select("stage").eq("id", id).maybeSingle()).data?.stage || "";
+  $("#jName").textContent = name;
+  $("#jStage").textContent = stage; $("#jStage").className = "st " + stageClass(stage);
+  $("#jType").textContent = a["203"] || ""; $("#jType").hidden = !a["203"];
+  $("#jSub").textContent = [a["70"] && "Agent " + a["70"], [a["12"], a["44"]].filter(Boolean).join(", "),
+    "Started " + jotDate(s.data.jot_created_at), s.data.jot_updated_at && "changed " + jotDate(s.data.jot_updated_at)].filter(Boolean).join(" · ");
+
+  // Answers grouped under the jot's own section headings; unanswered questions and empty sections are left out.
+  const secs = []; let cur = null;
+  for (const q of J.questions) {
+    if (q.type === "control_head") { cur = { title: q.label.trim(), rows: [] }; secs.push(cur); continue; }
+    if (!(q.qid in a)) continue;
+    if (!cur) { cur = { title: "", rows: [] }; secs.push(cur); }
+    cur.rows.push([q.label.trim(), jotText(a[q.qid])]);
+  }
+  $("#jAnswers").innerHTML = secs.filter(x => x.rows.length && x.title !== "Opportunity Path").map(x => `<section class="card jot-sec">
+    <div class="card-h"><h3>${esc(x.title)}</h3></div>
+    <div class="card-b kv">${x.rows.map(([l, t]) => `<div><span>${esc(l)}</span><b>${esc(t)}</b></div>`).join("")}</div></section>`).join("");
+
+  // History: what each saved version changed compared with the one before.
+  const vers = v.data || [];
+  const items = vers.map((ver, i) => {
+    const when = jotDate(ver.jot_updated_at);
+    if (i === 0) return `<div class="ver"><h4>${when || "First seen"}</h4><ul><li>${vers.length === 1 ? "No changes since the copy was taken." : "First version on file."}</li></ul></div>`;
+    const prev = vers[i - 1].answers, now = ver.answers;
+    const keys = [...new Set([...Object.keys(prev), ...Object.keys(now)])].filter(k => JSON.stringify(prev[k]) !== JSON.stringify(now[k]));
+    return `<div class="ver"><h4>${when}</h4><ul>${keys.map(k => `<li><b>${esc(label(k))}</b>: ${esc(jotText(prev[k])) || "(blank)"} &rarr; ${esc(jotText(now[k])) || "(blank)"}</li>`).join("")}</ul></div>`;
+  });
+  $("#jHistory").innerHTML = items.reverse().join("") +
+    `<p class="note" style="margin-bottom:0">Changes are tracked from Oct 21, 2026, when AHG Tools started copying this jot. Earlier edits aren't available.</p>`;
+  page("vJot");
+}
+$("#jBack").onclick = () => go("jots");
 
 // ---------- Commission shares (Access subform on SharedatTeamLevelSubtableNew) ----------
 function renderSplits() {
