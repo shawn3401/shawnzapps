@@ -7,11 +7,15 @@
 //    the email's HTML) or {report, action: "send", to: [...]} (sends now to those addresses).
 // Sends from reports@andersonhicks.com through the Gmail API with a Google Workspace service account
 // that has domain-wide delegation for gmail.send. Secret GOOGLE_SERVICE_ACCOUNT = the key's JSON.
+// reports@ is a Google Group, which can't sign in, so the service account signs in as a real user
+// (secret REPORTS_SEND_USER) who has reports@ set up under "Send mail as" in Gmail, and the email
+// goes out From reports@.
 // The numbers come from dlr_data() and hustle_board(), the same functions the pages use.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SENDER = "reports@andersonhicks.com";
+const SEND_USER = () => Deno.env.get("REPORTS_SEND_USER") || SENDER;
 const SITE = "https://shawnzapps.com/ahg-tools/";
 const TZ = "America/Boise";
 const cors = {
@@ -177,7 +181,7 @@ const b64url = (data: Uint8Array | string) => b64(data).replace(/\+/g, "-").repl
 async function gmailToken(sa: any) {
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(JSON.stringify({ iss: sa.client_email, sub: SENDER, scope: "https://www.googleapis.com/auth/gmail.send",
+  const claim = b64url(JSON.stringify({ iss: sa.client_email, sub: SEND_USER(), scope: "https://www.googleapis.com/auth/gmail.send",
     aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const pem = sa.private_key.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
@@ -186,7 +190,7 @@ async function gmailToken(sa: any) {
   const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${head}.${claim}.${b64url(sig)}` }) });
   const d = await r.json();
-  if (!d.access_token) throw new Error("Google sign-in for reports@ failed: " + (d.error_description || d.error || r.status));
+  if (!d.access_token) throw new Error(`Google sign-in as ${SEND_USER()} failed: ` + (d.error_description || d.error || r.status));
   return d.access_token as string;
 }
 async function sendMail(to: string[], subject: string, html: string) {
