@@ -419,7 +419,7 @@ table.tracker th { font-size: 11.5px; }
         </section>
         <div class="card search-card">
           <div class="search-row"><input class="in" id="tmQ" autocomplete="off" placeholder="Search by name, email, or Jotform name"></div>
-          <div class="seg" id="tmTabs"></div>
+          <div class="filters"><div class="seg small" id="tmTabs"></div><div class="fld"><span>Role</span><div class="seg small" id="tmRoleF"></div></div></div>
         </div>
         <div class="card scroll"><table class="grid list" id="teamTable"></table></div>
         <section class="card" id="tmLoose" hidden style="margin-top:16px">
@@ -1157,7 +1157,7 @@ for (const el of $$("#vSale [data-k]")) {
 // (team_member_add); "Left the team" is team_member_leave. Until switchover an Access refresh
 // rewrites the three Access tables, so add people in Access too until then.
 const ROLE_NAMES = { admin: "Admin", staff: "Staff", agent: "Agent" };
-let TM = { tab: "active", q: "" }, TD = {};
+let TM = { tab: "active", q: "", role: "" }, TD = {};
 const tmDate = v => v ? String(v).slice(0, 10) : "";
 async function loadTeamData() {
   const [m, r, h, u, j, hid, b, bt] = await Promise.all([
@@ -1190,7 +1190,14 @@ function renderTeam() {
   $("#tmTabs").innerHTML = [["active", "Active"], ["former", "Former"], ["all", "All"]].map(([v, t]) => `<button type="button" data-v="${v}" class="${TM.tab === v ? "on" : ""}">${t} (${n[v]})</button>`).join("");
   $$("#tmTabs [data-v]").forEach(b => b.onclick = () => { TM.tab = b.dataset.v; renderTeam(); });
   const q = TM.q.toLowerCase();
-  const rows = TD.members.filter(m => (TM.tab === "all" || (TM.tab === "active") === (m.active === "Yes")) &&
+  // role filter: the roles held by people in this tab, with counts
+  const inTab = TD.members.filter(m => TM.tab === "all" || (TM.tab === "active") === (m.active === "Yes"));
+  const counts = {}; inTab.forEach(m => { counts[m.current_role] = (counts[m.current_role] || 0) + 1; });
+  if (TM.role && !counts[TM.role]) TM.role = "";
+  $("#tmRoleF").innerHTML = `<button type="button" data-r="" class="${TM.role ? "" : "on"}">All</button>` +
+    TD.roles.filter(r => counts[r.id]).map(r => `<button type="button" data-r="${r.id}" class="${+TM.role === r.id ? "on" : ""}">${esc(r.role_name)} (${counts[r.id]})</button>`).join("");
+  $$("#tmRoleF [data-r]").forEach(b => b.onclick = () => { TM.role = b.dataset.r; renderTeam(); });
+  const rows = inTab.filter(m => (!TM.role || m.current_role === +TM.role) &&
     (!q || [m.team_member_name, user(m.id)?.email, ...jotsOf(m.id)].some(x => (x || "").toLowerCase().includes(q))));
   $("#teamTable").innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Started</th><th>Split level</th><th>Jotform name</th><th>Sign-in</th><th>Hustle board</th></tr></thead><tbody>` +
     (rows.length ? rows.map(m => { const u = user(m.id), agent = TD.roleName[m.current_role] === "Agent";
