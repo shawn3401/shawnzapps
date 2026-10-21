@@ -16,30 +16,30 @@ grant execute on function public.my_team_member() to authenticated;
 -- The sales an agent may see. security definer so it can look across splits without recursion.
 create or replace function public.my_sale_ids() returns setof integer
 language sql stable security definer set search_path = public as $$
-  select s.sale_id from public.sales s where s.primary_sales_rep = public.my_team_member()
+  select s.sale_id from public.sales s where s.primary_sales_rep = (select public.my_team_member())
   union
-  select t.sales_id from public.sharedat_team_level t where t.team_level_sales_rep = public.my_team_member()
+  select t.sales_id from public.sharedat_team_level t where t.team_level_sales_rep = (select public.my_team_member())
 $$;
 revoke all on function public.my_sale_ids() from anon;
 grant execute on function public.my_sale_ids() to authenticated;
 
 drop policy if exists "agent reads own sales" on public.sales;
 create policy "agent reads own sales" on public.sales for select to authenticated
-  using (public.my_team_member() is not null and sale_id in (select public.my_sale_ids()));
+  using ((select public.my_team_member()) is not null and sale_id in (select public.my_sale_ids()));
 
 drop policy if exists "agent reads splits on own sales" on public.sharedat_team_level;
 create policy "agent reads splits on own sales" on public.sharedat_team_level for select to authenticated
-  using (public.my_team_member() is not null and sales_id in (select public.my_sale_ids()));
+  using ((select public.my_team_member()) is not null and sales_id in (select public.my_sale_ids()));
 
 drop policy if exists "agent reads lenders on own sales" on public.lender_approvals;
 create policy "agent reads lenders on own sales" on public.lender_approvals for select to authenticated
-  using (public.my_team_member() is not null and sale in (select public.my_sale_ids()));
+  using ((select public.my_team_member()) is not null and sale in (select public.my_sale_ids()));
 
 -- Leads: the agent's own (lead owner) and the lead behind each of their sales.
 drop policy if exists "agent reads own leads" on public.leads;
 create policy "agent reads own leads" on public.leads for select to authenticated
-  using (public.my_team_member() is not null and (
-    sales_rep = public.my_team_member()
+  using ((select public.my_team_member()) is not null and (
+    sales_rep = (select public.my_team_member())
     or id in (select s.client_name from public.sales s where s.sale_id in (select public.my_sale_ids()))));
 
 -- Lists the forms need to show names (no client data in these).
@@ -48,7 +48,7 @@ declare t text;
 begin
   foreach t in array array['team_members', 'roles', 'lead_source', 'city_list', 'lenders', 'loan_officer', 'office_list', 'split_matrix'] loop
     execute format('drop policy if exists "agent reads list" on public.%I', t);
-    execute format('create policy "agent reads list" on public.%I for select to authenticated using (public.my_team_member() is not null)', t);
+    execute format('create policy "agent reads list" on public.%I for select to authenticated using ((select public.my_team_member()) is not null)', t);
   end loop;
 end $$;
 

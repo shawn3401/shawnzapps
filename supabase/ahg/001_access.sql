@@ -34,7 +34,7 @@ grant execute on function public.is_staff() to authenticated;
 
 drop policy if exists "own row or staff" on public.app_users;
 create policy "own row or staff" on public.app_users for select to authenticated
-  using (email = lower(auth.jwt() ->> 'email') or public.is_staff());
+  using (email = lower((select auth.jwt()) ->> 'email') or (select public.is_staff()));
 grant select on public.app_users to authenticated;
 
 -- Every table copied from Access (commented 'access:<name>' by the import script):
@@ -52,7 +52,7 @@ begin
     execute format('revoke all on public.%I from anon', t);
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format('drop policy if exists "staff all" on public.%I', t);
-    execute format('create policy "staff all" on public.%I for all to authenticated using (public.is_staff()) with check (public.is_staff())', t);
+    execute format('create policy "staff all" on public.%I for all to authenticated using ((select public.is_staff())) with check ((select public.is_staff()))', t);
   end loop;
 end $$;
 

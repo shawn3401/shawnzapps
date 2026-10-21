@@ -16,9 +16,9 @@ grant execute on function public.is_admin() to authenticated;
 drop policy if exists "admins add" on public.app_users;
 drop policy if exists "admins change" on public.app_users;
 drop policy if exists "admins remove" on public.app_users;
-create policy "admins add" on public.app_users for insert to authenticated with check (public.is_admin());
-create policy "admins change" on public.app_users for update to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy "admins remove" on public.app_users for delete to authenticated using (public.is_admin());
+create policy "admins add" on public.app_users for insert to authenticated with check ((select public.is_admin()));
+create policy "admins change" on public.app_users for update to authenticated using ((select public.is_admin())) with check ((select public.is_admin()));
+create policy "admins remove" on public.app_users for delete to authenticated using ((select public.is_admin()));
 grant insert, update, delete on public.app_users to authenticated;
 
 -- Never leave the team with no active admin, and no one can demote or switch off themself

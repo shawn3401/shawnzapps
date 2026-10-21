@@ -52,7 +52,7 @@ begin
     execute format('revoke all on public.%I from anon, authenticated', t);
     execute format('grant select on public.%I to authenticated', t);
     execute format('drop policy if exists "staff read" on public.%I', t);
-    execute format('create policy "staff read" on public.%I for select to authenticated using (public.is_staff())', t);
+    execute format('create policy "staff read" on public.%I for select to authenticated using ((select public.is_staff()))', t);
   end loop;
 end $$;
 

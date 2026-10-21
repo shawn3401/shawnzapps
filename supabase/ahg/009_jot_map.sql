@@ -23,7 +23,7 @@ alter table public.jot_source_map enable row level security;
 revoke all on public.jot_source_map from anon, authenticated;
 grant select on public.jot_source_map to authenticated;
 drop policy if exists "staff read" on public.jot_source_map;
-create policy "staff read" on public.jot_source_map for select to authenticated using (public.is_staff());
+create policy "staff read" on public.jot_source_map for select to authenticated using ((select public.is_staff()));
 
 -- Small readers for Jotform answers.
 create or replace function public.jot_ts(v jsonb) returns timestamp language sql immutable as $$
