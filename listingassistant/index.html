@@ -77,6 +77,21 @@ textarea{min-height:120px;resize:vertical}
 .head h2{font-size:26px}
 .lead{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:14px 16px;margin-top:10px;cursor:pointer}
 .lead:hover{background:var(--soft)}
+.lead.hasc{display:flex;gap:14px;align-items:flex-start}
+.lthumb{width:96px;height:96px;object-fit:cover;border-radius:8px;flex:none;background:var(--soft)}
+.lbody{flex:1;min-width:0}
+@media (max-width:520px){.lthumb{width:64px;height:64px}}
+.coverwrap{position:relative;margin:-18px -18px 16px}
+.coverwrap img{display:block;width:100%;height:250px;object-fit:cover;border-radius:10px 10px 0 0;background:var(--soft)}
+@media (max-width:520px){.coverwrap img{height:180px}}
+.coverbtn{position:absolute;right:12px;bottom:12px;background:rgba(255,255,255,.94);color:#1F2124;border-color:transparent}
+.coverbtn:hover{background:#fff}
+.coveradd{display:block;width:100%;border:1.5px dashed var(--line);background:none;border-radius:8px;padding:11px;color:var(--ink-2);font:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:14px}
+.coveradd:hover{border-color:var(--accent);color:var(--accent)}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:12px;max-height:46vh;overflow:auto}
+.cgrid button{padding:0;border:2px solid transparent;border-radius:7px;overflow:hidden;cursor:pointer;aspect-ratio:1;background:var(--soft)}
+.cgrid button.on{border-color:var(--accent)}
+.cgrid img{width:100%;height:100%;object-fit:cover;display:block}
 .lead .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
 .lead b{font-size:19px}
 .lead .addr{color:var(--ink-2);font-size:15px}
@@ -248,6 +263,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
   <section id="lead" hidden>
     <p class="back"><button class="btn link" id="backBtn">‹ All seller leads</button></p>
     <div class="card">
+      <div id="coverBox"></div>
       <div class="grid2">
         <div><label class="f" for="lName">Seller</label><input type="text" id="lName" data-col="name" placeholder="Name"></div>
         <div><label class="f" for="lAddr">Property</label><input type="text" id="lAddr" data-col="address" placeholder="Street address, city"></div>
@@ -309,6 +325,17 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
 <input type="file" id="blankPick" accept="application/pdf" hidden>
 
 <!-- new seller lead: just enough to make the record -->
+<!-- the lead's cover photo: one of its own photos, or a new one -->
+<dialog id="coverDlg">
+  <h2>Cover photo</h2>
+  <p class="sub" id="coverSub"></p>
+  <div class="cgrid" id="coverGrid"></div>
+  <input type="file" id="coverPick" accept="image/*" hidden>
+  <div class="busy" id="coverBusy" hidden><div class="spin"></div><span>Uploading…</span></div>
+  <div class="err" id="coverErr" hidden></div>
+  <div class="row" style="justify-content:space-between"><span style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="coverUpload">Upload a new photo</button><button type="button" class="btn" id="coverRemove">Remove cover</button></span><button type="button" class="btn" id="coverCancel">Close</button></div>
+</dialog>
+
 <!-- one number (or a low and high pair) on the Value card -->
 <dialog id="numDlg">
   <form id="numForm">
@@ -404,8 +431,10 @@ async function load(){
   if (!session){ show("out"); return; }
   const { data: a } = await sb.from("listing_access").select("user_id").maybeSingle();
   if (!a){ show("noAccess"); return; }
-  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, numbers, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
+  const { data, error } = await sb.from("listing_leads").select("id, name, address, stage, numbers, cover, updated_at, summary:brief->>summary").order("updated_at", { ascending: false });
   leads = error ? [] : data;
+  const covers = leads.map(l => l.cover).filter(p => p && !thumbs[p]);
+  if (covers.length){ const { data: su } = await sb.storage.from(BUCKET).createSignedUrls(covers, 3600); (su || []).forEach(d => { if (d.signedUrl) thumbs[d.path] = d.signedUrl; }); }
   const { data: open } = await sb.from("listing_todos").select("lead_id").eq("done", false);
   const n = {}; (open || []).forEach(t => n[t.lead_id] = (n[t.lead_id] || 0) + 1); leads.forEach(l => l.todo = n[l.id] || 0);
   route();
@@ -422,13 +451,13 @@ function renderList(){
   $("#filters").innerHTML = leads.length > 1 ? [["all", "All"], ...used].map(([k, n]) => `<button class="pill${filter === k ? " on" : ""}" data-f="${k}">${n}<span class="n">${k === "all" ? leads.length : counts[k]}</span></button>`).join("") : "";
   const shown = leads.filter(l => filter === "all" || l.stage === filter);
   $("#leadCards").innerHTML = shown.length ? shown.map(l => `
-    <button class="lead" data-id="${l.id}">
+    <button class="lead${l.cover && thumbs[l.cover] ? " hasc" : ""}" data-id="${l.id}">${l.cover && thumbs[l.cover] ? `<img class="lthumb" src="${thumbs[l.cover]}" alt="">` : ""}<div class="lbody">
       <div class="top"><b>${esc(l.name || "Unnamed lead")}</b><span class="stage">${esc(stageName(l.stage))}</span></div>
       ${l.address ? `<div class="addr">${esc(l.address)}</div>` : ""}
       ${l.summary ? `<div class="sum">${esc(l.summary)}</div>` : ""}
       ${(() => { const N = l.numbers || {}, rg = (a, b) => [N[a], N[b]].filter(Boolean).map(x => kmoney(x.amount)).join(" to "); const bits = [N.agreed && "Listing at " + kmoney(N.agreed.amount), !N.agreed && (N.rec_low || N.rec_high) && "Recommended " + rg("rec_low", "rec_high"), N.wants && "Wants " + kmoney(N.wants.amount), !N.agreed && !N.rec_low && !N.rec_high && (N.cma_low || N.cma_high) && "CMA " + rg("cma_low", "cma_high")].filter(Boolean); return bits.length ? `<div class="nx">${bits.join(" · ")}</div>` : ""; })()}
       <div class="when">${l.todo ? `<b style="color:var(--accent-deep)">${l.todo} to-do${l.todo === 1 ? "" : "s"} open</b> · ` : ""}Updated ${niceDate(l.updated_at)}</div>
-    </button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
+    </div></button>`).join("") : `<div class="empty">No seller leads yet. Tap <b>New seller lead</b> to start one.</div>`;
 }
 $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b){ filter = b.dataset.f; renderList(); } });
 $("#leadCards").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) location.hash = b.dataset.id; });
@@ -451,6 +480,7 @@ async function openLead(id){
 }
 function normForm(f){ f = f || {}; return { fields: f.fields || {}, checks: f.checks || {}, rooms: f.rooms || {}, locked: f.locked || {} }; }
 function renderLead(){
+  renderCover();
   $("#lName").value = cur.name; $("#lAddr").value = cur.address; cur.numbers ||= {}; renderValues();
   $("#stagePills").innerHTML = STAGES.map(([k, n]) => `<button class="pill${cur.stage === k ? " on" : ""}" data-s="${k}">${n}</button>`).join("");
   renderView();
@@ -517,6 +547,54 @@ $("#noteSave").addEventListener("click", async () => {
   const got = res.added || [];
   ok.textContent = res.error ? "Saved. (Couldn't check it for to-dos: " + res.error + ")" : got.length ? "Saved, and added to your to-dos: " + got.map(t => t.text).join("; ") + "." : "Saved.";
   setTimeout(() => { if (cur === lead) ok.hidden = true; }, got.length ? 9000 : 2500);
+});
+
+// ---- cover photo --------------------------------------------------------------------------
+// One of the lead's own photos as a banner here and a thumbnail on the leads list (Shawn, Oct 21, 2026).
+// Picked from the photos already in Files, or uploaded from the dialog, which also adds it to Files.
+const leadPhotos = () => items.filter(i => i.files[0]?.type.startsWith("image/")).sort((a, b) => b.created_at.localeCompare(a.created_at)).map(i => i.files[0].path);
+async function renderCover(){
+  const p = cur.cover;
+  if (!p){ $("#coverBox").innerHTML = `<button class="coveradd" id="coverAdd">+ Add a cover photo</button>`; return; }
+  if (!thumbs[p]){
+    $("#coverBox").innerHTML = `<div class="coverwrap"><img alt=""></div>`;
+    const { data } = await sb.storage.from(BUCKET).createSignedUrl(p, 3600); if (!data?.signedUrl || cur.cover !== p) return;
+    thumbs[p] = data.signedUrl;
+  }
+  $("#coverBox").innerHTML = `<div class="coverwrap"><img src="${thumbs[p]}" alt="Cover photo"><button class="btn small coverbtn" id="coverAdd">Change cover</button></div>`;
+}
+function openCover(){
+  const ps = leadPhotos();
+  $("#coverSub").textContent = ps.length ? "Tap one of this lead's photos, or upload a new one." : "No photos on this lead yet. Upload one and it goes in Files too.";
+  $("#coverGrid").innerHTML = ps.map(p => `<button type="button" class="${p === cur.cover ? "on" : ""}" data-cover="${esc(p)}" aria-label="Use this photo">${thumbs[p] ? `<img src="${thumbs[p]}" alt="" loading="lazy">` : ""}</button>`).join("");
+  $("#coverGrid").hidden = !ps.length; $("#coverRemove").hidden = !cur.cover;
+  $("#coverErr").hidden = true; $("#coverBusy").hidden = true;
+  $("#coverDlg").showModal();
+  loadThumbs().then(() => { if ($("#coverDlg").open) document.querySelectorAll("#coverGrid [data-cover]").forEach(b => { const u = thumbs[b.dataset.cover]; if (u && !b.firstChild) b.innerHTML = `<img src="${u}" alt="">`; }); });
+}
+async function setCover(path){
+  cur.cover = path; const row = leads.find(l => l.id === cur.id); if (row) row.cover = path;
+  renderCover();
+  const { error } = await sb.from("listing_leads").update({ cover: path }).eq("id", cur.id);
+  if (error) alert("The cover didn't save: " + error.message);
+}
+$("#coverBox").addEventListener("click", e => { if (e.target.closest("#coverAdd")) openCover(); });
+$("#coverGrid").addEventListener("click", e => { const b = e.target.closest("[data-cover]"); if (b){ $("#coverDlg").close(); setCover(b.dataset.cover); } });
+$("#coverCancel").addEventListener("click", () => $("#coverDlg").close());
+$("#coverRemove").addEventListener("click", () => { $("#coverDlg").close(); setCover(null); });
+$("#coverUpload").addEventListener("click", () => $("#coverPick").click());
+$("#coverPick").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const lead = cur, fail = m => { $("#coverErr").textContent = m; $("#coverErr").hidden = false; $("#coverBusy").hidden = true; };
+  $("#coverErr").hidden = true; $("#coverBusy").hidden = false;
+  const small = await shrink(f); if (!small) return fail("That photo couldn't be read. Try a JPEG or PNG, or a screenshot of it.");
+  const path = `${session.user.id}/${lead.id}/${crypto.randomUUID()}.jpg`;
+  const up = await sb.storage.from(BUCKET).upload(path, small, { contentType: "image/jpeg" }); if (up.error) return fail("Couldn't upload it: " + up.error.message);
+  const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: f.name, files: [{ path, name: f.name, type: "image/jpeg", size: small.size }] }).select().single();
+  if (error) return fail("Couldn't save it: " + error.message);
+  if (cur !== lead) return;
+  items.push(data); thumbs[path] = URL.createObjectURL(small);
+  $("#coverDlg").close(); setCover(path); renderView();
 });
 
 // ---- value -------------------------------------------------------------------------------
@@ -926,6 +1004,7 @@ async function entryClick(e){
     if (it.files.length) await sb.storage.from(BUCKET).remove(it.files.map(f => f.path));
     await sb.from("listing_items").delete().eq("id", it.id);
     items = items.filter(i => i !== it); renderView();
+    if (cur.cover && it.files.some(f => f.path === cur.cover)) setCover(null);
   }
   if (re) transcribe(items.find(i => i.id === re.dataset.retry));
   if (op){ const { data } = await sb.storage.from(BUCKET).createSignedUrl(op.dataset.open, 600); if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener"); }
