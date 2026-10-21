@@ -24,6 +24,16 @@
 .pick li small { color: var(--ink-3); margin-left: auto; white-space: nowrap; }
 .pick li:hover, .pick li.on { background: var(--ro); }
 .search-card { padding: 18px; margin-bottom: 16px; }
+.cons { display: grid; grid-template-columns: 150px repeat(3, minmax(0, 1fr)); gap: 9px 14px; align-items: center; margin-top: 14px; }
+.cons > b { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.cons > span:not(.st) { color: var(--ink-2); font-weight: 500; }
+.cons .st { justify-self: start; }
+.cons-top { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+.st.sched { background: var(--warn-soft); color: var(--warn); }
+.st.held2 { background: var(--good-soft); color: var(--good); }
+.st.miss { background: var(--soft); color: var(--accent-deep); }
+.st.none { background: var(--ro); color: var(--ink-3); }
+textarea.in { resize: vertical; font: inherit; }
 .roles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .pills button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 11px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
@@ -58,6 +68,9 @@
   .deadlines { grid-template-columns: minmax(0, 1fr) 70px 140px; }
   .list .hide-sm { display: none; }
   .roles, .add-row, .jot-grid { grid-template-columns: 1fr; }
+  .cons { grid-template-columns: 100px repeat(3, 150px); gap: 6px; font-size: 13px; min-width: 580px; }
+  .cons-wrap { overflow-x: auto; }
+  .cons-top { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -69,6 +82,7 @@
     <nav>
       <h4>Tools</h4>
       <a href="#sales" data-nav="sales" class="on">Sales</a>
+      <a href="#leads" data-nav="leads">Leads</a>
       <a href="#jots" data-nav="jots">Jots</a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
     </nav>
@@ -87,6 +101,108 @@
       </form>
       <div class="pills agents" id="agentPills"></div>
       <div id="results"></div>
+    </section>
+
+    <!-- Leads: Access form "Leads - Search" -->
+    <section id="vLeads" hidden>
+      <div class="head"><div class="grow"><h1>Leads</h1></div>
+        <div class="acts"><button class="btn red" data-newlead>+ New lead</button></div></div>
+      <form class="card search-card" id="leadSearch">
+        <label class="fld"><span>Enter part or all of the lead name or note</span>
+          <div class="search-row"><input class="in" id="lq" autocomplete="off" enterkeyhint="search"><button class="btn red" type="submit">Search</button></div>
+        </label>
+      </form>
+      <div class="pills agents" id="leadAgents"></div>
+      <div id="leadResults"></div>
+    </section>
+
+    <section id="vLead" hidden>
+      <div class="head">
+        <div class="grow">
+          <h1><span id="lName"></span><span class="chip" id="lTypeChip"></span><span class="chip gray" id="lId"></span></h1>
+          <div class="sub" id="lSub"></div>
+        </div>
+        <div class="acts">
+          <button class="btn" data-newlead>+ New lead</button>
+          <button class="btn red" id="leadExit">Save and close</button>
+          <div class="recnav" id="leadNav">
+            <button data-lgo="first" title="First">&laquo;</button><button data-lgo="prev" title="Previous">&lsaquo;</button>
+            <span id="leadPos"></span>
+            <button data-lgo="next" title="Next">&rsaquo;</button><button data-lgo="last" title="Last">&raquo;</button>
+          </div>
+        </div>
+      </div>
+      <div class="banner" id="leadNew" hidden>New lead. It saves once the starred fields are filled in.</div>
+
+      <div class="strip">
+        <div class="tile"><small>Received</small><b id="ltReceived">&nbsp;</b></div>
+        <div class="tile"><small>Appointment</small><b id="ltAppt">&nbsp;</b></div>
+        <div class="tile"><small>Appointment status</small><b id="ltStatus">&nbsp;</b></div>
+        <div class="tile green"><small>Rep contract signed</small><b id="ltRep">&nbsp;</b></div>
+      </div>
+
+      <div class="top">
+        <section class="card">
+          <div class="card-h"><h3>Lead</h3></div>
+          <div class="card-b fields">
+            <label class="fld"><span>Name</span><input class="in" data-l="lead_name"></label>
+            <label class="fld"><span>Client type</span><select class="in" data-l="lead_type" id="lfType"></select></label>
+            <label class="fld req"><span>Source</span><select class="in" data-l="lead_source" data-t="int" id="lfSource"></select></label>
+            <label class="fld"><span>Source detail</span><input class="in" data-l="lead_source_detail"></label>
+            <label class="fld"><span>Primary city</span><input class="in" data-l="primary_city"></label>
+            <label class="fld"><span>Price estimate</span><input class="in num" data-l="price_estimate" data-t="money"></label>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-h"><h3>People</h3></div>
+          <div class="card-b fields" style="grid-template-columns:1fr">
+            <label class="fld"><span>Lead owner</span><select class="in" data-l="sales_rep" data-t="int" id="lfOwner"></select></label>
+            <label class="fld"><span>Client originated by</span><select class="in" data-l="client_originated_by" data-names></select></label>
+            <label class="fld req"><span>Lead generated by (team member credit)</span><select class="in" data-l="team_member_credit" data-names></select></label>
+          </div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>Consultations</h3></div>
+        <div class="card-b">
+          <div class="fields cons-top">
+            <label class="fld"><span>Received</span><input class="in" type="date" data-l="lead_received_date"></label>
+            <label class="fld req"><span>Appt trigger</span><select class="in" data-l="trigger" id="lfTrigger"></select></label>
+            <label class="chk"><input type="checkbox" data-l="competing_y_n"> Competing</label>
+          </div>
+          <div class="cons-wrap"><div class="cons">
+            <div></div><b>First consultation</b><b>Second consultation*</b><b>Third consultation*</b>
+            <span>Appt set on</span><input class="in" type="date" data-l="first_appt_set_on_date"><input class="in" type="date" data-l="second_appt_set_on_date"><input class="in" type="date" data-l="third_appt_set_on_date">
+            <span>Appt set for</span><input class="in" type="date" data-l="first_appt_set_for_date"><input class="in" type="date" data-l="second_appt_set_for_date"><input class="in" type="date" data-l="third_appt_set_for_date">
+            <span>Appt set by</span><select class="in" data-l="first_appt_set_by" data-names></select><select class="in" data-l="second_appt_set_by" data-names></select><select class="in" data-l="third_appt_set_by" data-names></select>
+            <span>Appointment date</span><input class="in" type="date" data-l="first_appt_date"><input class="in" type="date" data-l="second_appt_date"><input class="in" type="date" data-l="third_appt_date">
+            <span>Handoff date</span><input class="in" type="datetime-local" data-l="first_appt_handoff_date"><input class="in" type="datetime-local" data-l="second_appt_handoff_date"><input class="in" type="datetime-local" data-l="third_appt_handoff_date">
+            <span>Handoff on time</span><select class="in" data-l="first_appt_handoff_on_time" data-yn></select><select class="in" data-l="second_appt_handoff_on_time" data-yn></select><select class="in" data-l="third_appt_handoff_on_time" data-yn></select>
+            <span>Appt status</span><span class="st" id="lst1"></span><span class="st" id="lst2"></span><span class="st" id="lst3"></span>
+          </div></div>
+          <p class="note" style="margin-bottom:0">* The second and third consultation are not for follow-up appointments after the consultation. Use them only if we lost touch, then regained it and held a follow-up consultation, and only if 6 months have passed since the previous consultation.</p>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:16px">
+        <div class="card-h"><h3>Progress</h3></div>
+        <div class="card-b fields">
+          <label class="fld"><span>Agent gave promise</span><select class="in" data-l="agent_gave_promise_lead" data-yn></select></label>
+          <label class="fld"><span>Appointment qualification</span><select class="in" data-l="appt_qualification" id="lfQual"></select></label>
+          <label class="fld"><span>Rep contract signed</span><input class="in" type="date" data-l="representation_contract_signed_date"></label>
+          <label class="fld"><span>Referred out date</span><input class="in" type="date" data-l="referrred_out_date"></label>
+          <label class="fld"><span>List checklist date/time</span><input class="in" type="datetime-local" data-l="listing_checklist_handoff_date_time"></label>
+          <label class="fld"><span>Referred to</span><input class="in" data-l="referred_to"></label>
+          <label class="fld"><span>MLS launched date</span><input class="in" type="date" data-l="mls_launched_date"></label>
+          <label class="fld"><span>Terminated/withdrawn</span><input class="in" type="date" data-l="terminatedor_withdrawn"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h3>Lead record note</h3></div>
+        <div class="card-b"><textarea class="in" rows="4" data-l="lead_note" placeholder="Notes regarding the data in this form"></textarea></div>
+      </section>
     </section>
 
     <!-- Opportunity Path jot submissions, read-only (synced from Jotform every 5 minutes) -->
@@ -404,8 +520,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -453,6 +569,10 @@ function route() {
   if (h === "new") return newSale();
   if (h === "team" && ME.role === "admin") return showTeam();
   if (h === "jots") return showJots();
+  if (h === "leads") return showLeads();
+  if (h === "newlead") return newLead();
+  const lm = h.match(/^lead=(\d+)$/);
+  if (lm) return openLead(+lm[1]);
   const j = h.match(/^jot=(\d+)$/);
   if (j) return openJot(j[1]);
   page("vSearch"); $("#q").value = R.q; renderResults(); $("#q").focus();
@@ -741,6 +861,178 @@ $("#addUser").addEventListener("submit", async e => {
   if (error) return status(error.message, true);
   $("#nuName").value = ""; $("#nuEmail").value = ""; $("#nuRole").value = "staff";
   status(`${name} added`); showTeam();
+});
+
+// ---------- Leads (Access form "Leads - Search") ----------
+const LEAD_TYPES = ["Buyer", "Seller", "Referral"];
+const TRIGGERS = ["None", "Client Events", "Promise Script", "Vyral Marketing"];
+const QUALS = ["Qualified", "Disqualified"];
+const LEAD_REQUIRED = { lead_source: "Source", team_member_credit: "Lead generated by", trigger: "Appt trigger" };
+const LD = { q: "", recent: true, rows: [], shown: [], ids: [], pos: -1, agent: "", searched: false };
+let LEAD = null, leadNew = false;
+
+// Access query Leads-Search, FirstApptStatus and the rest; same as appt_status() in the database.
+function apptStatus(qual, setFor, appt, handoff) {
+  const today = new Date().toISOString().slice(0, 10), f = day(setFor);
+  if (qual === "Disqualified") return "Disqualified";
+  if (f && f >= today) return "Scheduled";
+  if (f && f < today && !handoff) return "Missing Interview";
+  if (f && f < today && appt && handoff) return "Appt Held";
+  if (f && f < today && !appt && handoff) return "No Show";
+  return "Not Scheduled";
+}
+const apptClass = st => ({ "Scheduled": "sched", "Appt Held": "held2", "Missing Interview": "miss", "No Show": "miss" }[st] || "none");
+const apptPill = st => st ? `<span class="st ${apptClass(st)}">${esc(st)}</span>` : "";
+
+async function showLeads() {
+  page("vLeads"); $("#lq").value = LD.q;
+  await runLeadSearch(true, LD.searched ? LD.recent : true);
+}
+$("#leadSearch").addEventListener("submit", e => { e.preventDefault(); runLeadSearch(false, false); });
+$("#lq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runLeadSearch(false, false); } });
+$("#leadResults").addEventListener("click", e => { if (e.target.closest("[data-recent]")) { e.preventDefault(); $("#lq").value = ""; runLeadSearch(true, true); } });
+// Opens on leads received in the last 30 days, newest first; a search covers every lead, as in Access.
+async function runLeadSearch(stay, recent) {
+  LD.q = recent ? "" : $("#lq").value.trim(); LD.recent = recent;
+  let query = sb.from("leads_search").select("id, lead_name, lead_type, source, owner, team_member_credit, lead_received_date, appt_for, appt_status, rep_signed")
+    .order("lead_received_date", { ascending: false }).order("id", { ascending: false }).limit(1000);
+  if (recent) query = query.gte("lead_received_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
+  else if (LD.q) query = query.ilike("search", `%${LD.q.replace(/[%_\\]/g, m => "\\" + m)}%`);
+  const { data, error } = await query;
+  if (error) return status(error.message, true);
+  LD.rows = data; LD.searched = true;
+  if (data.length === 1 && !stay) return go("lead=" + data[0].id);
+  renderLeads();
+}
+function renderLeads() {
+  const counts = {};
+  for (const r of LD.rows) if (r.owner) counts[r.owner] = (counts[r.owner] || 0) + 1;
+  if (LD.agent && !counts[LD.agent]) LD.agent = "";
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  const pills = $("#leadAgents");
+  pills.hidden = names.length < 2;
+  pills.innerHTML = [["", "All agents", LD.rows.length], ...names.map(n => [n, n, counts[n]])].map(([v, t, c]) =>
+    `<button type="button" data-agent="${esc(v)}" class="${LD.agent === v ? "on" : ""}">${esc(t)}<small>${c.toLocaleString()}</small></button>`).join("");
+  pills.querySelectorAll("[data-agent]").forEach(b => b.onclick = () => { LD.agent = LD.agent === b.dataset.agent ? "" : b.dataset.agent; renderLeads(); });
+  LD.shown = LD.agent ? LD.rows.filter(r => r.owner === LD.agent) : LD.rows;
+  LD.ids = LD.shown.map(r => r.id);
+  const el = $("#leadResults");
+  const back = LD.recent ? "" : ` <a href="#" data-recent>Show recent leads</a>`;
+  if (!LD.shown.length) { el.innerHTML = `<p class="note">${LD.recent ? "No leads in the last 30 days." : "No leads match."}${back}</p>`; return; }
+  const n = LD.shown.length.toLocaleString(), who = LD.agent ? ` for ${esc(LD.agent)}` : "";
+  el.innerHTML = `<p class="note">${LD.recent ? `<b>Last 30 days</b> · ${n} leads${who}, newest first.` : LD.rows.length === 1000 && !LD.agent ? "Showing the newest 1,000. Type more to narrow it down." : `${n} leads${who}, newest first.`}${back}</p>
+  <div class="card scroll"><table class="grid list"><thead><tr><th>Name</th><th>Type</th><th class="hide-sm">Source</th><th>Lead owner</th><th>Received</th><th class="hide-sm">Appointment</th><th>Appt status</th><th class="hide-sm">Rep signed</th></tr></thead><tbody>
+  ${LD.shown.map((r, i) => `<tr data-i="${i}"><td><b>${esc(r.lead_name)}</b></td><td>${esc(r.lead_type)}</td><td class="hide-sm">${esc(r.source)}</td><td>${esc(r.owner)}</td><td>${usDate(r.lead_received_date)}</td><td class="hide-sm">${usDate(r.appt_for)}</td><td>${apptPill(r.appt_status)}</td><td class="hide-sm">${usDate(r.rep_signed)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+  el.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { LD.pos = +tr.dataset.i; go("lead=" + LD.ids[LD.pos]); });
+}
+
+const dtLocal = v => v ? String(v).replace(" ", "T").slice(0, 16) : "";
+function usDateTime(v) {
+  if (!v) return "";
+  const t = String(v).replace(" ", "T"), [hh, mm] = t.slice(11, 16).split(":").map(Number);
+  return usDate(t) + (hh || mm ? ` ${((hh + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}` : "");
+}
+
+async function openLead(id) {
+  const { data, error } = await sb.from("leads").select("*").eq("id", id).maybeSingle();
+  if (error || !data) { status(error?.message || "That lead wasn't found.", true); return go("leads"); }
+  LEAD = data; leadNew = false; LD.pos = LD.ids.indexOf(id);
+  renderLead(); page("vLead");
+}
+function newLead() {
+  leadNew = true; LD.pos = -1;
+  LEAD = { lead_received_date: new Date().toISOString().slice(0, 10), price_estimate: 0, competing_y_n: false, appt_qualification: "Qualified" };
+  renderLead(); page("vLead");
+  $('[data-l="lead_name"]').focus();
+}
+function renderLead() {
+  const names = L.team.map(t => ({ v: t.team_member_name, t: t.team_member_name }));
+  const yn = ["Yes", "No"].map(v => ({ v, t: v }));
+  fillSelect($("#lfType"), LEAD_TYPES.map(v => ({ v, t: v })), LEAD.lead_type);
+  fillSelect($("#lfSource"), Object.entries(L.source).map(([v, t]) => ({ v: +v, t })).sort((a, b) => a.t.localeCompare(b.t)), LEAD.lead_source);
+  fillSelect($("#lfOwner"), L.team.map(t => ({ v: t.id, t: t.team_member_name })), LEAD.sales_rep);
+  fillSelect($("#lfTrigger"), TRIGGERS.map(v => ({ v, t: v })), LEAD.trigger);
+  fillSelect($("#lfQual"), QUALS.map(v => ({ v, t: v })), LEAD.appt_qualification, false);
+  $$("#vLead [data-names]").forEach(el => fillSelect(el, names, LEAD[el.dataset.l]));
+  $$("#vLead [data-yn]").forEach(el => fillSelect(el, yn, LEAD[el.dataset.l]));
+  for (const el of $$("#vLead [data-l]")) {
+    if (el.tagName === "SELECT") continue;
+    const k = el.dataset.l;
+    if (el.type === "checkbox") el.checked = !!LEAD[k];
+    else if (el.type === "date") el.value = day(LEAD[k]);
+    else if (el.type === "datetime-local") el.value = dtLocal(LEAD[k]);
+    else el.value = show(el.dataset.t, LEAD[k]);
+  }
+  renderLeadHead();
+  $("#leadNew").hidden = !leadNew;
+  $("#leadNav").hidden = leadNew || LD.pos < 0;
+  $("#leadPos").textContent = LD.pos >= 0 ? `${LD.pos + 1} of ${LD.ids.length.toLocaleString()}` : "";
+}
+function renderLeadHead() {
+  const L_ = LEAD, sts = ["first", "second", "third"].map(n => apptStatus(L_.appt_qualification, L_[n + "_appt_set_for_date"], L_[n + "_appt_date"], L_[n + "_appt_handoff_date"]));
+  sts.forEach((st, i) => { const el = $("#lst" + (i + 1)); el.textContent = st; el.className = "st " + apptClass(st); });
+  const cur = L_.third_appt_set_on_date ? 2 : L_.second_appt_set_on_date ? 1 : 0;
+  $("#lName").textContent = leadNew ? "New lead" : (L_.lead_name || "Lead");
+  $("#lTypeChip").textContent = L_.lead_type || ""; $("#lTypeChip").hidden = !L_.lead_type;
+  $("#lId").textContent = leadNew ? "" : "#" + L_.id; $("#lId").hidden = leadNew;
+  $("#lSub").textContent = [L.teamName[L_.sales_rep] && "Lead owner " + L.teamName[L_.sales_rep], L.source[L_.lead_source],
+    L_.date_time_entered && "Entered " + usDateTime(L_.date_time_entered)].filter(Boolean).join(" · ");
+  $("#ltReceived").textContent = usDate(L_.lead_received_date) || " ";
+  $("#ltAppt").textContent = usDate(L_[["first", "second", "third"][cur] + "_appt_set_for_date"]) || " ";
+  $("#ltStatus").textContent = sts[cur];
+  $("#ltRep").textContent = usDate(L_.representation_contract_signed_date) || " ";
+}
+
+// Each field saves when it changes, like the Sales form; a new lead saves once the required ones are in.
+async function saveLeadField(k, v) {
+  if (LEAD_REQUIRED[k] && (v == null || v === "")) { status(`${LEAD_REQUIRED[k]} is required.`, true); return renderLead(); }
+  const old = LEAD[k]; LEAD[k] = v; renderLeadHead();
+  if (leadNew) return tryInsertLead();
+  const { error } = await sb.from("leads").update({ [k]: v }).eq("id", LEAD.id);
+  if (error) { LEAD[k] = old; renderLead(); return status("Not saved: " + error.message, true); }
+  status("Saved");
+}
+for (const el of $$("#vLead [data-l]")) {
+  el.addEventListener("change", () => {
+    const k = el.dataset.l, t = el.dataset.t;
+    let v;
+    if (el.type === "checkbox") v = el.checked;
+    else if (el.type === "date") v = el.value || null;
+    else if (el.type === "datetime-local") v = el.value ? el.value.replace("T", " ") + ":00" : null;
+    else if (el.tagName === "SELECT") v = el.value === "" ? null : (t === "int" ? +el.value : el.value);
+    else if (el.tagName === "TEXTAREA") v = el.value.trim() || null;
+    else {
+      v = parse(t, el.value);
+      if (v === undefined) { status("That isn't a number.", true); el.value = show(t, LEAD[k]); return; }
+      if (t) el.value = show(t, v);
+    }
+    saveLeadField(k, v);
+  });
+}
+const leadMissing = () => Object.entries(LEAD_REQUIRED).filter(([k]) => LEAD[k] == null || LEAD[k] === "").map(([, t]) => t);
+let insertingLead = false;
+async function tryInsertLead() {
+  if (leadMissing().length || insertingLead) return;
+  insertingLead = true;
+  const { data, error } = await sb.from("leads").insert(LEAD).select().single();
+  insertingLead = false;
+  if (error) return status("Not saved: " + error.message, true);
+  LEAD = data; leadNew = false;
+  status("Lead saved");
+  history.replaceState(null, "", "#lead=" + LEAD.id);
+  renderLead();
+}
+$$("[data-newlead]").forEach(b => b.onclick = () => go("newlead"));
+$("#leadExit").onclick = () => {
+  if (leadNew && leadMissing().length && !confirm("This new lead isn't saved yet (missing " + leadMissing().join(", ") + "). Leave without saving?")) return;
+  go("leads");
+};
+$$("#leadNav [data-lgo]").forEach(b => b.onclick = () => {
+  const n = LD.ids.length; if (!n) return;
+  const to = b.dataset.lgo;
+  const p = to === "first" ? 0 : to === "last" ? n - 1 : to === "prev" ? Math.max(0, LD.pos - 1) : Math.min(n - 1, LD.pos + 1);
+  if (p !== LD.pos) { LD.pos = p; go("lead=" + LD.ids[p]); }
 });
 
 // ---------- Jots: Opportunity Path submissions, read-only ----------
