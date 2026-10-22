@@ -156,8 +156,6 @@ ${numText}
   const history = (past || []).reverse().map((m) => m.role === "user" ? `Agent: ${m.text}` :
     `You: ${m.text}${(m.actions as Action[]).length ? "\n(Changes you made: " + (m.actions as (Action & { undone?: boolean })[]).map((a) => a.label + (a.undone ? " [later undone]" : "")).join("; ") + ")" : ""}`).join("\n\n");
 
-  await admin.from("listing_chats").insert({ lead_id: lead.id, user_id: userId, role: "user", text: message });
-
   // ---- the tools, run against this lead only
   const actions: Action[] = [];
   let formDirty = false;
@@ -244,7 +242,7 @@ ${numText}
 
   // ---- the conversation
   const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
-  const t0 = Date.now(); let inTok = 0, outTok = 0, reply = "";
+  const t0 = Date.now(); let inTok = 0, outTok = 0, reply = "", lastStop = "";
   const msgs: Anthropic.MessageParam[] = [{ role: "user", content: [
     { type: "text", text: context, cache_control: { type: "ephemeral" } },
     { type: "text", text: `<earlier_conversation>\n${history || "(none)"}\n</earlier_conversation>\n\n<todo_list>\n${todoText()}\n</todo_list>\n\nNew message from the agent:\n${message}` },
@@ -252,12 +250,12 @@ ${numText}
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const res = await client.messages.stream({
-        model: MODEL, max_tokens: 4000, output_config: { effort: "medium" },
+        model: MODEL, max_tokens: 16000, output_config: { effort: "medium" },   // 4000 ran out on "add those and review the whole form" (Oct 22, 2026)
         system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
         tools: TOOLS, messages: msgs,
       } as Anthropic.MessageStreamParams).finalMessage();
       inTok += (res.usage.input_tokens ?? 0) + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
-      outTok += res.usage.output_tokens ?? 0;
+      outTok += res.usage.output_tokens ?? 0; lastStop = res.stop_reason ?? "";
       const uses = res.content.filter((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
       const text = res.content.filter((x): x is Anthropic.TextBlock => x.type === "text").map((x) => x.text).join("\n").trim();
       if (!uses.length || res.stop_reason !== "tool_use") { reply = text; break; }
@@ -274,14 +272,18 @@ ${numText}
     console.error("anthropic error", err);
     if (!actions.length) {
       if (err instanceof Anthropic.RateLimitError) return json({ error: "The AI is busy right now. Try again in a minute." }, 503);
+      if (err instanceof Anthropic.APIError) return json({ error: "The AI couldn't do that: " + err.message }, 502);   // the page turns "credit balance is too low" into plain words
       return json({ error: "Something went wrong reaching the AI." }, 502);
     }
     reply = "I made some of the changes, then lost the connection to the AI. Check the list below.";
   }
   if (formDirty) await admin.from("listing_leads").update({ form }).eq("id", lead.id);
-  if (!reply) reply = actions.length ? "Done." : "Sorry, I didn't get an answer together. Try asking again.";
+  if (!reply) reply = lastStop === "max_tokens" ? (actions.length ? "I made the changes below, then ran out of room before finishing. Ask me for the rest." : "That was a lot to do in one go and I ran out of room. Try one part at a time, like checking the form first.")
+    : actions.length ? "Done." : "Sorry, I didn't get an answer together. Try asking again.";
   await admin.from("listing_usage").insert({ user_id: userId, kind: "chat", seconds: (Date.now() - t0) / 1000, input_tokens: inTok, output_tokens: outTok });
   console.log(`chat lead=${lead.id} actions=${actions.length} in=${inTok} out=${outTok} ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  // the agent's message is saved only now, with its answer, so a failed send leaves nothing behind in the history
+  await admin.from("listing_chats").insert({ lead_id: lead.id, user_id: userId, role: "user", text: message });
   const { data: saved } = await admin.from("listing_chats").insert({ lead_id: lead.id, user_id: userId, role: "assistant", text: reply, actions }).select().single();
   return json({ reply, actions, message: saved });
 });

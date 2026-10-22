@@ -1041,7 +1041,12 @@ async function fn(name, body){
   const { data } = await sb.auth.getSession();
   const r = await fetch(SUPABASE_URL + "/functions/v1/" + name, { method: "POST", headers: { Authorization: "Bearer " + data.session.access_token, apikey: SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || d.message || "Something went wrong (" + r.status + ").");
+  if (!r.ok){
+    const m = d.error || d.message || "Something went wrong (" + r.status + ").";
+    // the shared Anthropic account ran dry once (Oct 22, 2026) and every AI feature just said "Something went wrong"
+    if (/credit balance is too low/i.test(m)) throw new Error("The AI account is out of credit. Add credit at console.anthropic.com (Settings, then Plans & Billing), then try again.");
+    throw new Error(m);
+  }
   return d;
 }
 async function transcribe(it){
@@ -1114,7 +1119,7 @@ async function buildBrief(){
     await saveLead(patch);
     const row = leads.find(l => l.id === leadId); if (row) row.summary = b.summary;
   } catch (err){
-    $("#briefErr").textContent = err.message + " If it timed out, wait a minute and reload: the brief may have finished on its own."; $("#briefErr").hidden = false;
+    $("#briefErr").textContent = err.message + (/out of credit/.test(err.message) ? "" : " If it timed out, wait a minute and reload: the brief may have finished on its own."); $("#briefErr").hidden = false;
   } finally { $("#briefBusy").hidden = true; if (cur && cur.id === leadId) renderLead(); }
 }
 // The AI's draft becomes the form; anything the agent changed by hand (locked) is carried over on top.
