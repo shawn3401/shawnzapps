@@ -137,7 +137,7 @@ function hustleEmail(d: any, day: string) {
   const head = `<tr><th style="background:#fff"></th>${HB.map(([, t, c]) => `<th style="background:${c};color:${c === "#93c47d" || c === "#f1c75b" ? "#1f2124" : "#fff"};font-size:11px;padding:5px 3px;border:1px solid #c9c9c6;font-weight:bold">${t}</th>`).join("")}</tr>`;
   const rows = d.agents.map((a: any, i: number) => `<tr style="background:${i % 2 ? "#f3f3f1" : "#fff"}">
     <td style="font-weight:bold;padding:4px 8px;border:1px solid #d6d6d3;background:${i % 2 ? "#e4e4e1" : "#ececea"}">${esc(a.first)}</td>
-    ${HB.map(([key, , , f, rule]) => { const c = hbColor(a[key], rule); return `<td align="center" style="padding:4px 5px;border:1px solid #d6d6d3;font-size:13px;${c ? `color:${c};font-weight:bold` : ""}">${f(a[key])}</td>`; }).join("")}</tr>`).join("");
+    ${HB.map(([key, , , f, rule]) => { const c = hbColor(a[key], rule); return `<td align="center" style="padding:4px 5px;border:1px solid #d6d6d3;font-size:13px;white-space:nowrap;${c ? `color:${c};font-weight:bold` : ""}">${f(a[key])}</td>`; }).join("")}</tr>`).join("");
   const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fff;font-size:13px">${head}${rows}</table>`;
   return shell("Agent Hustle Board", "As of " + usLong(day), box + table +
     `<div style="font-size:12px;color:#8a9097;padding-top:8px">Green and red follow the KPI platform's thresholds. R90 is the last 90 days, MTD this month to date. Contracts leave out referrals.</div>`, SITE + "#hustle");
