@@ -50,6 +50,8 @@ The written notes are for different readers. Keep them apart.
 - lead: seller name as said (first and last when known), address, phone, email. Empty strings when not stated.
 - suggested_stage: new (nothing but a name), call (first conversation done), walk_set (walkthrough scheduled), walked (walkthrough done), pricing (agent is preparing or presenting numbers), signed, listed, hold, closed. next_step: the single next thing the agent should do, one short sentence.
 
+The agent can attach a note to a file. The note says how to treat that file, and it overrides the rules above. A file the note calls a draft, a partial listing, or something to check is NOT a source of facts: do not fill the form or the notes from it; instead check it against everything else, and add to admin_notes and questions anything in it that conflicts with the other material or that nothing else supports.
+
 Writing style: plain, specific, warm. Short sentences. No em dashes or en dashes. No markdown. Quote the seller's own words where they carry weight. Skip small talk that has no bearing on the property, the people, or the deal.`;
 
 const str = { type: "string" };
@@ -149,7 +151,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: lead } = await admin.from("listing_leads").select("id, name, address, phone, email, stage").eq("id", body.lead_id).eq("user_id", userId).maybeSingle();
   if (!lead) return json({ error: "That lead wasn't found." }, 404);
-  const { data: items } = await admin.from("listing_items").select("kind, occurred_on, title, transcript, files, status")
+  const { data: items } = await admin.from("listing_items").select("kind, occurred_on, title, transcript, files, status, note")
     .eq("lead_id", lead.id).order("occurred_on").order("created_at");
   if (!items?.length) return json({ error: "Add a call, a walkthrough, notes, or photos first." }, 400);
 
@@ -164,7 +166,8 @@ Deno.serve(async (req: Request) => {
     const words = (it.transcript || "").slice(0, Math.max(0, room));
     room -= words.length;
     const waiting = it.status !== "ready" && !words ? "\n(The recording for this item has not been transcribed.)" : "";
-    parts.push(`<item>\n${head}${imgs.length ? `\n${imgs.length} photo${imgs.length === 1 ? "" : "s"} attached.` : ""}${waiting}\n${words}\n</item>`);
+    const note = it.note ? `\nAgent's note about this file: ${it.note}` : "";
+    parts.push(`<item>\n${head}${note}${imgs.length ? `\n${imgs.length} photo${imgs.length === 1 ? "" : "s"} attached.` : ""}${waiting}\n${words}\n</item>`);
   });
   const shown = photos.slice(0, MAX_PHOTOS);
   const content: unknown[] = [];

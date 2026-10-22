@@ -207,6 +207,9 @@ dialog h2{font-size:22px}
 .askbar{display:flex;gap:8px;margin-top:14px;align-items:flex-end}
 .askbar textarea{min-height:52px;height:52px}
 .sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.fnote{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.fnote input{flex:1;min-width:200px;padding:6px 9px;font-size:15px}
+.fnoteshow{margin:8px 0 0;font-size:15px;padding:6px 10px;border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:0 6px 6px 0}
 .tnotes{margin-top:6px;border-left:3px solid var(--line);padding-left:10px}
 .tnote{font-size:15px;margin-top:4px;white-space:pre-wrap}
 .tnote .d{color:var(--ink-3);font-size:13px;margin-right:6px}
@@ -302,7 +305,9 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
       </div>
 
       <div id="filesTab" hidden>
-        <div class="head" style="margin:0"><p class="sub" style="margin:0;flex:1">Photos, recordings, video, documents. Pick as many at once as you like. A video is saved as its sound only.</p><button class="btn primary" id="addFiles">Add files</button></div>
+        <p class="sub" style="margin:0">Photos, recordings, video, documents. Pick as many at once as you like. A video is saved as its sound only.</p>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:flex-start"><input type="text" id="fileNote" placeholder="Note about the files you're adding (optional)" aria-label="Note about the files you're adding"><button class="btn primary" id="addFiles" style="flex:none">Add files</button></div>
+        <p class="note" style="margin:6px 0 0">The AI follows the note. For example: "Partial listing I'm still writing. Don't use it as a source, check it against everything else."</p>
         <input type="file" id="filePick" multiple hidden accept="audio/*,video/*,image/*,.m4a,.mp3,.wav,.aac,.mp4,.mov,.pdf,.doc,.docx,.txt">
         <div class="busy" id="upBusy" hidden><div class="spin"></div><span id="upBusyText">Uploading…</span></div>
         <div class="err" id="upErr" hidden></div>
@@ -420,7 +425,7 @@ const todayISO = () => new Date().toLocaleDateString("en-CA");
 const niceDate = d => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const words = t => (t.trim().match(/\S+/g) || []).length;
 
-let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, todoWho = "agent", whoFilter = "all", whoEdit = null, noteFor = null, chats = null, chatLead = null, asking = false, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
+let session = null, leads = [], cur = null, items = [], todos = [], scanning = 0, fileNoteFor = null, todoWho = "agent", whoFilter = "all", whoEdit = null, noteFor = null, chats = null, chatLead = null, asking = false, thumbs = {}, view = "notes", tab = "overview", filter = "all", fileFilter = "all", blank = null;
 let formMode = innerWidth >= 760 ? "page" : "list", pageImgs = null, pagesLoading = false, pagesFailed = false;   // the form as the real page (wide screens) or as a list of boxes (phones)
 const triedPdf = new Set();
 
@@ -863,13 +868,15 @@ function renderFiles(){
     const state = i.status === "transcribing" ? `<div class="busy"><div class="spin"></div><span>Transcribing…</span></div>`
       : i.status === "failed" ? `<div class="err">${esc(i.error || "This couldn't be transcribed.")} <button class="btn link" data-retry="${i.id}">Try again</button></div>` : "";
     return `<div class="item">
-      <div class="ih"><b>${esc(f.name)}</b><span class="meta">${FTYPES.find(x => x[0] === t)[1].replace(/s$/, "")} · ${fsize(f.size)} · ${niceDate(i.occurred_on)} · <button class="btn link" data-open="${esc(f.path)}">Open</button> · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      <div class="ih"><b>${esc(f.name)}</b><span class="meta">${FTYPES.find(x => x[0] === t)[1].replace(/s$/, "")} · ${fsize(f.size)} · ${niceDate(i.occurred_on)} · <button class="btn link" data-open="${esc(f.path)}">Open</button> · <button class="btn link" data-fnote="${i.id}">${i.note ? "Edit note" : "Add a note"}</button> · <button class="btn link" data-rm="${i.id}">Remove</button></span></div>
+      ${fileNoteFor === i.id ? `<div class="fnote"><input type="text" id="fnoteText" value="${esc(i.note || "")}" placeholder="How should the AI treat this file?" aria-label="Note about this file"><button class="btn small primary" data-fnsave="${i.id}">Save</button><button class="btn small" data-fncancel="1">Cancel</button></div>`
+        : i.note ? `<p class="fnoteshow"><b>Note:</b> ${esc(i.note)}</p>` : ""}
       ${state}
       ${i.transcript ? `<details><summary>${media ? "Transcript" : "Text read from it"} (${words(i.transcript).toLocaleString()} words)</summary><textarea data-tr="${i.id}">${esc(i.transcript)}</textarea></details>`
         : media && i.status === "ready" ? `<p class="note" style="margin:8px 0 0">Not transcribed. <button class="btn link" data-retry="${i.id}">Transcribe it</button></p>` : ""}
     </div>`;
   }).join("");
-  if (photos.length) html += `${rest.length ? `<h3 class="ph">Photos (${photos.length})</h3>` : ""}<div class="pgrid">${photos.map(({ i, f }) => `<div class="ptile">${thumbs[f.path] ? `<a href="${thumbs[f.path]}" target="_blank" rel="noopener"><img src="${thumbs[f.path]}" alt="${esc(f.name)}" loading="lazy"></a>` : esc(f.name)}<button class="px" data-rm="${i.id}" title="Remove" aria-label="Remove ${esc(f.name)}">×</button></div>`).join("")}</div>`;
+  if (photos.length) html += `${rest.length ? `<h3 class="ph">Photos (${photos.length})</h3>` : ""}<div class="pgrid">${photos.map(({ i, f }) => `<div class="ptile"${i.note ? ` title="Note: ${esc(i.note)}"` : ""}>${thumbs[f.path] ? `<a href="${thumbs[f.path]}" target="_blank" rel="noopener"><img src="${thumbs[f.path]}" alt="${esc(f.name)}" loading="lazy"></a>` : esc(f.name)}<button class="px" data-rm="${i.id}" title="Remove" aria-label="Remove ${esc(f.name)}">×</button></div>`).join("")}</div>`;
   $("#files").innerHTML = html || `<p class="sub" style="margin-top:14px">No files yet. Recordings are transcribed, photos are looked at, and all of it goes into the brief.</p>`;
 }
 $("#fileFilters").addEventListener("click", e => { const b = e.target.closest("[data-ff]"); if (b){ fileFilter = b.dataset.ff; renderFiles(); } });
@@ -960,6 +967,7 @@ async function videoSound(file, onProgress){
 $("#addFiles").addEventListener("click", () => $("#filePick").click());
 $("#filePick").addEventListener("change", async e => {
   const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+  const batchNote = $("#fileNote").value.trim();   // goes on every file in this batch
   const lead = cur, uid = session.user.id, problems = [], added = [];
   $("#upErr").hidden = true; $("#upBusy").hidden = false; $("#addFiles").disabled = true;
   for (let n = 0; n < files.length; n++){
@@ -984,13 +992,14 @@ $("#filePick").addEventListener("change", async e => {
     const media = /^(audio|video)\//.test(type);
     let text = "";
     if (type === "application/pdf"){ $("#upBusyText").textContent = `Reading ${f.name}`; try { text = await pdfText(await f.arrayBuffer()); } catch (_) {} }
-    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, transcript: text, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
+    const { data, error } = await sb.from("listing_items").insert({ lead_id: lead.id, kind: "file", title: name, note: batchNote, transcript: text, files: [{ path, name, type, size: blob.size }], status: media ? "transcribing" : "ready" }).select().single();
     if (data && type === "application/pdf"){ triedPdf.add(data.id); if (text) findTodos(data); }
     if (error){ problems.push(`${f.name}: ${error.message}`); await sb.storage.from(BUCKET).remove([path]); continue; }
     added.push(data);
     if (cur && cur.id === lead.id){ items.push(data); renderView(); }
   }
   $("#upBusy").hidden = true; $("#addFiles").disabled = false;
+  if (added.length) $("#fileNote").value = "";
   if (problems.length){ $("#upErr").textContent = "Not added: " + problems.join(" "); $("#upErr").hidden = false; }
   loadThumbs();
   for (const it of added) if (it.status === "transcribing") await transcribe(it);
@@ -999,6 +1008,15 @@ $("#filePick").addEventListener("change", async e => {
 // shared by the Notes and Files lists
 async function entryClick(e){
   const rm = e.target.closest("[data-rm]"), re = e.target.closest("[data-retry]"), op = e.target.closest("[data-open]");
+  const fn_ = e.target.closest("[data-fnote]"), fs_ = e.target.closest("[data-fnsave]");
+  if (fn_){ fileNoteFor = fn_.dataset.fnote; renderFiles(); const box = $("#fnoteText"); box.focus(); box.select(); return; }
+  if (e.target.closest("[data-fncancel]")){ fileNoteFor = null; return renderFiles(); }
+  if (fs_){
+    const it = items.find(i => i.id === fs_.dataset.fnsave), note = $("#fnoteText").value.trim();
+    const { error } = await sb.from("listing_items").update({ note }).eq("id", it.id);
+    if (error) return alert("The note didn't save: " + error.message);
+    it.note = note; fileNoteFor = null; return renderFiles();
+  }
   if (rm){
     const it = items.find(i => i.id === rm.dataset.rm);
     if (!confirm(isNote(it) ? "Remove this note?" : "Remove " + (it.title || "this file") + "?")) return;
@@ -1017,6 +1035,7 @@ async function entryChange(e){
   await sb.from("listing_items").update({ transcript: t.value }).eq("id", it.id);
 }
 for (const id of ["#notes", "#files"]){ $(id).addEventListener("click", entryClick); $(id).addEventListener("change", entryChange); }
+$("#files").addEventListener("keydown", e => { if (e.target.id === "fnoteText" && e.key === "Enter"){ e.preventDefault(); document.querySelector("[data-fnsave]")?.click(); } if (e.target.id === "fnoteText" && e.key === "Escape"){ fileNoteFor = null; renderFiles(); } });
 
 async function fn(name, body){
   const { data } = await sb.auth.getSession();

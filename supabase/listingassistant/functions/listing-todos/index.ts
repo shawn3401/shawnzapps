@@ -51,6 +51,8 @@ Rules for numbers (only these nine, only about THIS property, and only when the 
 - agreed: the list price the agent and seller agreed on.
 Give the amount in whole dollars ("she wants 525" means 525000) and one short quote of where it came from. Never use a comparable sale, a neighbor's house, a past purchase price, or a guess. When none of the nine is stated, return an empty list.
 
+A file can carry the agent's note saying how to treat it. Follow it. When the note calls the file a draft, a partial listing, or something to check, do not take facts or numbers from it; only add to-dos the note asks for or that come from checking it ("Fix the square footage on the partial listing").
+
 Plain words. No em dashes or en dashes. No markdown.`;
 
 const TOOL = {
@@ -98,10 +100,10 @@ Deno.serve(async (req: Request) => {
   const { data: lead } = await admin.from("listing_leads").select("id, name, address, numbers").eq("id", body.lead_id ?? "").eq("user_id", userId).maybeSingle();
   if (!lead) return json({ error: "That lead wasn't found." }, 404);
 
-  let q = admin.from("listing_items").select("id, kind, occurred_on, title, transcript").eq("lead_id", lead.id).order("occurred_on").order("created_at");
+  let q = admin.from("listing_items").select("id, kind, occurred_on, title, transcript, note").eq("lead_id", lead.id).order("occurred_on").order("created_at");
   if (body.item_id) q = q.eq("id", body.item_id);
   const { data: all } = await q;
-  const items = (all || []).filter((i) => (i.transcript || "").trim());
+  const items = (all || []).filter((i) => (i.transcript || "").trim() || (i.note || "").trim());
   if (!items.length) return json({ added: [], hinted: [], numbers: lead.numbers });
   const { data: have } = await admin.from("listing_todos").select("id, text, who, done").eq("lead_id", lead.id).order("created_at");
   const todos = have || [];
@@ -109,7 +111,7 @@ Deno.serve(async (req: Request) => {
   let room = MAX_WORDS;
   const parts = items.map((it) => {
     const words = it.transcript.slice(0, Math.max(0, room)); room -= words.length;
-    return `<entry>\n${it.kind === "note" ? "Agent's note" : "File: " + it.title}, ${it.occurred_on}\n${words}\n</entry>`;
+    return `<entry>\n${it.kind === "note" ? "Agent's note" : "File: " + it.title}, ${it.occurred_on}${it.note ? "\nAgent's note about this file: " + it.note : ""}\n${words}\n</entry>`;
   });
   const list = todos.length ? todos.map((t, n) => `${n + 1}. [${t.done ? "done" : "open"}] ${t.text} (${WHO[t.who] ?? "Listing Agent"})`).join("\n") : "(none yet)";
   const ask = `Seller: ${lead.name || "(no name yet)"}${lead.address ? ", " + lead.address : ""}

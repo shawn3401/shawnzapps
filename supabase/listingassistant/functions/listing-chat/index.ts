@@ -40,6 +40,7 @@ You can also make changes with your tools: add a to-do, mark one done or not don
 - After making changes, reply in one or two short sentences saying what you did. The page shows each change with an Undo button, so do not ask for permission first. If the request is ambiguous, ask one short question instead of guessing.
 - On the form, anything the agent tells you counts as confirmed. When checking a box that has options, a count, or a text blank, fill those only with what was given (empty strings and an empty list otherwise).
 - The Value card holds nine numbers: tax (tax assessed value), zest (Zestimate), wants (what the seller wants), loan (what they owe), cma_low and cma_high (the agent's CMA range), rec_low and rec_high (the list price range the agent recommends), and agreed (the list price agreed with the seller). Set one with set_value when the agent gives it ("Zestimate is 512k", "CMA came in 470 to 495"), in whole dollars, with a short note of where it came from if they said. An amount of 0 is a real value (a loan of 0 means the house is paid off); to remove a number, use clear true. Never set one from your own estimate.
+- A file can carry the agent's note saying how to treat it. Follow it. A file the note calls a draft, a partial listing, or something to check is not a source of facts: answer from the rest of the material, and when asked to check it, compare it line by line with everything else and list what conflicts or has no support.
 - Who on a to-do is one of: agent (Listing Agent: the agent's own work, and the default), seller (the seller or anyone on their side), team (the Success Team: office paperwork, MLS entry, title, photos, signs, lockboxes, marketing).
 
 Plain words. No markdown headings, tables, or bold. No em dashes or en dashes.`;
@@ -94,7 +95,7 @@ Deno.serve(async (req: Request) => {
   if (!lead) return json({ error: "That lead wasn't found." }, 404);
 
   const [{ data: itemRows }, { data: todoRows }, { data: past }] = await Promise.all([
-    admin.from("listing_items").select("kind, occurred_on, title, transcript, files").eq("lead_id", lead.id).order("occurred_on").order("created_at"),
+    admin.from("listing_items").select("kind, occurred_on, title, transcript, files, note").eq("lead_id", lead.id).order("occurred_on").order("created_at"),
     admin.from("listing_todos").select("id, text, who, done, done_at, done_hint").eq("lead_id", lead.id).order("created_at"),
     admin.from("listing_chats").select("role, text, actions").eq("lead_id", lead.id).order("created_at", { ascending: false }).limit(HISTORY),
   ]);
@@ -108,7 +109,7 @@ Deno.serve(async (req: Request) => {
     const files = (it.files as { name: string; type: string }[]).map((x) => x.name).join(", ");
     const words = (it.transcript || "").slice(0, Math.max(0, room)); room -= words.length;
     const head = it.kind === "note" ? `Note${it.title ? " (" + it.title + ")" : ""}` : `File: ${files}`;
-    return `<entry n="${n + 1}">\n${head}, ${it.occurred_on}\n${words}\n</entry>`;
+    return `<entry n="${n + 1}">\n${head}, ${it.occurred_on}${it.note ? "\nAgent's note about this file: " + it.note : ""}\n${words}\n</entry>`;
   }).join("\n") || "(nothing yet)";
   const todoText = () => todos.length ? todos.map((t, n) => `${n + 1}. [${t.done ? "done" : "open"}] ${t.text} (${WHO[t.who] ?? "Listing Agent"})`).join("\n") : "(none)";
   const marked = Object.entries(form.checks).map(([k, c]) => {
