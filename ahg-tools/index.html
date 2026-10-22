@@ -485,7 +485,7 @@ body.notadmin .ge-admin { display: none !important; }
       <section class="card" id="distEdit" hidden style="margin-bottom:16px">
         <div class="card-h"><h3 id="deTitle">New distribution</h3></div>
         <form class="card-b dist-form" id="distForm">
-          <div class="fld"><span>Report</span><div class="seg small" id="deReport"></div></div>
+          <div class="fld" id="deReportF"><span>Which report?</span><div class="seg small" id="deReport"></div></div>
           <label class="fld req"><span>Name of this list</span><input class="in" id="deName" autocomplete="off" placeholder="e.g. Leadership team, All agents"></label>
           <div class="fld"><span>Recipients</span>
             <div class="chips" id="deRcpts" style="margin:0 0 8px"></div>
@@ -1769,7 +1769,9 @@ function renderSendLog(rows) {
 function editDist(d) {
   DE = d ? { ...d, recipients: [...d.recipients], days: [...d.days] }
     : { report: "dlr", name: "", recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", mode: "test", test_to: ME.email, active: true };
-  $("#deTitle").textContent = d ? "Edit distribution" : "New distribution";
+  // The report is picked once, when the list is made; editing shows it in the heading instead.
+  $("#deTitle").textContent = d ? `${REPORTS[d.report]}: ${d.name}` : "New distribution";
+  $("#deReportF").hidden = !!d;
   $("#deName").value = DE.name; $("#deTime").value = DE.send_time.slice(0, 5); $("#deActive").checked = DE.active;
   $("#deMonthDay").value = DE.month_day || 1; $("#deTestTo").value = DE.test_to; $("#deEmail").value = "";
   $("#deDelete").hidden = !d; $("#dePrevFrame").hidden = true;
