@@ -125,6 +125,12 @@ def main():
             sql.append(f"alter table public.{q(st)} enable row level security;")
             sql.append(f"revoke all on public.{q(st)} from anon;")
 
+        # Access's relationships are re-added as foreign keys at the end. On a refresh they already
+        # exist and would reject rows loaded before their parent table, so drop them for the load.
+        for rel, child, ccol, parent, pcol in relationships():
+            if child in info and parent in info:
+                sql.append(f"alter table if exists public.{q(snake(child))} drop constraint if exists {q(snake(rel)[:60] + '_fk')};")
+
         sql.append("truncate " + ", ".join("public." + q(snake(t)) for t in names) + ";")
 
         for t in names:
