@@ -177,6 +177,17 @@ body.notadmin .ge-admin { display: none !important; }
 .rcpt-add .in { flex: 1; min-width: 200px; }
 .dist-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .dist-acts .grow { flex: 1; }
+.de-reps { display: grid; gap: 6px; max-width: 420px; }
+.de-rep { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; background: var(--paper); }
+.de-rep.on { border-color: var(--ink-3); }
+.de-rep .grow { flex: 1; }
+.de-rep button { border: 0; background: none; cursor: pointer; color: var(--ink-3); font-size: 15px; padding: 2px 6px; }
+.de-rep button:hover { color: var(--accent); }
+.de-groups { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.de-groups .gbtn { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px; font-weight: 600; cursor: pointer; color: var(--ink-2); }
+.de-groups .gbtn.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.de-who { margin: 8px 0 0; }
+.de-who .warn { color: var(--accent); }
 .preview-frame { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 10px; background: #f4f4f2; }
 .sendlog .bad { color: var(--accent); }
 .mode-test { background: var(--warn-soft); color: var(--warn); }
@@ -426,9 +437,10 @@ body.notadmin .ge-admin { display: none !important; }
             <label class="fld"><span>Start date</span><input class="in" type="date" id="naStart"></label>
             <label class="fld"><span>Split level</span><input class="in" id="naSplit" list="splitLevels" autocomplete="off"></label>
             <label class="fld"><span>Jotform name</span><input class="in" id="naJot" autocomplete="off" placeholder="As in the jot's agent list, e.g. Riley"></label>
+            <label class="fld"><span>Work email (for report emails)</span><input class="in" id="naEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off" placeholder="name@andersonhicks.com"></label>
             <label class="chk" id="naHustleF"><input type="checkbox" id="naHustle" checked> Show on the agent hustle board</label>
-            <h4 class="tm-h">Sign-in to AHG Tools (optional)</h4>
-            <label class="fld"><span>Email</span><input class="in" id="naEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off" placeholder="name@andersonhicks.com"></label>
+            <h4 class="tm-h">Sign-in to AHG Tools</h4>
+            <label class="chk"><input type="checkbox" id="naSignin"> Can sign in, with their work email</label>
             <label class="fld"><span>Access</span><select class="in" id="naAccess"><option value="agent">Agent: views only their own sales</option><option value="staff">Staff: sees and edits every sale</option><option value="admin">Admin: everything, plus this page</option></select></label>
             <div class="dist-acts" style="grid-column:1/-1"><button class="btn red" type="submit">Add</button><button class="btn" type="button" id="naCancel">Cancel</button>
               <span class="note" style="margin:0">Also add them to the agent list on the jots in Jotform.</span></div>
@@ -461,6 +473,7 @@ body.notadmin .ge-admin { display: none !important; }
             <label class="fld"><span>Role</span><select class="in" data-tm="current_role" id="tmRole"></select></label>
             <label class="fld"><span>Start date</span><input class="in" type="date" data-tm="company_start_date"></label>
             <label class="fld"><span>Split level</span><input class="in" data-tm="agent_split_level" list="splitLevels" autocomplete="off"></label>
+            <label class="fld" style="grid-column:1/-1"><span>Work email (for report emails)</span><input class="in" id="tmWorkEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off" placeholder="name@andersonhicks.com"></label>
             <p class="note" style="grid-column:1/-1;margin:0">Changing the role here also ends the old role and starts the new one in the role history, as of today.</p>
           </div></section>
           <section class="card"><div class="card-h"><h3>Sign-in to AHG Tools</h3></div><div class="card-b" id="tmSignin"></div></section>
@@ -480,20 +493,22 @@ body.notadmin .ge-admin { display: none !important; }
 
     <!-- Report distribution (admins only): who gets which report emails, how often, and when -->
     <section id="vDist" hidden>
-      <div class="head"><div class="grow"><h1>Report distribution</h1><div class="sub">Report emails sent from reports@andersonhicks.com. Times are Mountain time; each goes out within 15 minutes of its time.</div></div>
-        <div class="acts"><button class="btn red" id="distNew">+ New distribution</button></div></div>
+      <div class="head"><div class="grow"><h1>Report distribution</h1><div class="sub">Each email holds one or more reports and goes to groups from the Team page and any addresses you add. Sent from reports@andersonhicks.com; times are Mountain time, within 15 minutes.</div></div>
+        <div class="acts"><button class="btn red" id="distNew">+ New email</button></div></div>
       <section class="card" id="distEdit" hidden style="margin-bottom:16px">
         <div class="card-h"><h3 id="deTitle">New distribution</h3></div>
         <form class="card-b dist-form" id="distForm">
-          <div class="fld" id="deReportF"><span>Which report?</span><div class="seg small" id="deReport"></div></div>
-          <label class="fld req"><span>Name of this list</span><input class="in" id="deName" autocomplete="off" placeholder="e.g. Leadership team, All agents"></label>
-          <div class="fld"><span>Recipients</span>
-            <div class="chips" id="deRcpts" style="margin:0 0 8px"></div>
+          <label class="fld req"><span>Email subject (the date is added at the end)</span><input class="in" id="deName" autocomplete="off" placeholder="e.g. Daily Leadership Reports"></label>
+          <div class="fld"><span>Reports in this email, in order</span><div class="de-reps" id="deReports"></div></div>
+          <div class="fld"><span>Who gets it</span>
+            <div class="de-groups" id="deGroups"></div>
+            <div class="chips" id="deRcpts" style="margin:8px 0"></div>
             <div class="rcpt-add">
-              <input class="in" id="deEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off" placeholder="name@andersonhicks.com or a group like execs@andersonhicks.com">
+              <input class="in" id="deEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off" placeholder="Add an address, e.g. execs@andersonhicks.com">
               <button class="btn" type="button" id="deAddEmail">Add</button>
               <select class="in" id="dePick" style="flex:0 1 240px"></select>
-            </div></div>
+            </div>
+            <div class="note de-who" id="deWho"></div></div>
           <div class="fld"><span>How often</span><div class="seg small" id="deFreq"></div></div>
           <div class="fld" id="deDaysF" hidden><span>On these days</span><div class="seg small" id="deDays"></div></div>
           <label class="fld" id="deMonthF" hidden style="max-width:260px"><span>Day of the month (31 means the last day)</span><input class="in" id="deMonthDay" type="number" min="1" max="31"></label>
@@ -501,6 +516,7 @@ body.notadmin .ge-admin { display: none !important; }
             <label class="fld"><span>Send time</span><input class="in" id="deTime" type="time" step="900"></label>
             <label class="chk" style="align-self:end"><input type="checkbox" id="deActive"> On (uncheck to pause it)</label>
           </div>
+          <label class="chk"><input type="checkbox" id="deSkipHol"> Skip Idaho holidays (the list on Settings)</label>
           <div class="fld"><span>Mode</span><div class="seg small" id="deMode"></div><div class="note" id="deModeNote" style="margin:6px 0 0"></div></div>
           <label class="fld" id="deTestF"><span>Test emails go to</span><input class="in" id="deTestTo" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
           <div class="dist-acts">
@@ -1231,7 +1247,7 @@ const ROLE_NAMES = { admin: "Admin", staff: "Staff", agent: "Agent" };
 let TM = { tab: "active", q: "", role: "" }, TD = {};
 const tmDate = v => v ? String(v).slice(0, 10) : "";
 async function loadTeamData() {
-  const [m, r, h, u, j, hid, b, bt] = await Promise.all([
+  const [m, r, h, u, j, hid, b, bt, em] = await Promise.all([
     sb.from("team_members").select("*").order("team_member_name"),
     sb.from("roles").select("id, role_name").order("role_name"),
     sb.from("team_membersin_roles").select("*").order("role_start_date"),
@@ -1240,11 +1256,13 @@ async function loadTeamData() {
     sb.from("hustle_hidden").select("team_member_id"),
     sb.from("team_member_settings").select("*"),
     sb.from("bonus_types").select("bonus_type_id, bonus_name").order("bonus_type_id"),
+    sb.from("team_member_emails").select("*"),
   ]);
-  const err = [m, r, h, u, j, hid, b, bt].find(x => x.error);
+  const err = [m, r, h, u, j, hid, b, bt, em].find(x => x.error);
   if (err) { status(err.error.message, true); return false; }
   TD = { members: m.data, roles: r.data, roleName: Object.fromEntries(r.data.map(x => [x.id, x.role_name])), hist: h.data, users: u.data,
-    jots: j.data, hidden: new Set(hid.data.map(x => x.team_member_id)), bonus: b.data, bonusTypes: bt.data };
+    jots: j.data, hidden: new Set(hid.data.map(x => x.team_member_id)), bonus: b.data, bonusTypes: bt.data,
+    emails: Object.fromEntries(em.data.map(x => [x.team_member_id, x.email])) };
   const levels = [...new Set(TD.members.map(x => x.agent_split_level).filter(Boolean))].sort();
   $("#splitLevels").innerHTML = levels.map(v => `<option value="${esc(v)}">`).join("");
   return true;
@@ -1269,14 +1287,14 @@ function renderTeam() {
     TD.roles.filter(r => counts[r.id]).map(r => `<button type="button" data-r="${r.id}" class="${+TM.role === r.id ? "on" : ""}">${esc(r.role_name)} (${counts[r.id]})</button>`).join("");
   $$("#tmRoleF [data-r]").forEach(b => b.onclick = () => { TM.role = b.dataset.r; renderTeam(); });
   const rows = inTab.filter(m => (!TM.role || m.current_role === +TM.role) &&
-    (!q || [m.team_member_name, user(m.id)?.email, ...jotsOf(m.id)].some(x => (x || "").toLowerCase().includes(q))));
-  $("#teamTable").innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Started</th><th>Split level</th><th>Jotform name</th><th>Sign-in</th><th>Hustle board</th></tr></thead><tbody>` +
+    (!q || [m.team_member_name, TD.emails[m.id], user(m.id)?.email, ...jotsOf(m.id)].some(x => (x || "").toLowerCase().includes(q))));
+  $("#teamTable").innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Started</th><th>Split level</th><th>Jotform name</th><th>Work email</th><th>Sign-in</th><th>Hustle board</th></tr></thead><tbody>` +
     (rows.length ? rows.map(m => { const u = user(m.id), agent = TD.roleName[m.current_role] === "Agent";
       return `<tr data-id="${m.id}" class="${m.active === "Yes" ? "" : "off"}"><td><b>${esc(m.team_member_name)}</b></td><td>${esc(TD.roleName[m.current_role] || "")}</td>
         <td>${usDate(m.company_start_date)}</td><td>${esc(m.agent_split_level || "")}</td><td>${esc(jotsOf(m.id).join(", "))}</td>
-        <td>${u ? `${esc(u.email)} <span class="chip gray" style="margin-left:4px">${ROLE_NAMES[u.role]}${u.active ? "" : ", off"}</span>` : ""}</td>
+        <td>${esc(TD.emails[m.id] || u?.email || "")}</td><td>${u ? `<span class="chip gray" style="margin-left:0">${ROLE_NAMES[u.role]}${u.active ? "" : ", off"}</span>` : ""}</td>
         <td>${m.active === "Yes" && agent ? (TD.hidden.has(m.id) ? "Hidden" : "Shown") : ""}</td></tr>`; }).join("")
-    : `<tr><td colspan="7" class="note">No one matches.</td></tr>`) + `</tbody>`;
+    : `<tr><td colspan="8" class="note">No one matches.</td></tr>`) + `</tbody>`;
   $$("#teamTable tr[data-id]").forEach(tr => tr.onclick = () => go("member=" + tr.dataset.id));
   // sign-ins with no team member (shouldn't happen; offer to link them)
   const loose = TD.users.filter(u => !u.team_member_id);
@@ -1310,9 +1328,10 @@ $("#tmAddForm").addEventListener("submit", async e => {
   const email = $("#naEmail").value.trim().toLowerCase();
   if (!$("#naName").value.trim()) return status("Fill in the name.", true);
   if (email && !/^[^@\s]+@andersonhicks\.com$/.test(email)) return status("Use their @andersonhicks.com address.", true);
-  if (email && TD.users.some(u => u.email === email)) return status(email + " already has a sign-in.", true);
+  if (email && (TD.users.some(u => u.email === email) || Object.values(TD.emails).includes(email))) return status(email + " is already on the team list.", true);
+  if ($("#naSignin").checked && !email) return status("Fill in their work email so they can sign in.", true);
   const { data: id, error } = await sb.rpc("team_member_add", { p: { name: $("#naName").value, role: +$("#naRole").value, start: $("#naStart").value,
-    split: $("#naSplit").value.trim(), jot: $("#naJot").value, email, access: $("#naAccess").value, hide_hustle: !$("#naHustle").checked } });
+    split: $("#naSplit").value.trim(), jot: $("#naJot").value, email, signin: $("#naSignin").checked, access: $("#naAccess").value, hide_hustle: !$("#naHustle").checked } });
   if (error) return status(error.message, true);
   $("#tmAdd").hidden = true; status($("#naName").value.trim() + " added");
   await loadLookups(); go("member=" + id);
@@ -1333,6 +1352,7 @@ function renderMember(id) {
   $("#tmSub").textContent = [m.company_start_date && "Started " + usDate(m.company_start_date), "Team member " + m.id].filter(Boolean).join(" · ");
   $("#tmRole").innerHTML = `<option value=""></option>` + roleOpts(m.current_role);
   $$("#tmOne [data-tm]").forEach(el => { const v = m[el.dataset.tm]; el.value = el.type === "date" ? tmDate(v) : (v ?? ""); });
+  $("#tmWorkEmail").value = TD.emails[id] || "";
   // role history
   const hist = TD.hist.filter(h => h.team_member === id);
   $("#tmRoles").innerHTML = `<thead><tr><th>Role</th><th>Start</th><th>End</th><th></th></tr></thead><tbody>` +
@@ -1373,7 +1393,7 @@ function renderMember(id) {
         ${me ? "" : `<button class="btn" id="tmNoSign">Remove sign-in</button>`}</div>
       <p class="note" style="margin:0">Added ${usDate(u.added_at)}.</p></div>`
     : `<div class="tm-signin"><p class="note" style="margin:0">No sign-in yet.</p><div class="row">
-      <label class="fld" style="flex:1;min-width:220px"><span>Email</span><input class="in" id="tmNewEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore placeholder="name@andersonhicks.com"></label>
+      <label class="fld" style="flex:1;min-width:220px"><span>Email</span><input class="in" id="tmNewEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore placeholder="name@andersonhicks.com" value="${esc(TD.emails[id] || "")}"></label>
       <label class="fld"><span>Access</span><select class="in" id="tmNewAccess"><option value="agent">Agent</option><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
       <button class="btn red" id="tmGiveSign">Give sign-in</button></div></div>`;
   if (u) {
@@ -1392,7 +1412,9 @@ function renderMember(id) {
     const row = { email, name: m.team_member_name, role: $("#tmNewAccess").value, team_member_id: id };
     const { error } = await sb.from("app_users").insert(row);
     if (error) return status(/duplicate/.test(error.message) ? email + " already has a sign-in." : error.message, true);
-    TD.users.push({ ...row, active: true, added_at: new Date().toISOString() }); status("Sign-in added"); renderMember(id);
+    TD.users.push({ ...row, active: true, added_at: new Date().toISOString() });
+    if (!TD.emails[id]) { const { error: e2 } = await sb.from("team_member_emails").upsert({ team_member_id: id, email }); if (!e2) TD.emails[id] = email; }
+    status("Sign-in added"); renderMember(id);
   };
   // bonuses
   const bon = TD.bonus.filter(x => x.team_member_id === id);
@@ -1449,6 +1471,14 @@ $$("#tmOne [data-tm]").forEach(el => el.addEventListener("change", async () => {
   }
   status("Saved"); await loadLookups(); renderMember(m.id);
 }));
+$("#tmWorkEmail").addEventListener("change", async () => {
+  const m = TD.cur, v = $("#tmWorkEmail").value.trim().toLowerCase();
+  if (v && !/^[^@\s]+@andersonhicks\.com$/.test(v)) { status("Use their @andersonhicks.com address.", true); $("#tmWorkEmail").value = TD.emails[m.id] || ""; return; }
+  const { error } = v ? await sb.from("team_member_emails").upsert({ team_member_id: m.id, email: v }) : await sb.from("team_member_emails").delete().eq("team_member_id", m.id);
+  if (error) { status(/duplicate|unique/.test(error.message) ? v + " belongs to someone else on the list." : error.message, true); $("#tmWorkEmail").value = TD.emails[m.id] || ""; return; }
+  if (v) TD.emails[m.id] = v; else delete TD.emails[m.id];
+  status("Saved");
+});
 $("#tmAddRole").onclick = async () => {
   const m = TD.cur, today = new Date().toLocaleDateString("en-CA");
   const { data, error } = await sb.from("team_membersin_roles").insert({ team_member: m.id, role: m.current_role || TD.roles[0].id, role_start_date: today }).select().single();
@@ -1706,12 +1736,15 @@ $("#hoAdd").onclick = async () => {
 };
 
 // ---------- Report distribution (admins only; the database enforces it too) ----------
-// Shawn, Oct 21, 2026: pick a report, its recipients, how often, and when. The send-reports Edge
-// Function does the sending (pg_cron every 15 minutes) and the previews.
+// Shawn, Oct 22, 2026: an EMAIL is what gets sent: a subject, one or more reports stacked in order,
+// who gets it (groups from the Team page plus typed addresses), when, test or live, on or off, and
+// skip Idaho holidays. The send-reports Edge Function does the sending (pg_cron every 15 minutes)
+// and the previews; report_recipients() turns the groups into work emails when it sends.
 const REPORTS = { dlr: "Leadership dashboard", hustle: "Agent hustle board", tracker: "Pending tracker" };
 const FREQ = { weekdays: "Every weekday", daily: "Every day", days: "Certain days", monthly: "Monthly" };
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-let dists = [], DE = null;   // the list, and the one being edited
+const GROUPS = { agents: "All active agents", staff: "Staff (sign-in)", admins: "Admins (sign-in)" };
+let dists = [], DE = null, distRoles = [];   // the list, the one being edited, team roles
 const hm = t => { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`; };
 const ordinal = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
 function when(d) {
@@ -1719,6 +1752,7 @@ function when(d) {
     : d.frequency === "monthly" ? (d.month_day >= 31 ? "Last day of the month" : `Monthly on the ${ordinal(d.month_day || 1)}`) : FREQ[d.frequency];
   return `${f} at ${hm(d.send_time)}`;
 }
+const groupName = g => GROUPS[g] || (g.startsWith("role:") ? (distRoles.find(r => r.id === +g.slice(5))?.role_name || "Role " + g.slice(5)) : g);
 async function callSend(body) {
   const { data, error } = await sb.functions.invoke("send-reports", { body });
   if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} throw new Error(m); }
@@ -1727,26 +1761,28 @@ async function callSend(body) {
 async function showDist() {
   page("vDist");
   $("#distEdit").hidden = true;
-  const [d, s, u] = await Promise.all([
-    sb.from("report_distributions").select("*").order("report").order("name"),
+  const [d, s, u, r] = await Promise.all([
+    sb.from("report_distributions").select("*").order("name"),
     sb.from("report_sends").select("*").order("sent_at", { ascending: false }).limit(40),
     sb.from("app_users").select("name, email, active").order("name"),
+    sb.from("roles").select("id, role_name").order("role_name"),
   ]);
   if (d.error) return status(d.error.message, true);
-  dists = d.data; L.users = (u.data || []).filter(x => x.active);
+  dists = d.data; L.users = (u.data || []).filter(x => x.active); distRoles = r.data || [];
   renderDists(); renderSendLog(s.data || []);
 }
 function renderDists() {
-  $("#distTable").innerHTML = `<thead><tr><th>Report</th><th>List</th><th>Recipients</th><th>When</th><th>Mode</th><th>On</th><th>Last sent</th><th></th></tr></thead><tbody>` +
-    (dists.length ? dists.map((d, i) => `<tr data-i="${i}" class="${d.active ? "" : "off"}">
-      <td data-label="Report"><b>${REPORTS[d.report]}</b></td>
-      <td data-label="List">${esc(d.name)}</td>
-      <td data-label="Recipients">${d.recipients.length ? esc(d.recipients.slice(0, 3).join(", ")) + (d.recipients.length > 3 ? ` and ${d.recipients.length - 3} more` : "") : `<span class="note">None yet</span>`}</td>
-      <td data-label="When">${when(d)}</td>
+  $("#distTable").innerHTML = `<thead><tr><th>Email</th><th>Reports</th><th>Who gets it</th><th>When</th><th>Mode</th><th>On</th><th>Last sent</th><th></th></tr></thead><tbody>` +
+    (dists.length ? dists.map((d, i) => { const who = [...(d.audiences || []).map(groupName), ...d.recipients];
+      return `<tr data-i="${i}" class="${d.active ? "" : "off"}">
+      <td data-label="Email"><b>${esc(d.name)}</b></td>
+      <td data-label="Reports">${d.reports.map(r => REPORTS[r]).join(", ")}</td>
+      <td data-label="Who gets it">${who.length ? esc(who.slice(0, 3).join(", ")) + (who.length > 3 ? ` and ${who.length - 3} more` : "") : `<span class="note">No one yet</span>`}</td>
+      <td data-label="When">${when(d)}${d.skip_holidays ? "" : "<small>including holidays</small>"}</td>
       <td data-label="Mode"><span class="chip ${d.mode === "live" ? "mode-live" : "mode-test"}" style="margin:0;white-space:nowrap">${d.mode === "live" ? "Live" : "Test: " + esc(d.test_to.split("@")[0])}</span></td>
       <td data-label="On"><label class="chk" style="min-height:0"><input type="checkbox" data-on="${i}" ${d.active ? "checked" : ""}></label></td>
       <td data-label="Last sent">${usDate(d.last_sent_on)}</td>
-      <td><button class="btn" data-edit="${i}">Edit</button></td></tr>`).join("")
+      <td><button class="btn" data-edit="${i}">Edit</button></td></tr>`; }).join("")
     : `<tr><td colspan="8" class="note">No report emails set up yet.</td></tr>`) + `</tbody>`;
   $$("#distTable [data-edit]").forEach(b => b.onclick = () => editDist(dists[+b.dataset.edit]));
   $$("#distTable [data-on]").forEach(c => c.onchange = async () => {
@@ -1758,21 +1794,19 @@ function renderDists() {
 }
 function renderSendLog(rows) {
   const name = id => dists.find(d => d.id === id)?.name;
-  $("#sendLog").innerHTML = `<thead><tr><th>Sent</th><th>Report</th><th>Mode</th><th>To</th><th>Result</th></tr></thead><tbody>` +
+  $("#sendLog").innerHTML = `<thead><tr><th>Sent</th><th>Email</th><th>Mode</th><th>To</th><th>Result</th></tr></thead><tbody>` +
     (rows.length ? rows.map(r => `<tr><td style="white-space:nowrap">${new Date(r.sent_at).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
-      <td>${REPORTS[r.report] || esc(r.report)}${name(r.distribution_id) ? `<small> &middot; ${esc(name(r.distribution_id))}</small>` : ""}</td>
+      <td>${esc(name(r.distribution_id) || "")}<small>${r.report.split(",").map(x => REPORTS[x] || esc(x)).join(", ")}</small></td>
       <td>${r.mode === "manual" ? "Sent by hand" : r.mode === "live" ? "Live" : "Test"}</td>
-      <td>${esc(r.recipients.join(", "))}</td>
+      <td>${r.recipients.length > 4 ? `${r.recipients.length} people` : esc(r.recipients.join(", "))}</td>
       <td class="${r.ok ? "" : "bad"}">${r.ok ? "Sent" : "Failed: " + esc(r.detail)}</td></tr>`).join("")
     : `<tr><td colspan="5" class="note">Nothing sent yet.</td></tr>`) + `</tbody>`;
 }
 function editDist(d) {
-  DE = d ? { ...d, recipients: [...d.recipients], days: [...d.days] }
-    : { report: "dlr", name: "", recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", mode: "test", test_to: ME.email, active: true };
-  // The report is picked once, when the list is made; editing shows it in the heading instead.
-  $("#deTitle").textContent = d ? `${REPORTS[d.report]}: ${d.name}` : "New distribution";
-  $("#deReportF").hidden = !!d;
-  $("#deName").value = DE.name; $("#deTime").value = DE.send_time.slice(0, 5); $("#deActive").checked = DE.active;
+  DE = d ? { ...d, reports: [...d.reports], audiences: [...(d.audiences || [])], recipients: [...d.recipients], days: [...d.days] }
+    : { name: "", reports: [], audiences: [], recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", mode: "test", test_to: ME.email, active: true, skip_holidays: true };
+  $("#deTitle").textContent = d ? "Edit email: " + d.name : "New email";
+  $("#deName").value = DE.name; $("#deTime").value = DE.send_time.slice(0, 5); $("#deActive").checked = DE.active; $("#deSkipHol").checked = DE.skip_holidays;
   $("#deMonthDay").value = DE.month_day || 1; $("#deTestTo").value = DE.test_to; $("#deEmail").value = "";
   $("#deDelete").hidden = !d; $("#dePrevFrame").hidden = true;
   $("#dePick").innerHTML = `<option value="">Add someone from the team list</option>` + (L.users || []).map(u => `<option value="${esc(u.email)}">${esc(u.name)}</option>`).join("");
@@ -1780,12 +1814,38 @@ function editDist(d) {
   $("#distEdit").hidden = false;
   $("#distEdit").scrollIntoView({ behavior: "smooth", block: "start" });
 }
+let whoSeq = 0;
+async function renderWho() {
+  const seq = ++whoSeq, el = $("#deWho");
+  if (!DE.audiences.length && !DE.recipients.length) { el.innerHTML = "No one yet. Pick a group or add an address."; return; }
+  const [r, m] = await Promise.all([sb.rpc("report_recipients", { p_audiences: DE.audiences, p_extra: DE.recipients }), sb.rpc("report_missing_emails", { p_audiences: DE.audiences })]);
+  if (seq !== whoSeq) return;
+  const to = r.data || [], miss = m.data || [];
+  el.innerHTML = `Right now this goes to <b>${to.length} ${to.length === 1 ? "address" : "addresses"}</b>` +
+    (to.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer;text-decoration:underline">see them</summary> ${esc(to.join(", "))}</details>` : "") +
+    (miss.length ? `<br><span class="warn">${miss.length} in these groups ${miss.length === 1 ? "has" : "have"} no work email yet, so ${miss.length === 1 ? "they won't" : "they won't"} get it: ${esc(miss.join(", "))}. Add emails on the Team page.</span>` : "");
+}
 function renderDE() {
   const seg = (el, opts, on, cb) => {
     $(el).innerHTML = Object.entries(opts).map(([v, t]) => `<button type="button" data-v="${v}" class="${on(v) ? "on" : ""}">${t}</button>`).join("");
     $$(el + " [data-v]").forEach(b => b.onclick = () => { cb(b.dataset.v); renderDE(); });
   };
-  seg("#deReport", REPORTS, v => DE.report === v, v => DE.report = v);
+  // reports: the picked ones in order with arrows, then the rest
+  const order = [...DE.reports, ...Object.keys(REPORTS).filter(r => !DE.reports.includes(r))];
+  $("#deReports").innerHTML = order.map(r => { const i = DE.reports.indexOf(r), on = i >= 0;
+    return `<div class="de-rep ${on ? "on" : ""}"><label class="chk grow" style="min-height:0"><input type="checkbox" data-rp="${r}" ${on ? "checked" : ""}> ${on ? `<b>${i + 1}.</b> ` : ""}${REPORTS[r]}</label>
+      ${on && DE.reports.length > 1 ? `<button type="button" data-up="${r}" title="Move up" ${i === 0 ? "disabled" : ""}>&uarr;</button><button type="button" data-down="${r}" title="Move down" ${i === DE.reports.length - 1 ? "disabled" : ""}>&darr;</button>` : ""}</div>`; }).join("");
+  $$("#deReports [data-rp]").forEach(c => c.onchange = () => { const r = c.dataset.rp; DE.reports = c.checked ? [...DE.reports, r] : DE.reports.filter(x => x !== r); renderDE(); });
+  const move = (r, by) => { const i = DE.reports.indexOf(r), j = i + by; if (j < 0 || j >= DE.reports.length) return; [DE.reports[i], DE.reports[j]] = [DE.reports[j], DE.reports[i]]; renderDE(); };
+  $$("#deReports [data-up]").forEach(b => b.onclick = () => move(b.dataset.up, -1));
+  $$("#deReports [data-down]").forEach(b => b.onclick = () => move(b.dataset.down, 1));
+  // groups
+  const roleGroups = DE.audiences.filter(g => g.startsWith("role:"));
+  $("#deGroups").innerHTML = Object.entries(GROUPS).map(([g, t]) => `<button type="button" class="gbtn ${DE.audiences.includes(g) ? "on" : ""}" data-g="${g}">${t}</button>`).join("") +
+    roleGroups.map(g => `<button type="button" class="gbtn on" data-g="${g}" title="Team role">${esc(groupName(g))} &#10005;</button>`).join("") +
+    `<select class="in" id="deRoleAdd" style="width:auto"><option value="">+ A team role</option>${distRoles.filter(r => r.role_name !== "Agent" && !DE.audiences.includes("role:" + r.id)).map(r => `<option value="${r.id}">${esc(r.role_name)}</option>`).join("")}</select>`;
+  $$("#deGroups [data-g]").forEach(b => b.onclick = () => { const g = b.dataset.g; DE.audiences = DE.audiences.includes(g) ? DE.audiences.filter(x => x !== g) : [...DE.audiences, g]; renderDE(); });
+  $("#deRoleAdd").onchange = () => { if ($("#deRoleAdd").value) DE.audiences = [...DE.audiences, "role:" + $("#deRoleAdd").value]; renderDE(); };
   seg("#deFreq", FREQ, v => DE.frequency === v, v => DE.frequency = v);
   seg("#deDays", Object.fromEntries(DOW.map((t, i) => [i + 1, t])), v => DE.days.includes(+v),
     v => DE.days = DE.days.includes(+v) ? DE.days.filter(x => x !== +v) : [...DE.days, +v].sort());
@@ -1793,12 +1853,11 @@ function renderDE() {
   $("#deDaysF").hidden = DE.frequency !== "days";
   $("#deMonthF").hidden = DE.frequency !== "monthly";
   $("#deTestF").hidden = DE.mode !== "test";
-  $("#deModeNote").textContent = DE.mode === "test" ? "Test: only the address below gets it, with (test) in the subject. The recipients get nothing yet."
-    : `Live: all ${DE.recipients.length} recipient${DE.recipients.length === 1 ? "" : "s"} get it.`;
-  $("#deRcpts").innerHTML = DE.recipients.map((e, i) => `<span class="chip-x">${esc(e)}<button type="button" data-rm="${i}" title="Remove">&#10005;</button></span>`).join("")
-    + (DE.recipients.length > 1 ? `<button type="button" class="clear" id="deClear">Remove all</button>` : "");
+  $("#deModeNote").textContent = DE.mode === "test" ? "Test: only the address below gets it, with (test) in the subject. Nobody else gets anything yet."
+    : "Live: everyone under Who gets it receives it.";
+  $("#deRcpts").innerHTML = DE.recipients.map((e, i) => `<span class="chip-x">${esc(e)}<button type="button" data-rm="${i}" title="Remove">&#10005;</button></span>`).join("");
   $$("#deRcpts [data-rm]").forEach(b => b.onclick = () => { DE.recipients.splice(+b.dataset.rm, 1); renderDE(); });
-  $("#deClear")?.addEventListener("click", () => { DE.recipients = []; renderDE(); });
+  renderWho();
 }
 function addRecipients(text) {
   const bad = [];
@@ -1820,14 +1879,18 @@ $("#distForm").addEventListener("submit", async e => {
   e.preventDefault();
   if ($("#deEmail").value.trim() && !addRecipients($("#deEmail").value)) return;
   $("#deEmail").value = "";
-  const row = { report: DE.report, name: $("#deName").value.trim(), recipients: DE.recipients, frequency: DE.frequency,
+  const row = { name: $("#deName").value.trim(), reports: DE.reports, audiences: DE.audiences, recipients: DE.recipients, frequency: DE.frequency,
     days: DE.frequency === "days" ? DE.days : [], month_day: DE.frequency === "monthly" ? Math.min(31, Math.max(1, +$("#deMonthDay").value || 1)) : null,
-    send_time: $("#deTime").value || "07:00", mode: DE.mode, test_to: $("#deTestTo").value.trim().toLowerCase() || ME.email, active: $("#deActive").checked };
-  if (!row.name) return status("Give the list a name.", true);
+    send_time: $("#deTime").value || "07:00", mode: DE.mode, test_to: $("#deTestTo").value.trim().toLowerCase() || ME.email,
+    active: $("#deActive").checked, skip_holidays: $("#deSkipHol").checked };
+  if (!row.name) return status("Give the email a subject.", true);
+  if (!row.reports.length) return status("Pick at least one report.", true);
   if (row.frequency === "days" && !row.days.length) return status("Pick at least one day.", true);
-  if (row.mode === "live" && !row.recipients.length) return status("Add recipients before switching it to live.", true);
-  if (row.mode === "live" && DE.id && dists.find(d => d.id === DE.id)?.mode !== "live" &&
-    !confirm(`Switch "${row.name}" to live? ${row.recipients.length} people will get ${REPORTS[row.report]} ${when(row).toLowerCase()}.`)) return;
+  if (row.mode === "live" && !row.audiences.length && !row.recipients.length) return status("Pick who gets it before switching it to live.", true);
+  if (row.mode === "live" && (!DE.id || dists.find(d => d.id === DE.id)?.mode !== "live")) {
+    const { data: to } = await sb.rpc("report_recipients", { p_audiences: row.audiences, p_extra: row.recipients });
+    if (!confirm(`Switch "${row.name}" to live? ${(to || []).length} addresses will get it ${when(row).toLowerCase()}.`)) return;
+  }
   // Changing the time to later today should still send today, so a new time clears today's mark.
   if (DE.id && DE.send_time.slice(0, 5) !== row.send_time) row.last_sent_on = null;
   const { error } = DE.id ? await sb.from("report_distributions").update(row).eq("id", DE.id)
@@ -1836,20 +1899,22 @@ $("#distForm").addEventListener("submit", async e => {
   status("Saved"); showDist();
 });
 $("#deDelete").onclick = async () => {
-  if (!confirm(`Delete "${DE.name}"? Nobody on it will get ${REPORTS[DE.report]} anymore.`)) return;
+  if (!confirm(`Delete "${DE.name}"? Nobody will get this email anymore.`)) return;
   const { error } = await sb.from("report_distributions").delete().eq("id", DE.id);
   if (error) return status(error.message, true);
   status("Deleted"); showDist();
 };
 $("#dePreview").onclick = async () => {
+  if (!DE.reports.length) return status("Pick at least one report.", true);
   const b = $("#dePreview"); b.disabled = true; b.textContent = "Building…";
-  try { const { html } = await callSend({ report: DE.report, action: "preview" }); $("#dePrevFrame").srcdoc = html; $("#dePrevFrame").hidden = false; }
+  try { const { html } = await callSend({ action: "preview", reports: DE.reports }); $("#dePrevFrame").srcdoc = html; $("#dePrevFrame").hidden = false; }
   catch (e) { status(e.message, true); }
   b.disabled = false; b.textContent = "Preview";
 };
 $("#deSendMe").onclick = async () => {
+  if (!DE.reports.length) return status("Pick at least one report.", true);
   const b = $("#deSendMe"); b.disabled = true; b.textContent = "Sending…";
-  try { await callSend({ report: DE.report, action: "send", to: [ME.email] }); status("Sent to " + ME.email); }
+  try { await callSend({ action: "send", reports: DE.reports, name: $("#deName").value.trim() || "AHG Reports", distribution_id: DE.id || null, to: [ME.email] }); status("Sent to " + ME.email); }
   catch (e) { status(e.message, true); }
   b.disabled = false; b.textContent = "Send me one now";
   const s = await sb.from("report_sends").select("*").order("sent_at", { ascending: false }).limit(40);

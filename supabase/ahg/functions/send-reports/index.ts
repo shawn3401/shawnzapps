@@ -1,10 +1,11 @@
 // AHG Tools: build and send the report emails (Daily Leadership Dashboard, Agent Hustle Board,
 // Pending Tracker). Supabase Edge Function `send-reports` (project pjfiyfljkzcvfvcrdrcj), verify_jwt on.
 //  * pg_cron calls it every 15 minutes with no body: it sends every active report_distributions row
-//    that is due today (Mountain time), past its send time, and not sent yet today. Test mode goes
-//    only to test_to; live goes to the recipients.
-//  * An admin calls it from the "Report distribution" page with {report, action: "preview"} (returns
-//    the email's HTML) or {report, action: "send", to: [...]} (sends now to those addresses).
+//    (an email: subject, one or more reports in order, groups and addresses, schedule) that is due
+//    today (Mountain time), past its send time, not sent yet today, and not an Idaho holiday when it
+//    skips holidays. Test mode goes only to test_to; live goes to report_recipients(groups, addresses).
+//  * An admin calls it from the "Report distribution" page with {reports, name, action: "preview"}
+//    (returns the email's HTML) or {reports, name, action: "send", to: [...]} (sends now).
 // Sends from reports@andersonhicks.com through the Gmail API with a Google Workspace service account
 // that has domain-wide delegation for gmail.send. Secret GOOGLE_SERVICE_ACCOUNT = the key's JSON.
 // reports@ is a Google Group, which can't sign in, so the service account signs in as a real user
@@ -40,14 +41,18 @@ const k = (n: number) => Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + "M" : Math.
 const pct = (v: number | null) => v == null ? "NA" : Math.round(v * 100) + "%";
 const monthName = (iso: string) => new Date(iso.slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
 
-// ---------- email shell (inline styles only: email programs ignore style sheets) ----------
+// ---------- email (inline styles only: email programs ignore style sheets) ----------
+// Each report is a section; an email stacks one or more sections in order.
 function shell(title: string, sub: string, body: string, link: string) {
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f2">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2"><tr><td align="center" style="padding:18px 10px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:1100px;font-family:Arial,Helvetica,sans-serif;color:#1f2124">
-<tr><td style="padding:0 0 12px"><div style="font-size:22px;font-weight:bold">${esc(title)}</div><div style="color:#565b62;font-size:14px">${esc(sub)}</div></td></tr>
+  return `<tr><td style="padding:18px 0 12px"><div style="font-size:22px;font-weight:bold">${esc(title)}</div><div style="color:#565b62;font-size:14px">${esc(sub)}</div></td></tr>
 <tr><td>${body}</td></tr>
-<tr><td style="padding:16px 0 4px"><a href="${link}" style="display:inline-block;background:#c8322b;color:#fff;text-decoration:none;font-weight:bold;padding:10px 16px;border-radius:8px">Open in AHG Tools</a></td></tr>
+<tr><td style="padding:16px 0 18px;border-bottom:2px solid #dededc"><a href="${link}" style="display:inline-block;background:#c8322b;color:#fff;text-decoration:none;font-weight:bold;padding:10px 16px;border-radius:8px">Open in AHG Tools</a></td></tr>`;
+}
+function emailHtml(sections: string[]) {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f2">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2"><tr><td align="center" style="padding:0 10px 18px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:1100px;font-family:Arial,Helvetica,sans-serif;color:#1f2124">
+${sections.join("\n")}
 <tr><td style="color:#8a9097;font-size:12px;padding:8px 0">Sent by AHG Tools from the Anderson Hicks Group database.</td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -207,7 +212,12 @@ async function sendMail(to: string[], subject: string, html: string) {
 }
 
 // ---------- building one report ----------
-const SUBJECT: Record<string, string> = { dlr: "Daily Leadership Reports", hustle: "Agent Hustle Board", tracker: "Pending Tracker" };
+const REPORTS = ["dlr", "hustle", "tracker"];
+async function buildEmail(db: any, reports: string[], day: string) {
+  const sections = [];
+  for (const r of reports) sections.push(await build(db, r, day));
+  return emailHtml(sections);
+}
 async function build(db: any, report: string, day: string) {
   if (report === "dlr") {
     const { data, error } = await db.rpc("dlr_data", { p_today: day });
@@ -234,24 +244,26 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* the cron call has no body */ }
 
-  // An admin, from the Report emails page: preview or send now.
-  if (body.report) {
+  // An admin, from the Report distribution page: preview or send now (the form as it stands).
+  if (body.action) {
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const { data: who } = await db.auth.getUser(token);
     const email = who?.user?.email?.toLowerCase();
     const { data: me } = await db.from("app_users").select("role, active").eq("email", email ?? "").maybeSingle();
     if (!me || !me.active || me.role !== "admin") return json({ error: "Only admins can do this." }, 403);
     const day = body.day || now.day;
+    const reports: string[] = (body.reports || (body.report ? [body.report] : [])).filter((r: string) => REPORTS.includes(r));
+    if (!reports.length) return json({ error: "Pick at least one report." }, 400);
     try {
-      const html = await build(db, body.report, day);
+      const html = await buildEmail(db, reports, day);
       if (body.action === "preview") return json({ html });
       const to = (body.to as string[] || []).map(s => s.trim().toLowerCase()).filter(Boolean);
       if (!to.length) return json({ error: "No recipients." }, 400);
-      await sendMail(to, `${SUBJECT[body.report]} ${us(day)}`, html);
-      await db.from("report_sends").insert({ report: body.report, mode: "manual", recipients: to, ok: true, detail: "sent by " + email });
+      await sendMail(to, `${body.name || "AHG Reports"} ${us(day)}`, html);
+      await db.from("report_sends").insert({ distribution_id: body.distribution_id || null, report: reports.join(","), mode: "manual", recipients: to, ok: true, detail: "sent by " + email });
       return json({ sent: to });
     } catch (e) {
-      await db.from("report_sends").insert({ report: body.report, mode: "manual", recipients: body.to || [], ok: false, detail: (e as Error).message });
+      await db.from("report_sends").insert({ distribution_id: body.distribution_id || null, report: reports.join(","), mode: "manual", recipients: body.to || [], ok: false, detail: (e as Error).message });
       return json({ error: (e as Error).message }, 500);
     }
   }
@@ -261,23 +273,30 @@ Deno.serve(async (req: Request) => {
   const results: Record<string, string> = {};
   const lastDay = new Date(Date.UTC(+now.day.slice(0, 4), +now.day.slice(5, 7), 0)).getUTCDate();
   const dom = +now.day.slice(8, 10);
+  const { data: hol } = await db.from("holidays").select("name").eq("day", now.day).maybeSingle();
   for (const s of dist ?? []) {
     const dueToday = s.frequency === "daily" || (s.frequency === "weekdays" && now.dow <= 5) ||
       (s.frequency === "days" && (s.days || []).includes(now.dow)) ||
       (s.frequency === "monthly" && (s.month_day === dom || (s.month_day > lastDay && dom === lastDay)));
     if (!dueToday || now.time < s.send_time.slice(0, 5) || s.last_sent_on === now.day) continue;
-    const to: string[] = s.mode === "live" ? s.recipients : [s.test_to].filter(Boolean);
+    if (hol && s.skip_holidays) { results[`${s.id} ${s.name}`] = "skipped, " + hol.name; continue; }
+    let to: string[] = [s.test_to].filter(Boolean);
+    if (s.mode === "live") {
+      const { data: r, error } = await db.rpc("report_recipients", { p_audiences: s.audiences || [], p_extra: s.recipients || [] });
+      if (error) { results[`${s.id} ${s.name}`] = "error: " + error.message; continue; }
+      to = r || [];
+    }
     const label = `${s.id} ${s.name}`;
     if (!to.length) { results[label] = "no recipients"; continue; }
     try {
-      await sendMail(to, `${SUBJECT[s.report]} ${us(now.day)}${s.mode === "test" ? " (test)" : ""}`, await build(db, s.report, now.day));
+      await sendMail(to, `${s.name} ${us(now.day)}${s.mode === "test" ? " (test)" : ""}`, await buildEmail(db, s.reports, now.day));
       await db.from("report_distributions").update({ last_sent_on: now.day }).eq("id", s.id);
-      await db.from("report_sends").insert({ distribution_id: s.id, report: s.report, mode: s.mode, recipients: to, ok: true });
+      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: s.mode, recipients: to, ok: true });
       results[label] = "sent to " + to.join(", ");
     } catch (e) {
       // mark the day so a broken setup doesn't retry every 15 minutes; the error shows on the page
       await db.from("report_distributions").update({ last_sent_on: now.day }).eq("id", s.id);
-      await db.from("report_sends").insert({ distribution_id: s.id, report: s.report, mode: s.mode, recipients: to, ok: false, detail: (e as Error).message });
+      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: s.mode, recipients: to, ok: false, detail: (e as Error).message });
       results[label] = "error: " + (e as Error).message;
     }
   }
