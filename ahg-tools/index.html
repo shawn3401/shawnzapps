@@ -517,8 +517,6 @@ body.notadmin .ge-admin { display: none !important; }
             <label class="chk" style="align-self:end"><input type="checkbox" id="deActive"> On (uncheck to pause it)</label>
           </div>
           <label class="chk"><input type="checkbox" id="deSkipHol"> Skip Idaho holidays (the list on Settings)</label>
-          <div class="fld"><span>Mode</span><div class="seg small" id="deMode"></div><div class="note" id="deModeNote" style="margin:6px 0 0"></div></div>
-          <label class="fld" id="deTestF"><span>Test emails go to</span><input class="in" id="deTestTo" type="email" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
           <div class="dist-acts">
             <button class="btn red" type="submit">Save</button>
             <button class="btn" type="button" id="dePreview">Preview</button>
@@ -1772,18 +1770,17 @@ async function showDist() {
   renderDists(); renderSendLog(s.data || []);
 }
 function renderDists() {
-  $("#distTable").innerHTML = `<thead><tr><th>Email</th><th>Reports</th><th>Who gets it</th><th>When</th><th>Mode</th><th>On</th><th>Last sent</th><th></th></tr></thead><tbody>` +
+  $("#distTable").innerHTML = `<thead><tr><th>Email</th><th>Reports</th><th>Who gets it</th><th>When</th><th>On</th><th>Last sent</th><th></th></tr></thead><tbody>` +
     (dists.length ? dists.map((d, i) => { const who = [...(d.audiences || []).map(groupName), ...d.recipients];
       return `<tr data-i="${i}" class="${d.active ? "" : "off"}">
       <td data-label="Email"><b>${esc(d.name)}</b></td>
       <td data-label="Reports">${d.reports.map(r => REPORTS[r]).join(", ")}</td>
       <td data-label="Who gets it">${who.length ? esc(who.slice(0, 3).join(", ")) + (who.length > 3 ? ` and ${who.length - 3} more` : "") : `<span class="note">No one yet</span>`}</td>
       <td data-label="When">${when(d)}${d.skip_holidays ? "" : "<small>including holidays</small>"}</td>
-      <td data-label="Mode"><span class="chip ${d.mode === "live" ? "mode-live" : "mode-test"}" style="margin:0;white-space:nowrap">${d.mode === "live" ? "Live" : "Test: " + esc(d.test_to.split("@")[0])}</span></td>
       <td data-label="On"><label class="chk" style="min-height:0"><input type="checkbox" data-on="${i}" ${d.active ? "checked" : ""}></label></td>
       <td data-label="Last sent">${usDate(d.last_sent_on)}</td>
       <td><button class="btn" data-edit="${i}">Edit</button></td></tr>`; }).join("")
-    : `<tr><td colspan="8" class="note">No report emails set up yet.</td></tr>`) + `</tbody>`;
+    : `<tr><td colspan="7" class="note">No report emails set up yet.</td></tr>`) + `</tbody>`;
   $$("#distTable [data-edit]").forEach(b => b.onclick = () => editDist(dists[+b.dataset.edit]));
   $$("#distTable [data-on]").forEach(c => c.onchange = async () => {
     const d = dists[+c.dataset.on];
@@ -1794,20 +1791,20 @@ function renderDists() {
 }
 function renderSendLog(rows) {
   const name = id => dists.find(d => d.id === id)?.name;
-  $("#sendLog").innerHTML = `<thead><tr><th>Sent</th><th>Email</th><th>Mode</th><th>To</th><th>Result</th></tr></thead><tbody>` +
+  $("#sendLog").innerHTML = `<thead><tr><th>Sent</th><th>Email</th><th>How</th><th>To</th><th>Result</th></tr></thead><tbody>` +
     (rows.length ? rows.map(r => `<tr><td style="white-space:nowrap">${new Date(r.sent_at).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
       <td>${esc(name(r.distribution_id) || "")}<small>${r.report.split(",").map(x => REPORTS[x] || esc(x)).join(", ")}</small></td>
-      <td>${r.mode === "manual" ? "Sent by hand" : r.mode === "live" ? "Live" : "Test"}</td>
+      <td>${r.mode === "manual" ? "Sent by hand" : r.mode === "test" ? "Test" : "On schedule"}</td>
       <td>${r.recipients.length > 4 ? `${r.recipients.length} people` : esc(r.recipients.join(", "))}</td>
       <td class="${r.ok ? "" : "bad"}">${r.ok ? "Sent" : "Failed: " + esc(r.detail)}</td></tr>`).join("")
     : `<tr><td colspan="5" class="note">Nothing sent yet.</td></tr>`) + `</tbody>`;
 }
 function editDist(d) {
   DE = d ? { ...d, reports: [...d.reports], audiences: [...(d.audiences || [])], recipients: [...d.recipients], days: [...d.days] }
-    : { name: "", reports: [], audiences: [], recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", mode: "test", test_to: ME.email, active: true, skip_holidays: true };
+    : { name: "", reports: [], audiences: [], recipients: [], frequency: "weekdays", days: [1, 2, 3, 4, 5], month_day: 1, send_time: "07:00", active: true, skip_holidays: true };
   $("#deTitle").textContent = d ? "Edit email: " + d.name : "New email";
   $("#deName").value = DE.name; $("#deTime").value = DE.send_time.slice(0, 5); $("#deActive").checked = DE.active; $("#deSkipHol").checked = DE.skip_holidays;
-  $("#deMonthDay").value = DE.month_day || 1; $("#deTestTo").value = DE.test_to; $("#deEmail").value = "";
+  $("#deMonthDay").value = DE.month_day || 1; $("#deEmail").value = "";
   $("#deDelete").hidden = !d; $("#dePrevFrame").hidden = true;
   $("#dePick").innerHTML = `<option value="">Add someone from the team list</option>` + (L.users || []).map(u => `<option value="${esc(u.email)}">${esc(u.name)}</option>`).join("");
   renderDE();
@@ -1849,12 +1846,8 @@ function renderDE() {
   seg("#deFreq", FREQ, v => DE.frequency === v, v => DE.frequency = v);
   seg("#deDays", Object.fromEntries(DOW.map((t, i) => [i + 1, t])), v => DE.days.includes(+v),
     v => DE.days = DE.days.includes(+v) ? DE.days.filter(x => x !== +v) : [...DE.days, +v].sort());
-  seg("#deMode", { test: "Test", live: "Live" }, v => DE.mode === v, v => DE.mode = v);
   $("#deDaysF").hidden = DE.frequency !== "days";
   $("#deMonthF").hidden = DE.frequency !== "monthly";
-  $("#deTestF").hidden = DE.mode !== "test";
-  $("#deModeNote").textContent = DE.mode === "test" ? "Test: only the address below gets it, with (test) in the subject. Nobody else gets anything yet."
-    : "Live: everyone under Who gets it receives it.";
   $("#deRcpts").innerHTML = DE.recipients.map((e, i) => `<span class="chip-x">${esc(e)}<button type="button" data-rm="${i}" title="Remove">&#10005;</button></span>`).join("");
   $$("#deRcpts [data-rm]").forEach(b => b.onclick = () => { DE.recipients.splice(+b.dataset.rm, 1); renderDE(); });
   renderWho();
@@ -1881,15 +1874,15 @@ $("#distForm").addEventListener("submit", async e => {
   $("#deEmail").value = "";
   const row = { name: $("#deName").value.trim(), reports: DE.reports, audiences: DE.audiences, recipients: DE.recipients, frequency: DE.frequency,
     days: DE.frequency === "days" ? DE.days : [], month_day: DE.frequency === "monthly" ? Math.min(31, Math.max(1, +$("#deMonthDay").value || 1)) : null,
-    send_time: $("#deTime").value || "07:00", mode: DE.mode, test_to: $("#deTestTo").value.trim().toLowerCase() || ME.email,
-    active: $("#deActive").checked, skip_holidays: $("#deSkipHol").checked };
+    send_time: $("#deTime").value || "07:00", active: $("#deActive").checked, skip_holidays: $("#deSkipHol").checked };
   if (!row.name) return status("Give the email a subject.", true);
   if (!row.reports.length) return status("Pick at least one report.", true);
   if (row.frequency === "days" && !row.days.length) return status("Pick at least one day.", true);
-  if (row.mode === "live" && !row.audiences.length && !row.recipients.length) return status("Pick who gets it before switching it to live.", true);
-  if (row.mode === "live" && (!DE.id || dists.find(d => d.id === DE.id)?.mode !== "live")) {
+  if (!row.audiences.length && !row.recipients.length) return status("Pick who gets it.", true);
+  // New emails: say who will get it before it's saved (there's no test mode; send to a few people first).
+  if (!DE.id && row.active) {
     const { data: to } = await sb.rpc("report_recipients", { p_audiences: row.audiences, p_extra: row.recipients });
-    if (!confirm(`Switch "${row.name}" to live? ${(to || []).length} addresses will get it ${when(row).toLowerCase()}.`)) return;
+    if (!confirm(`Save "${row.name}"? ${(to || []).length} ${(to || []).length === 1 ? "address gets" : "addresses get"} it ${when(row).toLowerCase()}.`)) return;
   }
   // Changing the time to later today should still send today, so a new time clears today's mark.
   if (DE.id && DE.send_time.slice(0, 5) !== row.send_time) row.last_sent_on = null;

@@ -3,7 +3,8 @@
 //  * pg_cron calls it every 15 minutes with no body: it sends every active report_distributions row
 //    (an email: subject, one or more reports in order, groups and addresses, schedule) that is due
 //    today (Mountain time), past its send time, not sent yet today, and not an Idaho holiday when it
-//    skips holidays. Test mode goes only to test_to; live goes to report_recipients(groups, addresses).
+//    skips holidays, to report_recipients(groups, addresses). There is no test mode (Shawn, Oct 22,
+//    2026): a new email is tested by sending it to a few people first.
 //  * An admin calls it from the "Report distribution" page with {reports, name, action: "preview"}
 //    (returns the email's HTML) or {reports, name, action: "send", to: [...]} (sends now).
 // Sends from reports@andersonhicks.com through the Gmail API with a Google Workspace service account
@@ -280,23 +281,20 @@ Deno.serve(async (req: Request) => {
       (s.frequency === "monthly" && (s.month_day === dom || (s.month_day > lastDay && dom === lastDay)));
     if (!dueToday || now.time < s.send_time.slice(0, 5) || s.last_sent_on === now.day) continue;
     if (hol && s.skip_holidays) { results[`${s.id} ${s.name}`] = "skipped, " + hol.name; continue; }
-    let to: string[] = [s.test_to].filter(Boolean);
-    if (s.mode === "live") {
-      const { data: r, error } = await db.rpc("report_recipients", { p_audiences: s.audiences || [], p_extra: s.recipients || [] });
-      if (error) { results[`${s.id} ${s.name}`] = "error: " + error.message; continue; }
-      to = r || [];
-    }
+    const { data: r, error } = await db.rpc("report_recipients", { p_audiences: s.audiences || [], p_extra: s.recipients || [] });
+    if (error) { results[`${s.id} ${s.name}`] = "error: " + error.message; continue; }
+    const to: string[] = r || [];
     const label = `${s.id} ${s.name}`;
     if (!to.length) { results[label] = "no recipients"; continue; }
     try {
-      await sendMail(to, `${s.name} ${us(now.day)}${s.mode === "test" ? " (test)" : ""}`, await buildEmail(db, s.reports, now.day));
+      await sendMail(to, `${s.name} ${us(now.day)}`, await buildEmail(db, s.reports, now.day));
       await db.from("report_distributions").update({ last_sent_on: now.day }).eq("id", s.id);
-      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: s.mode, recipients: to, ok: true });
+      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: "scheduled", recipients: to, ok: true });
       results[label] = "sent to " + to.join(", ");
     } catch (e) {
       // mark the day so a broken setup doesn't retry every 15 minutes; the error shows on the page
       await db.from("report_distributions").update({ last_sent_on: now.day }).eq("id", s.id);
-      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: s.mode, recipients: to, ok: false, detail: (e as Error).message });
+      await db.from("report_sends").insert({ distribution_id: s.id, report: s.reports.join(","), mode: "scheduled", recipients: to, ok: false, detail: (e as Error).message });
       results[label] = "error: " + (e as Error).message;
     }
   }
