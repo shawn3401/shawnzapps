@@ -22,7 +22,7 @@ const NS_LABELS = ["Initial Offer", "Counter 1", "Counter 2", "Counter 3", "Coun
 const NS_MODES = [["appt", "Listing appointment"], ["listing", "With the listing"], ["offer", "Offers"]];
 const NS_FEES = { transaction: 495, reconveyance: 85, recording: 25, tax_service: 85, flood: 12, reinspection: 150, well: 160, septic: 500, escrow_rate: 3, escrow_base_listing: 150,
   escrow_base: { alliance: 100, pioneer: 100, title_one: 100, flying_s: 100, amerititle: 150, other: 150 } };
-const NS_FEE_LABELS = [["transaction", "Transaction/compliance fee"], ["reconveyance", "Reconveyance, per seller loan"], ["recording", "Recording"], ["well", "Well test"], ["septic", "Septic pump and inspection"],
+const NS_FEE_LABELS = [["transaction", "Transaction/compliance fee (starting amount)"], ["reconveyance", "Reconveyance, per seller loan"], ["recording", "Recording"], ["well", "Well test"], ["septic", "Septic pump and inspection"],
   ["tax_service", "Tax service fee (FHA, VA, RD)"], ["flood", "Flood certification (FHA, VA, RD)"], ["reinspection", "Appraisal reinspection (FHA, VA, RD)"], ["escrow_rate", "Escrow fee per $1,000 of price"], ["escrow_base_listing", "Escrow base fee, listing sheets"]];
 let nsFees = { ...NS_FEES, escrow_base: { ...NS_FEES.escrow_base } }, nsFeesLoaded = false, nsSaveT = 0, nsOverKey = null;
 
@@ -80,7 +80,7 @@ function nsColumn(kind, price, o){
   const commBase = offer && o_.comm_on_conc === false ? net_price : price;
   add("buyer_comm", `Buyers Agent Commission (${S.buyer_pct}%)`, commBase * S.buyer_pct / 100);
   add("list_comm", `Listing Agent Commission (${S.list_pct}%)`, commBase * S.list_pct / 100);
-  add("transaction", "Transaction/Compliance Fee", F.transaction);
+  add("transaction", "Transaction/Compliance Fee", S.transaction ?? F.transaction);   // an input on the sheet (Shawn, Oct 22, 2026), starting from the team default
   if (offer) add("tax_service", "Tax Service Fee", govt ? F.tax_service : 0, true);
   const loans = [S.payoff1, S.payoff2].filter(x => x > 0).length;
   add("reconveyance", loans > 1 ? `Reconveyance (${loans} loans)` : "Reconveyance", F.reconveyance * loans, true);
@@ -105,7 +105,7 @@ function nsShared(){   // what is entered, falling back to the lead and its Valu
   const d = new Date(); d.setDate(d.getDate() + 60);
   return {
     seller: s.seller ?? cur.name ?? "", address: s.address ?? cur.address ?? "", city: s.city ?? "",
-    closing: s.closing ?? isoDay(d), taxes: s.taxes ?? null, buyer_pct: s.buyer_pct ?? 3, list_pct: s.list_pct ?? 3, warranty: s.warranty ?? null,
+    closing: s.closing ?? isoDay(d), taxes: s.taxes ?? null, buyer_pct: s.buyer_pct ?? 3, list_pct: s.list_pct ?? 3, transaction: s.transaction ?? nsFees.transaction, warranty: s.warranty ?? null,
     well: !!s.well, septic: !!s.septic, payoff1: s.payoff1 !== undefined ? s.payoff1 : amt("loan") ?? null, payoff1_to: s.payoff1_to ?? "", payoff2: s.payoff2 ?? null, payoff2_to: s.payoff2_to ?? "",
   };
 }
@@ -165,7 +165,7 @@ function nsInputs(mode){
     h += sec("Inspection and terms", fPick("offer", "inspect", "Will the buyer inspect?", YN) + (nsVal("offer", "inspect") === true ? fNum("offer", "inspect_days", "Days to complete inspection (business days)") : "") + fPick("offer", "other_terms", "Any other terms and conditions?", YN) + fText("offer", "inclusions", "Items specifically included") + fText("offer", "exclusions", "Items specifically excluded") + fPick("offer", "occupy", "Buyer will occupy?", YN) + fPick("offer", "assignable", "Can the contract be assigned?", YN) + fPick("offer", "licensed", "Buyers are licensed agents?", YN) + fPick("offer", "dual", "Is this dual agency?", YN) + fPick("offer", "buying_locally", "Sellers buying locally at the same time?", YN));
     h += sec("Closing", fPick("offer", "title", "Title company", NS_TITLES) + fDate("offer", "closing", "Contract closing date") + fNum("offer", "walkthrough", "Walkthrough days before close") + fPick("offer", "possession", "Possession", [["Upon Closing", "Upon closing"], ["Before Closing", "Before closing"], ["After Closing", "After closing"]]) + (["Before Closing", "After Closing"].includes(nsVal("offer", "possession")) ? fDate("offer", "possession_date", "Possession date") : ""));
   }
-  h += sec("Seller and property", fText("shared", "seller", "Seller name") + fText("shared", "address", "Street address") + fText("shared", "city", "City, state, zip") + (mode === "offer" ? "" : fDate("shared", "closing", "Estimated closing date")) + fMoney("shared", "taxes", "Annual property taxes") + fPct("shared", "buyer_pct", "Buyer's agent commission %") + fPct("shared", "list_pct", "Listing agent commission %") + (mode === "offer" ? "" : fMoney("shared", "warranty", "Home warranty")) + fPick("shared", "well", "Well on the property?", YN) + fPick("shared", "septic", "Septic tank on the property?", YN));
+  h += sec("Seller and property", fText("shared", "seller", "Seller name") + fText("shared", "address", "Street address") + fText("shared", "city", "City, state, zip") + (mode === "offer" ? "" : fDate("shared", "closing", "Estimated closing date")) + fMoney("shared", "taxes", "Annual property taxes") + fPct("shared", "buyer_pct", "Buyer's agent commission %") + fPct("shared", "list_pct", "Listing agent commission %") + fMoney("shared", "transaction", "Transaction/compliance fee") + (mode === "offer" ? "" : fMoney("shared", "warranty", "Home warranty")) + fPick("shared", "well", "Well on the property?", YN) + fPick("shared", "septic", "Septic tank on the property?", YN));
   h += sec("Loans being paid off", fMoney("shared", "payoff1", "1st lien payoff", "From the Value card's loan amount until you change it.") + fText("shared", "payoff1_to", "Paid to") + fMoney("shared", "payoff2", "2nd lien payoff") + fText("shared", "payoff2_to", "Paid to"));
   return h;
 }
