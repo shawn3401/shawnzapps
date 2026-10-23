@@ -182,7 +182,9 @@ dialog h2{font-size:22px}
 .nstoolr{display:flex;gap:8px;flex-wrap:wrap}
 .nsoffers{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .nsbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 12px;padding:4px 14px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.nsbar label.f{margin-top:10px}
+.nsbar label.f{margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nsbar > div{display:flex;flex-direction:column;justify-content:flex-end;min-width:0}
+.nsbar input{height:44px}
 .nsbar .pills .pill,.nssec .pills .pill{font-size:13px;padding:5px 11px}
 .nstag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--good);background:var(--good-soft);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}
 .nssecs{margin:12px 0 16px;border:1px solid var(--line);border-radius:10px;overflow:hidden}

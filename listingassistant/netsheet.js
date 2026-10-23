@@ -172,9 +172,9 @@ function fPick(where, key, label, opts, wide){ const v = nsVal(where, key); retu
 const YN = [[true, "Yes"], [false, "No"]];
 const ynS = v => v === true ? "Yes" : v === false ? "No" : "";
 function nsBar(mode){
-  if (mode === "appt") return fMoney("appt", "low", "Low", "Value card") + fMoney("appt", "mid", "Medium", "Value card") + fMoney("appt", "high", "High", "Value card") + fDate("shared", "closing", "Estimated closing") + fMoney("shared", "taxes", "Annual property taxes");
-  if (mode === "listing") return fMoney("listing", "price", "List price", "Value card") + fDate("shared", "closing", "Estimated closing") + fMoney("shared", "taxes", "Annual property taxes");
-  return fMoney("offer", "price", "Purchase price") + fMoney("offer", "cc_amt", "Buyer closing costs") + fDate("offer", "closing", "Contract closing") + fMoney("shared", "taxes", "Annual property taxes") + fPick("offer", "loan_type", "Loan type", NS_LOANS.map(x => [x, x]), true) + fPick("offer", "title", "Title company", NS_TITLES, true);
+  if (mode === "appt") return fMoney("appt", "low", "Low", "Value card") + fMoney("appt", "mid", "Medium", "Value card") + fMoney("appt", "high", "High", "Value card") + fDate("shared", "closing", "Estimated closing") + fMoney("shared", "taxes", "Annual taxes");
+  if (mode === "listing") return fMoney("listing", "price", "List price", "Value card") + fDate("shared", "closing", "Estimated closing") + fMoney("shared", "taxes", "Annual taxes");
+  return fMoney("offer", "price", "Purchase price") + fMoney("offer", "cc_amt", "Buyer closing costs") + fDate("offer", "closing", "Contract closing") + fMoney("shared", "taxes", "Annual taxes") + fPick("offer", "loan_type", "Loan type", NS_LOANS.map(x => [x, x]), true) + fPick("offer", "title", "Title company", NS_TITLES, true);
 }
 function nsSections(mode){
   const S = nsShared(), o = nsOffer() || {}, list = a => a.filter(Boolean).join(" · ");
