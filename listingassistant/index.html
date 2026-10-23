@@ -178,19 +178,32 @@ dialog h2{font-size:22px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 #chat{display:flex;flex-direction:column}
 /* net sheet */
-.nsmodes{margin-bottom:12px}
+.nstool{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.nstoolr{display:flex;gap:8px;flex-wrap:wrap}
 .nsoffers{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
-.nsgrid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:20px;align-items:start}
-@media (max-width:900px){.nsgrid{grid-template-columns:minmax(0,1fr)}}
-.nsh{margin:18px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-deep)}
-.nsh:first-child{margin-top:0}
-.nsin label.f{margin-top:10px}
-.nsin .pills .pill{font-size:13px;padding:5px 11px}
-.nsout{position:sticky;top:70px}
-@media (max-width:900px){.nsout{position:static}}
+.nsbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 12px;padding:4px 14px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.nsbar label.f{margin-top:10px}
+.nsbar .pills .pill,.nssec .pills .pill{font-size:13px;padding:5px 11px}
+.nstag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--good);background:var(--good-soft);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}
+.nssecs{margin:12px 0 16px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.nssec{border-top:1px solid var(--line)}
+.nssec:first-child{border-top:0}
+.nssec summary{display:flex;gap:12px;align-items:baseline;padding:10px 14px;cursor:pointer;list-style:none}
+.nssec summary::-webkit-details-marker{display:none}
+.nssec summary::before{content:"›";color:var(--ink-3);font-weight:700;transition:transform .15s;display:inline-block}
+.nssec[open] summary::before{transform:rotate(90deg)}
+.nssec summary b{white-space:nowrap;font-size:15px}
+.nssec summary span{color:var(--ink-3);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.nssec[open] summary{background:var(--bg)}
+.nssecbody{padding:0 14px 14px}
+.nssecbody label.f{margin-top:10px}
+.nsresult{border:1px solid var(--good);background:var(--good-soft);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+.nsresult .ih{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.nsresult ul{margin:2px 0 0;padding-left:20px;font-size:15px}
 .nssheet{overflow-x:auto;background:#fff;color:#1F2124;border:1px solid var(--line);border-radius:8px;padding:18px 18px 12px;font-size:14px}
 .nshead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .nslogo{width:120px;height:auto;flex:none}
+@media (max-width:640px){.nslogo{width:72px}}
 .nstitle{font-size:18px;font-weight:700;margin-bottom:8px}
 .nsinfo td{padding:1px 10px 1px 0;vertical-align:top}
 .nsinfo td:first-child{color:#565B62;white-space:nowrap}
