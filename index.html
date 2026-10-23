@@ -44,7 +44,7 @@ a{color:inherit}
 
 /* hero */
 .hero{background:var(--hero);color:var(--hero-ink);position:relative;overflow:hidden}
-.hero::after{content:"";position:absolute;right:-60px;top:-40px;width:420px;height:520px;opacity:.07;pointer-events:none;
+.hero::after{content:"";position:absolute;right:6%;bottom:36px;width:220px;height:290px;opacity:.12;pointer-events:none;
   background:var(--zap);clip-path:polygon(58% 0,8% 52%,42% 52%,30% 100%,92% 40%,56% 40%)}
 .top{display:flex;align-items:center;justify-content:space-between;padding-top:22px;padding-bottom:22px;position:relative;z-index:1}
 .mark{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em}
@@ -93,6 +93,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 
 @media (max-width:760px){
   .pitch{padding:36px 0 48px}
+  .hero::after{display:none}
   .pitch h1{font-size:40px}
   .pitch p{font-size:18px}
   .grid{grid-template-columns:1fr}
@@ -124,8 +125,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
   </div>
   <div class="wrap">
     <div class="pitch">
-      <h1>Apps I built because I <em>needed them.</em></h1>
-      <p>I'm Shawn Anderson in Idaho Falls, Idaho. I sell real estate and I build software. Some of it runs my business and some of it settles where we eat. It all lives here.</p>
+      <h1>Shawn's apps,<br><em>all in one place.</em></h1>
+      <p>Some for real estate, some for home. Made in Idaho Falls by Shawn Anderson.</p>
     </div>
   </div>
 </header>
