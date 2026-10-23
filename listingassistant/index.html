@@ -229,8 +229,9 @@ dialog h2{font-size:22px}
 @media print{
   body > *:not(#printArea){display:none!important}
   #printArea{display:block}
+  #printArea{padding:.6in .65in}
   #printArea .nssheet{border:0;padding:0;font-size:12px}
-  @page{margin:.6in}
+  @page{margin:0}   /* no page margin leaves the browser no room for its date, title, and web address (Shawn's Harris printout, Oct 22, 2026) */
 }
 .vgroups{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;align-items:start}
 .vgrp.wide{grid-column:1/-1}
