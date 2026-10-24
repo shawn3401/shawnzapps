@@ -177,6 +177,21 @@ dialog h2{font-size:22px}
 .whopick{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:150px}
 @media (max-width:560px){.todo{flex-wrap:wrap}.todo .tb{flex-basis:calc(100% - 40px)}.todo > .whoc,.todo > .whopick{margin-left:37px;max-width:none;justify-content:flex-start}}
 #chat{display:flex;flex-direction:column}
+.reccard{background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--ink-2);border-radius:10px;padding:12px 16px;margin:0 0 14px}
+.reccard.off{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.rechead{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.recact{display:flex;gap:10px;align-items:center}
+.recn{font-size:12px;font-weight:700;background:var(--soft);color:var(--accent-deep);border-radius:999px;padding:2px 9px;margin-left:6px;vertical-align:2px}
+.recrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;padding:10px 0;border-top:1px solid var(--line);margin-top:10px}
+.recrow + .recrow{margin-top:0}
+.recbtns{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+.recwhy{max-width:230px}
+.recleads{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.recsum{font-size:14px;color:var(--ink-2);margin-top:6px;max-height:220px;overflow:auto}
+.recmain details summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:4px}
+@media (max-width:560px){.recrow{grid-template-columns:1fr}.recbtns{align-items:flex-start;text-align:left}}
+.gransteps{margin:10px 0 0;padding-left:20px;font-size:15px;color:var(--ink-2)}
+.gransteps li{margin-bottom:4px}
 /* net sheet */
 .nstool{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .nstoolr{display:flex;gap:8px;flex-wrap:wrap}
@@ -316,6 +331,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
 
   <section id="list" hidden>
     <div class="head"><h2>Seller leads</h2><button class="btn primary" id="newLead">New seller lead</button></div>
+    <div id="recBox"></div>
     <div class="pills" id="filters"></div>
     <div id="leadCards"></div>
   </section>
@@ -398,6 +414,31 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
   <div class="busy" id="coverBusy" hidden><div class="spin"></div><span>Uploading…</span></div>
   <div class="err" id="coverErr" hidden></div>
   <div class="row" style="justify-content:space-between"><span style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="coverUpload">Upload a new photo</button><button type="button" class="btn" id="coverRemove">Remove cover</button></span><button type="button" class="btn" id="coverCancel">Close</button></div>
+</dialog>
+
+<!-- connecting Granola -->
+<dialog id="granDlg">
+  <div id="granOff">
+    <form id="granForm">
+      <h2>Connect Granola</h2>
+      <p class="sub">Recordings you make in Granola (Apple Watch, iPhone, or Mac) show up on the leads list, ready to file on a lead.</p>
+      <ol class="gransteps">
+        <li>Granola's API needs its <b>Business</b> plan.</li>
+        <li>In the Granola app on your Mac: <b>Settings → Connectors → API keys → Create new key</b>. Choose <b>Personal notes</b>, then copy the key.</li>
+        <li>Paste it here.</li>
+      </ol>
+      <label class="f" for="granKey">Granola API key</label>
+      <input type="password" id="granKey" autocomplete="off" spellcheck="false" placeholder="grn_...">
+      <p class="note" style="margin:6px 0 0">Kept on the server where only Listing Assistant can use it. It isn't shown again.</p>
+      <div class="err" id="granErr" hidden></div>
+      <div class="row"><button type="button" class="btn" id="granCancel">Cancel</button><button class="btn primary" id="granSave">Connect</button></div>
+    </form>
+  </div>
+  <div id="granOn" hidden>
+    <h2>Granola is connected</h2>
+    <p class="sub">New recordings are checked when you open the leads list (at most every 10 minutes), or whenever you tap Check Granola. The first check looks back 30 days.</p>
+    <div class="row" style="justify-content:space-between"><button type="button" class="btn" id="granOff2">Disconnect Granola</button><button type="button" class="btn primary" id="granClose">Close</button></div>
+  </div>
 </dialog>
 
 <!-- one cost line on one net sheet -->
@@ -514,6 +555,7 @@ async function load(){
   const { data: open } = await sb.from("listing_todos").select("lead_id").eq("done", false);
   const n = {}; (open || []).forEach(t => n[t.lead_id] = (n[t.lead_id] || 0) + 1); leads.forEach(l => l.todo = n[l.id] || 0);
   route();
+  loadRecs();
 }
 function route(){
   if (!session) return;
@@ -1490,6 +1532,7 @@ sb.auth.onAuthStateChange((event, sess) => {
 });
 </script>
 <script src="netsheet.js"></script>
+<script src="recordings.js"></script>
 <div id="printArea"></div>
 </body>
 </html>
