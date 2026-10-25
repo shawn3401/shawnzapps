@@ -150,6 +150,17 @@ table.tracker th { font-size: 11.5px; }
 .back { display: inline-block; color: var(--ink-3); font-weight: 600; text-decoration: none; margin-bottom: 4px; }
 .back:hover { color: var(--accent); }
 .tm-signin { display: grid; gap: 12px; }
+.aud-rule { margin-bottom: 16px; }
+.aud-rule .card-h p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
+.aud-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.aud-row:last-child { border-bottom: 0; }
+.aud-row a.rec { font-weight: 700; color: var(--ink); text-decoration: none; }
+.aud-row a.rec:hover { color: var(--accent); }
+.aud-row small { display: block; color: var(--ink-3); }
+.aud-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.aud-ok { display: flex; gap: 8px; grid-column: 1/-1; }
+.aud-ok .in { flex: 1; }
+@media (max-width: 700px) { .aud-row { grid-template-columns: 1fr; } .aud-acts { justify-content: flex-start; } }
 .gl-row.team td { background: var(--soft); font-weight: 700; }
 .gl-sum td { color: var(--ink-2); font-style: italic; border-bottom: 0; }
 .ge-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
@@ -216,6 +227,7 @@ body.notadmin .ge-admin { display: none !important; }
       <a href="#sales" data-nav="sales" class="on">Sales</a>
       <a href="#leads" data-nav="leads">Leads</a>
       <a href="#jots" data-nav="jots">Jots <span class="nav-count" id="attCount" hidden></span></a>
+      <a href="#audit" data-nav="audit" id="navAudit">Audit <span class="nav-count" id="audCount" hidden></span></a>
       <a href="#goals" data-nav="goals" id="navGoals">Goals</a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
       <h4 style="margin-top:16px">Reports</h4>
@@ -583,6 +595,14 @@ body.notadmin .ge-admin { display: none !important; }
       </section>
     </section>
 
+    <!-- Audit: records a rule flagged for a person to check (Shawn, Oct 25, 2026) -->
+    <section id="vAudit" hidden>
+      <div class="head"><div class="grow"><h1>Audit</h1><div class="sub">Records that need a second look. Fix the record and the item clears itself within a few minutes, or mark it OK if it's right as it is.</div></div></div>
+      <div class="seg" id="audTabs" style="margin:0 0 16px"></div>
+      <div id="audList"></div>
+      <section class="card ge-admin" id="audRules" style="margin-top:8px"><div class="card-h"><h3>Rules</h3></div><div class="card-b scroll"><table class="grid" id="audRulesT"></table></div></section>
+    </section>
+
     <!-- one sale -->
     <section id="vSale" hidden>
       <div class="head">
@@ -851,8 +871,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals", "vSettings"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals", vSettings: "settings" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals", "vSettings", "vAudit"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals", vSettings: "settings", vAudit: "audit" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -879,13 +899,14 @@ async function start(session) {
   if (role === "agent") {
     document.body.classList.add("viewonly");
     $('[data-nav="jots"]').hidden = true;
+    $("#navAudit").hidden = true;
     $("#navDlr").hidden = true;
     $("#navGoals").textContent = "My goals";
     $("#salesTitle").textContent = "My sales";
     $("#saveExit").textContent = "Back to list"; $("#leadExit").textContent = "Back to list";
   }
   await loadLookups();
-  refreshAttention();
+  refreshAttention(); refreshAuditCount();
   window.addEventListener("hashchange", route);
   route();
 }
@@ -921,6 +942,7 @@ function route() {
   if (h === "distribution" && ME.role === "admin") return showDist();
   if (h === "goals" || h.startsWith("goals?")) return showGoals(h);
   if (h === "settings" && ME.role === "admin") return showSettings();
+  if (h === "audit" && !isAgent()) return showAudit();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
   if (h === "hustle") return showHustle();
@@ -1737,6 +1759,84 @@ $("#hoAdd").onclick = async () => {
   if (error) return status(/duplicate/.test(error.message) ? usDate(day) + " is already a holiday." : error.message, true);
   $("#hoDay").value = ""; $("#hoName").value = ""; HO.year = +day.slice(0, 4); status("Added"); showSettings();
 };
+
+// ---------- Audit (Shawn, Oct 25, 2026) ----------
+// Rules (audit_rules, 024_audit.sql) flag leads and sales for a person to check; audit_scan() runs
+// every 5 minutes and when this page opens. Fixing the record closes the item by itself; "Mark OK"
+// keeps a record as it is (with an optional note). New rules are added in the database.
+let AUD = { tab: "open", items: [], rules: [], names: {} };
+async function refreshAuditCount() {
+  if (isAgent()) return;
+  const { count } = await sb.from("audit_items").select("id", { count: "exact", head: true }).eq("status", "open");
+  $("#audCount").textContent = count || ""; $("#audCount").hidden = !count;
+}
+async function showAudit() {
+  page("vAudit");
+  await sb.rpc("audit_scan");
+  const [it, ru] = await Promise.all([
+    sb.from("audit_items").select("*").order("found_at", { ascending: false }),
+    sb.from("audit_rules").select("*").order("sort"),
+  ]);
+  if (it.error) return status(it.error.message, true);
+  AUD.items = it.data; AUD.rules = ru.data || [];
+  const kindOf = Object.fromEntries(AUD.rules.map(r => [r.key, r.record_kind]));
+  const leadIds = [...new Set(AUD.items.filter(i => kindOf[i.rule_key] === "lead").map(i => i.record_id))];
+  const saleIds = [...new Set(AUD.items.filter(i => kindOf[i.rule_key] === "sale").map(i => i.record_id))];
+  const [ls, ss] = await Promise.all([
+    leadIds.length ? sb.from("leads").select("id, lead_name, lead_type, sales_rep, lead_received_date").in("id", leadIds) : { data: [] },
+    saleIds.length ? sb.from("sales_search").select("sale_id, lead_name, address, sale_type, agent, contract_date").in("sale_id", saleIds) : { data: [] },
+  ]);
+  AUD.names = {};
+  for (const l of ls.data || []) AUD.names["lead" + l.id] = { name: l.lead_name, sub: [l.lead_type, L.teamName[l.sales_rep], l.lead_received_date && "received " + usDate(l.lead_received_date)].filter(Boolean).join(" · "), href: "#lead=" + l.id };
+  for (const x of ss.data || []) AUD.names["sale" + x.sale_id] = { name: x.address || x.lead_name, sub: [x.lead_name, x.sale_type, x.agent, x.contract_date && "contract " + usDate(x.contract_date)].filter(Boolean).join(" · "), href: "#sale=" + x.sale_id };
+  AUD.kindOf = kindOf;
+  renderAudit(); refreshAuditCount();
+}
+function renderAudit() {
+  const cut = Date.now() - 30 * 864e5;
+  const inTab = (i, t) => t === "open" ? i.status === "open" : t === "ok" ? i.status === "ok" : i.status === "fixed" && new Date(i.resolved_at) > cut;
+  const counts = Object.fromEntries(["open", "ok", "fixed"].map(t => [t, AUD.items.filter(i => inTab(i, t)).length]));
+  $("#audTabs").innerHTML = [["open", "To review"], ["ok", "Marked OK"], ["fixed", "Fixed (30 days)"]].map(([v, t]) => `<button type="button" data-v="${v}" class="${AUD.tab === v ? "on" : ""}">${t} (${counts[v]})</button>`).join("");
+  $$("#audTabs [data-v]").forEach(b => b.onclick = () => { AUD.tab = b.dataset.v; renderAudit(); });
+  const groups = AUD.rules.map(r => ({ r, items: AUD.items.filter(i => i.rule_key === r.key && inTab(i, AUD.tab)) })).filter(g => g.items.length);
+  $("#audList").innerHTML = groups.length ? groups.map(({ r, items }) => `<section class="card aud-rule"><div class="card-h" style="display:block"><h3>${esc(r.title)} (${items.length})</h3><p>${esc(r.description)}</p></div>
+    <div class="card-b">${items.map(i => { const kind = AUD.kindOf[i.rule_key], nm = AUD.names[kind + i.record_id] || { name: (kind === "lead" ? "Lead " : "Sale ") + i.record_id, sub: "", href: "#" + kind + "=" + i.record_id };
+      return `<div class="aud-row" data-id="${i.id}"><div><a class="rec" href="${nm.href}">${esc(nm.name)}</a><small>${esc(nm.sub)}</small></div>
+        <div>${esc(i.detail || "")}<small>${i.status === "open" ? "Found " + usDate(i.found_at) : i.status === "ok" ? `OK by ${esc((i.resolved_by || "").split("@")[0])} ${usDate(i.resolved_at)}${i.note ? ": " + esc(i.note) : ""}` : "Fixed " + usDate(i.resolved_at)}</small></div>
+        <div class="aud-acts"><a class="btn" href="${nm.href}">Open</a>${i.status === "open" ? `<button class="btn" data-ok="${i.id}">Mark OK</button>` : i.status === "ok" ? `<button class="btn" data-reopen="${i.id}">Reopen</button>` : ""}</div></div>`; }).join("")}</div></section>`).join("")
+    : `<div class="card"><div class="card-b note">${AUD.tab === "open" ? "Nothing to review. Nice." : "Nothing here."}</div></div>`;
+  $$("#audList [data-ok]").forEach(b => b.onclick = () => {
+    const row = b.closest(".aud-row");
+    if (row.querySelector(".aud-ok")) return;
+    row.insertAdjacentHTML("beforeend", `<div class="aud-ok"><input class="in" placeholder="Why it's OK (optional)"><button class="btn red">Mark OK</button><button class="btn">Cancel</button></div>`);
+    const box = row.querySelector(".aud-ok"), inp = box.querySelector("input");
+    inp.focus();
+    box.querySelectorAll("button")[1].onclick = () => box.remove();
+    const save = async () => {
+      const { error } = await sb.rpc("audit_mark", { p_id: +b.dataset.ok, p_status: "ok", p_note: inp.value });
+      if (error) return status(error.message, true);
+      Object.assign(AUD.items.find(x => x.id === +b.dataset.ok), { status: "ok", note: inp.value.trim() || null, resolved_by: ME.email, resolved_at: new Date().toISOString() });
+      status("Marked OK"); renderAudit(); refreshAuditCount();
+    };
+    box.querySelectorAll("button")[0].onclick = save;
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") save(); });
+  });
+  $$("#audList [data-reopen]").forEach(b => b.onclick = async () => {
+    const { error } = await sb.rpc("audit_mark", { p_id: +b.dataset.reopen, p_status: "open" });
+    if (error) return status(error.message, true);
+    Object.assign(AUD.items.find(x => x.id === +b.dataset.reopen), { status: "open", resolved_at: null, resolved_by: null });
+    status("Reopened"); renderAudit(); refreshAuditCount();
+  });
+  // rules (admins switch them on or off; new rules are added in the database)
+  $("#audRulesT").innerHTML = `<thead><tr><th>Rule</th><th>Looks at</th><th>From</th><th>On</th></tr></thead><tbody>` + AUD.rules.map(r => `<tr><td><b>${esc(r.title)}</b><small>${esc(r.description)}</small></td>
+    <td>${r.record_kind === "lead" ? "Leads received" : "Sales under contract"}</td><td>${usDate(r.since)} on</td>
+    <td><label class="chk" style="min-height:0"><input type="checkbox" data-rule="${esc(r.key)}" ${r.active ? "checked" : ""}></label></td></tr>`).join("") + `</tbody>`;
+  $$("#audRulesT [data-rule]").forEach(c => c.onchange = async () => {
+    const { error } = await sb.from("audit_rules").update({ active: c.checked }).eq("key", c.dataset.rule);
+    if (error) { c.checked = !c.checked; return status(error.message, true); }
+    status(c.checked ? "Rule on" : "Rule off");
+  });
+}
 
 // ---------- Report distribution (admins only; the database enforces it too) ----------
 // Shawn, Oct 22, 2026: an EMAIL is what gets sent: a subject, one or more reports stacked in order,
