@@ -151,6 +151,7 @@ table.tracker th { font-size: 11.5px; }
 .back:hover { color: var(--accent); }
 .tm-signin { display: grid; gap: 12px; }
 .aud-rule { margin-bottom: 16px; }
+#audRulesT small { display: block; color: var(--ink-3); font-weight: 400; }
 .aud-rule .card-h p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
 .aud-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .aud-row:last-child { border-bottom: 0; }
@@ -228,6 +229,7 @@ body.notadmin .ge-admin { display: none !important; }
       <a href="#leads" data-nav="leads">Leads</a>
       <a href="#jots" data-nav="jots">Jots <span class="nav-count" id="attCount" hidden></span></a>
       <a href="#audit" data-nav="audit" id="navAudit">Audit <span class="nav-count" id="audCount" hidden></span></a>
+      <a href="#newleads" data-nav="newleads" id="navNewLeads">Daily new leads</a>
       <a href="#goals" data-nav="goals" id="navGoals">Goals</a>
       <a href="#team" data-nav="team" id="navTeam" hidden>Team</a>
       <h4 style="margin-top:16px">Reports</h4>
@@ -603,6 +605,19 @@ body.notadmin .ge-admin { display: none !important; }
       <section class="card ge-admin" id="audRules" style="margin-top:8px"><div class="card-h"><h3>Rules</h3></div><div class="card-b scroll"><table class="grid" id="audRulesT"></table></div></section>
     </section>
 
+    <!-- Daily new leads: the one number a day Trevor types from a Brivity search (Access's Daily Agent
+         Activity Entry, house account row, TotalNewLeads) -->
+    <section id="vNewLeads" hidden>
+      <div class="head"><div class="grow"><h1>Daily new leads</h1><div class="sub">How many new leads came in each day, from Brivity. One number a day.</div></div></div>
+      <section class="card" style="margin-bottom:16px"><form class="card-b dist-acts" id="nlForm">
+        <label class="fld"><span>Day</span><input class="in" type="date" id="nlDay"></label>
+        <label class="fld"><span>New leads</span><input class="in" type="number" min="0" id="nlCount" style="width:120px"></label>
+        <button class="btn red" type="submit" style="align-self:end">Save</button>
+        <span class="note" style="margin:0;align-self:end" id="nlNote"></span>
+      </form></section>
+      <div class="card scroll"><table class="grid" id="nlTable"></table></div>
+    </section>
+
     <!-- one sale -->
     <section id="vSale" hidden>
       <div class="head">
@@ -871,8 +886,8 @@ function page(id) {
   $("#vSignin").hidden = id !== "vSignin";
   $("#vDenied").hidden = id !== "vDenied";
   $("#shell").hidden = id === "vSignin" || id === "vDenied";
-  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals", "vSettings", "vAudit"]) $("#" + v).hidden = v !== id;
-  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals", vSettings: "settings", vAudit: "audit" }[id] || "sales";
+  for (const v of ["vSearch", "vSale", "vTeam", "vJots", "vJot", "vLeads", "vLead", "vTracker", "vDlr", "vHustle", "vDist", "vGoals", "vSettings", "vAudit", "vNewLeads"]) $("#" + v).hidden = v !== id;
+  const nav = { vTeam: "team", vJots: "jots", vJot: "jots", vLeads: "leads", vLead: "leads", vTracker: "tracker", vDlr: "dlr", vHustle: "hustle", vDist: "distribution", vGoals: "goals", vSettings: "settings", vAudit: "audit", vNewLeads: "newleads" }[id] || "sales";
   $$("[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === nav));
   $("#side").classList.remove("open");
   window.scrollTo(0, 0);
@@ -899,7 +914,7 @@ async function start(session) {
   if (role === "agent") {
     document.body.classList.add("viewonly");
     $('[data-nav="jots"]').hidden = true;
-    $("#navAudit").hidden = true;
+    $("#navAudit").hidden = true; $("#navNewLeads").hidden = true;
     $("#navDlr").hidden = true;
     $("#navGoals").textContent = "My goals";
     $("#salesTitle").textContent = "My sales";
@@ -943,6 +958,7 @@ function route() {
   if (h === "goals" || h.startsWith("goals?")) return showGoals(h);
   if (h === "settings" && ME.role === "admin") return showSettings();
   if (h === "audit" && !isAgent()) return showAudit();
+  if (h === "newleads" && !isAgent()) return showNewLeads();
   if (h === "jots" || h.startsWith("jots?")) return showJots(h);
   if (h === "tracker") return showTracker();
   if (h === "hustle") return showHustle();
@@ -1759,6 +1775,54 @@ $("#hoAdd").onclick = async () => {
   if (error) return status(/duplicate/.test(error.message) ? usDate(day) + " is already a holiday." : error.message, true);
   $("#hoDay").value = ""; $("#hoName").value = ""; HO.year = +day.slice(0, 4); status("Added"); showSettings();
 };
+
+// ---------- Daily new leads (Shawn, Oct 25, 2026) ----------
+// Access's Daily Agent Activity Entry form has only been used for this since 2023: one row a day on the
+// "Anderson Hicks" house account with TotalNewLeads, which Trevor types from a Brivity search.
+let NL = [];
+const houseId = () => L.team.find(t => t.team_member_name === "Anderson Hicks")?.id;
+async function showNewLeads() {
+  page("vNewLeads");
+  const { data, error } = await sb.from("daily_activities").select("id, session_date, total_new_leads").eq("sales_rep", houseId()).not("session_date", "is", null).order("session_date", { ascending: false }).limit(45);
+  if (error) return status(error.message, true);
+  NL = data;
+  if (!$("#nlDay").value) $("#nlDay").value = new Date().toLocaleDateString("en-CA");
+  nlNote(); renderNewLeads();
+}
+function nlNote() {
+  const d = $("#nlDay").value, row = NL.find(r => r.session_date.slice(0, 10) === d);
+  $("#nlNote").textContent = row ? `${usDate(d)} already has ${row.total_new_leads}; saving replaces it.` : "";
+}
+function renderNewLeads() {
+  $("#nlTable").innerHTML = `<thead><tr><th>Day</th><th class="n">New leads</th><th></th></tr></thead><tbody>` + (NL.length ? NL.map(r => `<tr>
+    <td>${new Date(r.session_date.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric", year: "numeric" })}</td>
+    <td class="n"><input class="in" type="number" min="0" data-nl="${r.id}" value="${r.total_new_leads ?? ""}" style="width:90px;text-align:right"></td>
+    <td class="x"><button title="Remove this day" data-nlrm="${r.id}">&#10005;</button></td></tr>`).join("") : `<tr><td colspan="3" class="note">Nothing yet.</td></tr>`) + `</tbody>`;
+  $$("#nlTable [data-nl]").forEach(el => el.onchange = async () => {
+    const v = el.value === "" ? null : Math.max(0, Math.round(+el.value));
+    const { error } = await sb.from("daily_activities").update({ total_new_leads: v }).eq("id", +el.dataset.nl);
+    if (error) return status(error.message, true);
+    NL.find(r => r.id === +el.dataset.nl).total_new_leads = v; status("Saved");
+  });
+  $$("#nlTable [data-nlrm]").forEach(b => b.onclick = async () => {
+    if (!confirm("Remove this day's count?")) return;
+    const { error } = await sb.from("daily_activities").delete().eq("id", +b.dataset.nlrm);
+    if (error) return status(error.message, true);
+    NL = NL.filter(r => r.id !== +b.dataset.nlrm); status("Removed"); renderNewLeads();
+  });
+}
+$("#nlDay").addEventListener("change", nlNote);
+$("#nlForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const d = $("#nlDay").value, v = $("#nlCount").value;
+  if (!d || v === "") return status("Pick the day and type the number.", true);
+  const n = Math.max(0, Math.round(+v)), row = NL.find(r => r.session_date.slice(0, 10) === d);
+  const { error } = row ? await sb.from("daily_activities").update({ total_new_leads: n }).eq("id", row.id)
+    : await sb.from("daily_activities").insert({ sales_rep: houseId(), session_date: d, total_new_leads: n, dials: 0, phone_conversations: 0, emails: 0, texts: 0,
+        digital_conversations: 0, average_response_time: 0, current_task_balance: 0, overdue_task_balance: 0, in_rotation: false });
+  if (error) return status(error.message, true);
+  $("#nlCount").value = ""; status(`Saved ${n} for ${usDate(d)}`); showNewLeads();
+});
 
 // ---------- Audit (Shawn, Oct 25, 2026) ----------
 // Rules (audit_rules, 024_audit.sql) flag leads and sales for a person to check; audit_scan() runs
