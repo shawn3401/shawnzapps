@@ -168,6 +168,10 @@ def main():
         if r.returncode:
             sys.exit("Load failed, nothing was changed:\n" + r.stderr[-2000:])
 
+        # Team members with no start date take their earliest role start (022_start_dates.sql).
+        r = subprocess.run([PSQL, CONN, "-At", "-c", "select fill_start_dates()"], env=env, capture_output=True, text=True)
+        print("start dates filled from role history:", (r.stdout.strip() or r.stderr.strip()))
+
         # Leads and sales were just replaced, so links from jots point at nothing (or the wrong rows).
         # Start the automatic step over from when this copy of Access was taken (its file time, in
         # Jotform's clock, Mountain time): jots after that create or link again.
