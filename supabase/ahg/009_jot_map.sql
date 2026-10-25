@@ -37,6 +37,12 @@ $$;
 create or replace function public.jot_pct(t text) returns numeric language sql immutable as $$
   select case when public.jot_num(t) is null then null when public.jot_num(t) > 1 then public.jot_num(t) / 100 else public.jot_num(t) end
 $$;
+-- A commission rate as typed in the contract jot: "2.5%", "2.5", "1%", "1" are percents; "0.025" is
+-- already a fraction. (jot_pct read "1%" and "1" as 100%; found Oct 25, 2026 on 640 Sunflower.)
+create or replace function public.jot_rate(t text) returns numeric language sql immutable as $$
+  select case when public.jot_num(t) is null then null
+    when t like '%\%%' or public.jot_num(t) >= 0.2 then public.jot_num(t) / 100 else public.jot_num(t) end
+$$;
 create or replace function public.norm_name(t text) returns text language sql immutable as $$
   select lower(regexp_replace(coalesce(t, ''), '[^A-Za-z]', '', 'g'))
 $$;
@@ -154,7 +160,7 @@ language sql stable security definer set search_path = public as $$
     'contract_date', jot_ts(a -> '76')::date,
     'outside_agent_referral_percent', case when a ->> '18' = 'Yes' then coalesce(jot_pct(a ->> '19'), 0) else 0 end,
     'referral_paidby', case when a ->> '18' = 'Yes' then 'Brokerage' else 'NA' end,
-    'projected_commission_percent', coalesce(jot_pct(case a ->> '48' when 'Seller' then a ->> '21' else a ->> '22' end), 0.03),
+    'projected_commission_percent', coalesce(jot_rate(case a ->> '48' when 'Seller' then a ->> '21' else a ->> '22' end), 0.03),
     'transaction_fees_bonuses', case when a ->> '23' = 'No' then 0 else coalesce(jot_num(a ->> '24'), 0) end,
     'agent_gave_promise_sale', a ->> '10',
     'termination_date', case when a ->> '36' = 'Yes' then jot_ts(a -> '60')::date end,

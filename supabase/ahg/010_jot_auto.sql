@@ -266,12 +266,16 @@ revoke all on function public.jot_ingest(text, jsonb) from public, anon, authent
 -- wrong rows). Forget them and the issues, and create from jots submitted after the copy was taken.
 create or replace function public.jot_after_refresh(p_copy_time text) returns jsonb
 language plpgsql security definer set search_path = public as $$
+-- Replays EVERY jot since the automatic step started (auto_from), not just since this copy (changed
+-- Oct 25, 2026: a weekend copy dropped three jots the success team hadn't typed yet). Jots the team
+-- already typed link to their Access records (the matching rules); the rest are created again.
+-- p_copy_time only sets auto_from the first time.
 declare r record; n int := 0;
 begin
   delete from jot_links; delete from jot_issues;
-  update jot_forms set auto_from = p_copy_time;
+  update jot_forms set auto_from = p_copy_time where auto_from is null;
   for r in select s.id from jot_submissions s join jot_forms f using (form_id)
-           where s.jot_created_at >= p_copy_time or coalesce(s.jot_updated_at, '') >= p_copy_time
+           where s.jot_created_at >= f.auto_from or coalesce(s.jot_updated_at, '') >= f.auto_from
            order by f.kind = 'sale', s.jot_created_at loop   -- leads before sales, oldest first
     perform jot_apply(r.id); n := n + 1;
   end loop;
