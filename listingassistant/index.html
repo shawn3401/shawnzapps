@@ -192,6 +192,12 @@ dialog h2{font-size:22px}
 @media (max-width:560px){.recrow{grid-template-columns:1fr}.recbtns{align-items:flex-start;text-align:left}}
 .gransteps{margin:10px 0 0;padding-left:20px;font-size:15px;color:var(--ink-2)}
 .gransteps li{margin-bottom:4px}
+.recsrc{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:6px;vertical-align:1px}
+.recnote{max-height:96px;color:var(--ink)}
+.capsec{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.capsec h3{margin:0 0 4px;font-size:16px}
+.capcopy{display:flex;gap:8px;margin-top:8px}
+.capcopy input{flex:1;min-width:0;font-size:14px}
 /* net sheet */
 .nstool{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .nstoolr{display:flex;gap:8px;flex-wrap:wrap}
@@ -439,6 +445,36 @@ footer{max-width:900px;margin:0 auto;padding:0 16px 30px;color:var(--ink-3);font
     <p class="sub">New recordings are checked when you open the leads list (at most every 10 minutes), or whenever you tap Check Granola. The first check looks back 30 days.</p>
     <div class="row" style="justify-content:space-between"><button type="button" class="btn" id="granOff2">Disconnect Granola</button><button type="button" class="btn primary" id="granClose">Close</button></div>
   </div>
+</dialog>
+
+<!-- quick capture: Siri shortcut and email -->
+<dialog id="capDlg">
+  <h2>Quick capture</h2>
+  <p class="sub">Say a note to Siri on your watch or phone, or email one, and it lands in the inbox on the leads list with the lead it looks like.</p>
+  <div class="err" id="capErr" hidden></div>
+  <div class="capsec">
+    <h3>Siri shortcut (iPhone and Apple Watch)</h3>
+    <div class="capcopy"><input id="capUrl" readonly><button type="button" class="btn small" data-copy="capUrl">Copy</button></div>
+    <ol class="gransteps">
+      <li>Open this page on your iPhone and copy the link above.</li>
+      <li>In the <b>Shortcuts</b> app, tap <b>+</b> and name the shortcut <b>Listing note</b>.</li>
+      <li>Add the action <b>Dictate Text</b>.</li>
+      <li>Add <b>Get Contents of URL</b> and paste the link as the URL. Tap the arrow to show more: Method <b>POST</b>, Request Body <b>JSON</b>, add a <b>Text</b> field named <b>text</b>, and set its value to <b>Dictated Text</b>.</li>
+      <li>Add <b>Speak Text</b> and give it <b>Contents of URL</b>, so Siri tells you it saved and which lead it looks like.</li>
+      <li>In the shortcut's details (the <b>i</b> button), turn on <b>Show on Apple Watch</b>.</li>
+    </ol>
+    <p class="note" style="margin:6px 0 0">Then say "Hey Siri, listing note" and talk.</p>
+  </div>
+  <div class="capsec">
+    <h3>Email (for Instinct, or forwarding)</h3>
+    <div id="capMailOn">
+      <div class="capcopy"><input id="capEmail" readonly><button type="button" class="btn small" data-copy="capEmail">Copy</button></div>
+      <p class="note" style="margin:6px 0 0">Anything sent here lands in the inbox, subject and all. Tell Instinct once: when I text "listing note", email it to this address. Forwarding a seller's email works too.</p>
+    </div>
+    <p class="note" id="capMailOff" hidden>Email capture isn't switched on yet.</p>
+  </div>
+  <p class="note" style="margin-top:14px">Anyone with this link or address can add notes to your inbox, though they can't read anything, so keep them to yourself.</p>
+  <div class="row" style="justify-content:space-between"><button type="button" class="btn" id="capReset">Make a new link</button><button type="button" class="btn primary" id="capClose">Close</button></div>
 </dialog>
 
 <!-- one cost line on one net sheet -->
