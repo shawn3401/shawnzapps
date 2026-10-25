@@ -457,7 +457,7 @@ body.notadmin .ge-admin { display: none !important; }
         <div class="strip roles" style="margin-top:16px">
           <div class="tile"><small>Admin sign-in</small><span>Sees and edits everything, and manages this page and report emails.</span></div>
           <div class="tile"><small>Staff sign-in</small><span>Sees and edits every sale and lead.</span></div>
-          <div class="tile"><small>Agent sign-in</small><span>Views only their own sales (primary agent or on the split) and their leads. Can't change anything.</span></div>
+          <div class="tile"><small>Agent sign-in</small><span>Views only their own sales (primary agent or on the split) and their leads, plus anyone they assist (set on their page). Can't change anything.</span></div>
         </div>
       </div>
       <div id="tmOne" hidden>
@@ -1389,6 +1389,9 @@ function renderMember(id) {
       <div class="row"><label class="fld"><span>Access</span><select class="in" id="tmAccess" ${me ? "disabled title=\"Another admin has to change your access\"" : ""}>${Object.entries(ROLE_NAMES).map(([v, n]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${n}</option>`).join("")}</select></label>
         <label class="chk"><input type="checkbox" id="tmOn" ${u.active ? "checked" : ""} ${me ? "disabled" : ""}> Can sign in</label>
         ${me ? "" : `<button class="btn" id="tmNoSign">Remove sign-in</button>`}</div>
+      ${u.role === "agent" ? `<div class="fld"><span>Also sees the sales and leads of (for assistants)</span>
+        <div class="chips" style="margin:0 0 6px">${(u.also_sees || []).map(x => `<span class="chip-x">${esc(L.teamName[x] || x)}<button type="button" data-unsee="${x}" title="Remove">&#10005;</button></span>`).join("") || `<span class="note" style="margin:0">Only their own.</span>`}</div>
+        <select class="in" id="tmSeeAdd" style="max-width:280px"><option value="">+ Add someone they assist</option>${L.team.filter(t => L.activeIds.has(t.id) && t.id !== id && !(u.also_sees || []).includes(t.id)).map(t => `<option value="${t.id}">${esc(t.team_member_name)}</option>`).join("")}</select></div>` : ""}
       <p class="note" style="margin:0">Added ${usDate(u.added_at)}.</p></div>`
     : `<div class="tm-signin"><p class="note" style="margin:0">No sign-in yet.</p><div class="row">
       <label class="fld" style="flex:1;min-width:220px"><span>Email</span><input class="in" id="tmNewEmail" type="email" data-1p-ignore data-lpignore="true" data-bwignore placeholder="name@andersonhicks.com" value="${esc(TD.emails[id] || "")}"></label>
@@ -1398,6 +1401,8 @@ function renderMember(id) {
     const upd = async patch => { const { error } = await sb.from("app_users").update(patch).eq("email", u.email); if (error) { status(error.message, true); return renderMember(id); } Object.assign(u, patch); status("Saved"); renderMember(id); };
     $("#tmAccess").onchange = () => upd({ role: $("#tmAccess").value });
     $("#tmOn").onchange = () => upd({ active: $("#tmOn").checked });
+    $("#tmSeeAdd")?.addEventListener("change", () => { const v = +$("#tmSeeAdd").value; if (v) upd({ also_sees: [...(u.also_sees || []), v] }); });
+    $$("#tmSignin [data-unsee]").forEach(b => b.onclick = () => upd({ also_sees: (u.also_sees || []).filter(x => x !== +b.dataset.unsee) }));
     $("#tmNoSign")?.addEventListener("click", async () => {
       if (!confirm(`Remove ${u.email}'s sign-in? They won't be able to open AHG Tools.`)) return;
       const { error } = await sb.from("app_users").delete().eq("email", u.email);
