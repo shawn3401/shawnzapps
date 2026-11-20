@@ -139,6 +139,9 @@ nav.tabs button.on{color:var(--orange)}
 .sheet .panel{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;width:100%;max-width:440px;margin:0 auto}
 .sheet form{padding:18px}
 body.locked{overflow:hidden}
+#authDlg .authpanel{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:4px 0 30px}
+#authDlg form{padding:18px}
+#authDlg h2{margin:0 0 4px;font-size:21px;letter-spacing:-.4px}
 .sheet h2{margin:0 0 4px;font-size:21px;letter-spacing:-.4px}
 label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin:14px 0 5px}
 .in{width:100%;height:44px;background:var(--cell);border:1px solid var(--dash);border-radius:4px;padding:0 11px;font-size:16px}
@@ -214,7 +217,7 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
 </form></div></div>
 
 <!-- sign in -->
-<div class="sheet" id="authDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="authForm">
+<section class="wrap" id="authDlg" hidden><div class="authpanel"><form id="authForm" method="post" action="./" name="login">
   <h2 id="authTitle">Sign in</h2>
   <p class="sub" id="authSub" style="margin-top:6px"></p>
   <div id="googleWrap" hidden>
@@ -222,17 +225,17 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
     <p class="or">OR USE YOUR EMAIL</p>
   </div>
   <label class="f" for="email">Email</label>
-  <input class="in" type="email" id="email" autocomplete="email" required>
+  <input class="in" type="email" id="email" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" required>
   <div id="pwWrap">
     <label class="f" for="password">Password</label>
-    <input class="in" type="password" id="password" autocomplete="current-password" minlength="8">
+    <input class="in" type="password" id="password" name="password" autocomplete="current-password" minlength="8">
     <label class="showpw"><input type="checkbox" id="showPw"> Show password</label>
   </div>
   <div class="err" id="authErr" hidden></div>
   <div class="ok" id="authOk" hidden></div>
-  <div class="dlgrow"><div class="sp"></div><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
+  <div class="dlgrow"><div class="sp"></div><button class="btn primary" id="authBtn">Sign in</button></div>
   <p class="note" id="authLinks"></p>
-</form></div></div>
+</form></div></section>
 
 <div class="sheet" id="pwDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="pwForm">
   <h2>New password</h2>
@@ -325,8 +328,7 @@ function render(){
 
 function signedOut(){
   return `<div class="h1" style="margin-top:28px">Your spools, counted.</div>
-  <p class="sub">Run through your filament in a minute and see exactly what to reorder. Sign in to see yours.</p>
-  <button class="btn primary block" data-act="signIn">Sign in</button>`;
+  <p class="sub">Run through your filament in a minute and see exactly what to reorder. Sign in to see yours.</p>`;
 }
 function noneYet(){
   return `<div class="empty"><b>No filament here yet</b>Signed in as ${esc(session.user.email)}. If your filament is on a different account, sign out and use that one.</div>
@@ -586,10 +588,8 @@ function openAuth(m){
     ? `<button type="button" class="link" data-mode="up">Create an account</button> · <button type="button" class="link" data-mode="reset">Forgot your password?</button>`
     : `<button type="button" class="link" data-mode="in">Back to sign in</button>`;
   $("#authErr").hidden = $("#authOk").hidden = true;
-  if (!isOpen("#authDlg")) openDlg("#authDlg");
 }
 $("#authLinks").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
-$("#authCancel").addEventListener("click", () => closeDlg("#authDlg"));
 $("#showPw").addEventListener("change", (e) => { $("#password").type = e.target.checked ? "text" : "password"; });
 $("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE, queryParams: { prompt: "select_account" } } }));
 $("#authForm").addEventListener("submit", async (e) => {
@@ -624,14 +624,16 @@ $("#pwForm").addEventListener("submit", async (e) => {
 function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; openDlg("#acctDlg"); }
 $("#acct").addEventListener("click", openAcct);
 $("#acctForm").addEventListener("submit", (e) => { e.preventDefault(); closeDlg("#acctDlg"); });
-$("#signOut").addEventListener("click", () => { closeDlg("#acctDlg"); sb.auth.signOut(); });
+$("#signOut").addEventListener("click", () => { closeDlg("#acctDlg"); openAuth("in"); sb.auth.signOut(); });
 
 function setSession(sess){
   const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
   session = sess;
+  $("#authDlg").hidden = !!sess;
   $("#acct").hidden = !sess; $("#acct").textContent = sess ? (sess.user.email || "").split("@")[0].slice(0, 14) : "";
   if (changed || !sess) load(); else render();
 }
+openAuth("in");
 sb.auth.onAuthStateChange((event, sess) => {
   if (event === "PASSWORD_RECOVERY") openDlg("#pwDlg");
   setTimeout(() => setSession(sess), 0);
