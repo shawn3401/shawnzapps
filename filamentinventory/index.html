@@ -71,7 +71,7 @@ nav.tabs button.on{color:var(--orange)}
 .prog .top{display:flex;align-items:center;gap:10px}
 .prog .t{flex:1}
 .prog .big{font-size:18px;font-weight:700}
-.prog .small{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+.prog .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
 .bar{height:6px;background:var(--cell);border-radius:3px;margin-top:12px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--orange);border-radius:3px;transition:width .25s}
 
@@ -123,6 +123,8 @@ nav.tabs button.on{color:var(--orange)}
 .row.chosen{background:var(--panel)}
 
 /* order */
+.titlerow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.titlerow .h1{margin-bottom:4px}
 .sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 6px}
 .sum div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
 .sum b{display:block;font-family:var(--mono);font-size:26px;font-weight:600;color:var(--orange)}
@@ -364,10 +366,10 @@ function countView(){
   let h = `<div class="floors">${["main", "up"].map((fl) => `<button class="${fl === floor ? "on" : ""}" data-act="floor" data-v="${fl}">${FLOORS[fl].name}${counting() ? `<small>${done(fl)}/${L.length}</small>` : ""}</button>`).join("")}</div>`;
   if (counting()){
     const d = done(floor), pct = L.length ? Math.round(d / L.length * 100) : 0;
-    h += `<div class="prog"><div class="top"><div class="t"><div class="big">${d} of ${L.length} checked</div><div class="small">${F.name.toUpperCase()} · STARTED ${fmtDay(cnt.started_at).toUpperCase()}</div></div>
-      <button class="btn small" data-act="finish">Finish</button></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    h += `<div class="prog"><div class="top"><div class="t"><div class="big">${d} of ${L.length} checked</div><div class="meta">${F.name.toUpperCase()} · STARTED ${fmtDay(cnt.started_at).toUpperCase()}</div></div>
+      <button class="btn small ghost" data-act="cancelCount">Cancel</button><button class="btn small" data-act="finish">Finish</button></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
   } else {
-    h += `<div class="prog"><div class="top"><div class="t"><div class="big">Ready to count?</div><div class="small">${cnt ? "LAST COUNT " + fmtDay(cnt.finished_at).toUpperCase() : "NO COUNTS YET"}</div></div>
+    h += `<div class="prog"><div class="top"><div class="t"><div class="big">Ready to count?</div><div class="meta">${cnt ? "LAST COUNT " + fmtDay(cnt.finished_at).toUpperCase() : "NO COUNTS YET"}</div></div>
       <button class="btn small primary" data-act="start">Start a count</button></div></div>`;
   }
   h += `<div class="shelfhd"><span class="kicker">${arranging ? "Drag to match your shelf" : F.name + " shelf"}</span>${arranging
@@ -405,7 +407,7 @@ function stepper(it, field){
 function orderView(){
   const L = live(), want = L.filter((i) => need(i) > 0), way = L.filter((i) => i.on_order > 0);
   const spools = want.reduce((s, i) => s + need(i), 0);
-  let h = `<div class="h1">Order</div><p class="sub">Tap Ordered once it's in your cart. When the box shows up, tap Got it and the spools go upstairs.</p>
+  let h = `<div class="titlerow"><div class="h1">Order</div><button class="btn small" data-act="toCount">Done</button></div><p class="sub">Tap Ordered once it's in your cart. When the box shows up, tap Got it and the spools go upstairs.</p>
   <div class="sum"><div><b>${spools}</b><span>SPOOLS TO ORDER</span></div><div><b>${want.length}</b><span>COLORS</span></div></div>`;
   if (!want.length) h += `<div class="empty"><b>Nothing to order</b>Every filament has its backups.</div>`;
   else {
@@ -418,7 +420,7 @@ function orderView(){
   if (way.length){
     h += `<div class="grp" style="margin-top:30px"><span class="kicker" style="color:var(--green)">On the way</span><span class="n">${way.reduce((s, i) => s + i.on_order, 0)} SPOOLS</span></div>`;
     for (const it of way) h += `<div class="orow">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="why">${esc(groupKey(it))}</div></div><div class="qty">${it.on_order}<small>×</small></div><button class="btn small" data-act="unorder" data-id="${it.id}" aria-label="Not ordered after all">✕</button><button class="btn small primary" data-act="got" data-id="${it.id}">Got it</button></div>`;
-    if (way.length > 1) h += `<div class="acts"><button class="btn block" data-act="gotAll">Got everything</button></div>`;
+    h += `<div class="acts">${way.length > 1 ? `<button class="btn" data-act="gotAll">Got everything</button>` : ""}<button class="btn ghost" data-act="cancelOrder">Cancel order</button></div>`;
   }
   return h;
 }
@@ -532,6 +534,20 @@ const ACTS = {
   async orderAll(){
     for (const it of live().filter((i) => need(i) > 0)){ const q = need(it); await save(it, { on_order: it.on_order + q }, { kind: "ordered", qty: q }); }
     toast("Marked as ordered.");
+  },
+  toCount(){ setTab("count"); },
+  async cancelCount(){
+    if (!confirm("Cancel this count? The checkmarks are cleared. Any numbers you changed stay as they are.")) return;
+    const { error } = await sb.from("filament_counts").delete().eq("id", cnt.id);
+    if (error){ toast("Couldn't cancel the count. Try again."); return; }
+    const { data } = await sb.from("filament_counts").select("*").order("started_at", { ascending: false }).limit(1);
+    cnt = data?.[0] || null; render(); window.scrollTo({ top: 0 }); toast("Count canceled.");
+  },
+  async cancelOrder(){
+    const way = live().filter((i) => i.on_order > 0), n = way.reduce((s, i) => s + i.on_order, 0);
+    if (!confirm(`Cancel the order? ${n} ${n === 1 ? "spool goes" : "spools go"} back on the to-order list.`)) return;
+    for (const it of way) await save(it, { on_order: 0 }, { kind: "unordered" });
+    setTab("count"); toast("Order canceled.");
   },
   unorder({ id }){ const it = byId(id); save(it, { on_order: 0 }, { kind: "unordered" }); },
   got({ id }){
