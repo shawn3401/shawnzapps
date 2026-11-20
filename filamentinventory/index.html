@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Filament</title>
+<meta name="description" content="Count your spools and see what to reorder.">
+<meta name="theme-color" content="#1B1D1F">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Filament">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#1B1D1F; --panel:#232629; --cell:#2C3034; --line:#363A3F; --dash:#3A3D41;
+  --ink:#ECE9E2; --dim:#A19D95; --faint:#76726B;
+  --orange:#FF6B1A; --orange-ink:#1B1D1F; --orange-soft:#3A2618;
+  --green:#7BD389; --red:#FF5A4E;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  --sans:"Space Grotesk", system-ui, -apple-system, sans-serif;
+  --safe-b:env(safe-area-inset-bottom, 0px); --safe-t:env(safe-area-inset-top, 0px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding-bottom:calc(76px + var(--safe-b))}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+input,select{font:inherit;color:var(--ink)}
+[hidden]{display:none !important}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+.mono{font-family:var(--mono)}
+
+/* header */
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:var(--safe-t);border-bottom:1px solid var(--line)}
+.hd{display:flex;align-items:center;gap:10px;height:56px}
+.mark{display:flex;align-items:center;gap:9px;font-weight:700;font-size:22px;letter-spacing:-.5px}
+.mark svg{width:26px;height:26px}
+.hd .sp{flex:1}
+.acct{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--dash);border-radius:4px;padding:5px 8px}
+
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+nav.tabs button{height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;color:var(--dim);font-family:var(--mono);letter-spacing:.5px;position:relative}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button.on{color:var(--orange)}
+.badge{position:absolute;top:8px;left:calc(50% + 6px);background:var(--orange);color:var(--orange-ink);font-weight:600;font-size:11px;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 5px;text-align:center}
+
+/* common */
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--orange);text-transform:uppercase}
+.h1{font-size:26px;font-weight:700;letter-spacing:-.6px;margin:18px 0 4px}
+.sub{color:var(--dim);font-size:14px;margin:0 0 14px;line-height:1.45}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 16px;border-radius:4px;border:1px solid var(--dash);font-weight:500;font-size:15px}
+.btn.primary{background:var(--orange);border-color:var(--orange);color:var(--orange-ink);font-weight:700}
+.btn.small{height:34px;padding:0 11px;font-size:13px}
+.btn.block{width:100%}
+.btn.ghost{border-color:transparent;color:var(--dim)}
+.btn:active{transform:scale(.98)}
+.empty{border:1px dashed var(--dash);border-radius:6px;padding:22px 18px;text-align:center;color:var(--dim);margin:18px 0;line-height:1.5}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+
+/* progress */
+.prog{margin:16px 0 4px;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.prog .top{display:flex;align-items:center;gap:10px}
+.prog .t{flex:1}
+.prog .big{font-size:18px;font-weight:700}
+.prog .small{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+.bar{height:6px;background:var(--cell);border-radius:3px;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--orange);border-radius:3px;transition:width .25s}
+
+/* jump chips */
+.jump{display:flex;gap:6px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}
+.jump::-webkit-scrollbar{display:none}
+.jump a{flex:none;font-family:var(--mono);font-size:12px;color:var(--dim);text-decoration:none;border:1px solid var(--dash);border-radius:4px;padding:6px 9px}
+
+/* groups and rows */
+.grp{display:flex;align-items:baseline;gap:8px;margin:22px 0 4px;scroll-margin-top:70px}
+.grp .kicker{flex:1}
+.grp .n{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.row{padding:12px 0;border-bottom:1px dashed var(--dash)}
+.row .a{display:flex;align-items:center;gap:11px}
+.sw{width:30px;height:30px;border-radius:50%;flex:none;border:2px solid var(--dash);position:relative}
+.sw::after{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--bg);opacity:.85}
+.nm{flex:1;min-width:0}
+.nm .c{font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;align-items:center}
+.code{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.tag{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:2px;line-height:16px}
+.tag.order{background:var(--orange);color:var(--orange-ink);font-weight:600}
+.tag.out{background:var(--red);color:#1B1D1F;font-weight:600}
+.tag.way{border:1px solid var(--green);color:var(--green)}
+.tag.sp{border:1px solid var(--dash);color:var(--dim)}
+.chk{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--dash);display:flex;align-items:center;justify-content:center;flex:none;color:var(--faint)}
+.chk svg{width:20px;height:20px}
+.chk.on{background:var(--orange);border-color:var(--orange);color:var(--orange-ink)}
+.row.done .c{color:var(--dim)}
+.b{display:flex;align-items:flex-end;gap:10px;margin:10px 0 0 41px}
+.st{display:flex;flex-direction:column;gap:3px}
+.st .l{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--faint);text-transform:uppercase}
+.st .ctl{display:flex;align-items:center;background:var(--cell);border-radius:4px;height:38px}
+.st .ctl button{width:36px;height:38px;font-size:20px;color:var(--dim);display:flex;align-items:center;justify-content:center}
+.st .ctl button:active{color:var(--orange)}
+.st .ctl span{font-family:var(--mono);font-weight:600;font-size:17px;min-width:22px;text-align:center}
+.swap{margin-left:auto;height:38px;font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--dash);border-radius:4px;padding:0 9px;display:flex;align-items:center;gap:5px}
+.swap svg{width:15px;height:15px}
+.lvl{display:flex;gap:5px;margin:9px 0 0 41px;align-items:center;flex-wrap:wrap}
+.lvl .l{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--faint);text-transform:uppercase;margin-right:2px}
+.lvl button{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--dash);border-radius:3px;padding:6px 8px}
+.lvl button.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
+.lvl.ask button{border-color:var(--orange)}
+
+/* order */
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 6px}
+.sum div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+.sum b{display:block;font-family:var(--mono);font-size:26px;font-weight:600;color:var(--orange)}
+.sum span{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.5px}
+.orow{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px dashed var(--dash)}
+.qty{font-family:var(--mono);font-weight:600;font-size:22px;min-width:38px;text-align:right}
+.qty small{font-size:12px;color:var(--faint);font-weight:400}
+.why{font-size:12px;color:var(--dim);margin-top:2px}
+.acts{display:flex;gap:8px;margin:14px 0}
+.acts .btn{flex:1}
+
+/* filaments tab */
+.frow{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px dashed var(--dash);width:100%;text-align:left}
+.frow .chev{color:var(--faint)}
+.frow.ret{opacity:.55}
+
+/* dialogs */
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:0;width:min(440px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog form{padding:18px}
+dialog h2{margin:0 0 4px;font-size:21px;letter-spacing:-.4px}
+label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin:14px 0 5px}
+.in{width:100%;height:44px;background:var(--cell);border:1px solid var(--dash);border-radius:4px;padding:0 11px;font-size:16px}
+.in:focus{outline:none;border-color:var(--orange)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.colorpick{display:flex;gap:10px;align-items:center}
+.colorpick input[type=color]{width:52px;height:44px;border:1px solid var(--dash);border-radius:4px;background:var(--cell);padding:3px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{height:42px;border:1px solid var(--dash);border-radius:4px;font-weight:500}
+.seg button.on{background:var(--orange);border-color:var(--orange);color:var(--orange-ink);font-weight:700}
+.hint{font-size:13px;color:var(--dim);margin:8px 0 0;line-height:1.45}
+.dlgrow{display:flex;gap:8px;margin-top:20px}
+.dlgrow .sp{flex:1}
+.err{color:var(--red);font-size:14px;margin-top:10px}
+.ok{color:var(--green);font-size:14px;margin-top:10px}
+.or{text-align:center;color:var(--faint);font-family:var(--mono);font-size:11px;margin:14px 0 0}
+.note{font-size:13px;color:var(--dim);margin-top:14px;line-height:1.6}
+.link{color:var(--orange);text-decoration:underline;text-underline-offset:2px;font-size:13px;padding:0}
+.showpw{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--dim);margin-top:8px}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translateX(-50%);background:var(--ink);color:var(--bg);font-weight:500;font-size:14px;padding:10px 14px;border-radius:4px;z-index:20;max-width:calc(100vw - 32px);text-align:center}
+.loading{padding:40px 0;text-align:center;color:var(--faint);font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd">
+  <div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="none" stroke="#FF6B1A" stroke-width="3"/><circle cx="16" cy="16" r="9" fill="none" stroke="#ECE9E2" stroke-width="2" stroke-dasharray="3 2.4"/><circle cx="16" cy="16" r="3.5" fill="#FF6B1A"/></svg>Filament</div>
+  <div class="sp"></div>
+  <button class="acct" id="acct" hidden></button>
+</div></header>
+
+<main class="wrap" id="main"><div class="loading">Loading…</div></main>
+
+<nav class="tabs" id="tabs" hidden><div class="in">
+  <button data-tab="count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>COUNT</button>
+  <button data-tab="order"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L22 7H6"/></svg>ORDER<span class="badge" id="badge" hidden></span></button>
+  <button data-tab="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>FILAMENTS</button>
+</div></nav>
+
+<!-- edit / add a filament -->
+<dialog id="editDlg"><form id="editForm" method="dialog">
+  <h2 id="editTitle">Edit filament</h2>
+  <label class="f" for="eColor">Color name</label>
+  <input class="in" id="eColor" required maxlength="60" autocomplete="off">
+  <div class="two">
+    <div><label class="f" for="eMat">Material</label><input class="in" id="eMat" required maxlength="20" list="matList" autocomplete="off"></div>
+    <div><label class="f" for="eSub">Type</label><input class="in" id="eSub" maxlength="30" list="subList" autocomplete="off"></div>
+  </div>
+  <datalist id="matList"></datalist><datalist id="subList"></datalist>
+  <div class="two">
+    <div><label class="f" for="eCode">Bambu code</label><input class="in mono" id="eCode" maxlength="20" inputmode="numeric" autocomplete="off"></div>
+    <div><label class="f" for="eSort">Order in list</label><input class="in mono" id="eSort" type="number" min="0" max="999" inputmode="numeric"></div>
+  </div>
+  <label class="f" for="eHex">Swatch</label>
+  <div class="colorpick"><input type="color" id="eHex" value="#888888"><span class="hint" style="margin:0">Close is fine. It's just so you can spot it in the list.</span></div>
+  <div id="eStock">
+    <div class="two">
+      <div><label class="f" for="eMain">Main floor</label><input class="in mono" id="eMain" type="number" min="0" max="99" value="0" inputmode="numeric"></div>
+      <div><label class="f" for="eUp">Upstairs</label><input class="in mono" id="eUp" type="number" min="0" max="99" value="0" inputmode="numeric"></div>
+    </div>
+  </div>
+  <label class="f">How fast do you go through it?</label>
+  <div class="seg" id="eSpeed"><button type="button" data-v="normal">Normal</button><button type="button" data-v="heavy">Heavy</button><button type="button" data-v="slow">Slow</button></div>
+  <p class="hint" id="eSpeedHint"></p>
+  <div class="err" id="eErr" hidden></div>
+  <div class="dlgrow">
+    <button type="button" class="btn ghost" id="eRetire">Retire</button>
+    <div class="sp"></div>
+    <button type="button" class="btn" id="eCancel">Cancel</button>
+    <button type="submit" class="btn primary" id="eSave" value="save">Save</button>
+  </div>
+</form></dialog>
+
+<!-- sign in -->
+<dialog id="authDlg"><form id="authForm">
+  <h2 id="authTitle">Sign in</h2>
+  <p class="sub" id="authSub" style="margin-top:6px"></p>
+  <div id="googleWrap" hidden>
+    <button type="button" class="btn block" id="google">Continue with Google</button>
+    <p class="or">OR USE YOUR EMAIL</p>
+  </div>
+  <label class="f" for="email">Email</label>
+  <input class="in" type="email" id="email" autocomplete="email" required>
+  <div id="pwWrap">
+    <label class="f" for="password">Password</label>
+    <input class="in" type="password" id="password" autocomplete="current-password" minlength="8">
+    <label class="showpw"><input type="checkbox" id="showPw"> Show password</label>
+  </div>
+  <div class="err" id="authErr" hidden></div>
+  <div class="ok" id="authOk" hidden></div>
+  <div class="dlgrow"><div class="sp"></div><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
+  <p class="note" id="authLinks"></p>
+</form></dialog>
+
+<dialog id="pwDlg"><form id="pwForm">
+  <h2>New password</h2>
+  <p class="sub" style="margin-top:6px">You're in from the reset link. Pick a new password.</p>
+  <label class="f" for="pw1">New password</label>
+  <input class="in" type="text" id="pw1" autocomplete="new-password" minlength="8" required>
+  <div class="err" id="pwErr" hidden></div>
+  <div class="dlgrow"><div class="sp"></div><button type="button" class="btn" id="pwLater">Not now</button><button class="btn primary" id="pwBtn">Save password</button></div>
+</form></dialog>
+
+<dialog id="acctDlg"><form method="dialog">
+  <h2>Account</h2>
+  <p class="sub" style="margin-top:6px">Signed in as <b id="acctEmail"></b>. One account works across all of Shawn's apps.</p>
+  <div class="dlgrow"><button type="button" class="btn" id="signOut">Sign out</button><div class="sp"></div><button class="btn primary">Done</button></div>
+</form></dialog>
+
+<script>
+const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
+const HERE = location.origin + location.pathname;
+let GOOGLE_ENABLED = false;
+fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((d) => { GOOGLE_ENABLED = !!d?.external?.google; if ($("#authDlg").open && mode !== "reset") $("#googleWrap").hidden = !GOOGLE_ENABLED; }).catch(() => {});
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (q) => document.querySelector(q);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const ICON_SWAP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13"/><path d="M6 11l6 6 6-6"/><path d="M5 21h14"/></svg>`;
+
+// How fast a filament goes decides when it is reordered (agreed with Shawn Nov 19, 2026).
+const SPEEDS = {
+  normal: { name: "Normal", hint: "Keep one backup upstairs. Goes on the order list when Upstairs is empty, and orders enough for one on the main floor and one upstairs." },
+  heavy:  { name: "Heavy",  hint: "Keep two backups upstairs. Goes on the order list when Upstairs is down to one, and orders back up to one on the main floor and two upstairs." },
+  slow:   { name: "Slow",   hint: "No backup needed until the active spool is half used. Goes on the order list when the main floor spool is half or less and nothing is upstairs." },
+};
+const LEVELS = [["over_half", "Over ½"], ["half", "½ or less"], ["empty", "Empty"]];
+
+let session = null, items = [], cnt = null, tab = "count", loaded = false;
+try { tab = localStorage.getItem("fil.tab") || "count"; } catch {}
+
+// ---- the reorder rule ----------------------------------------------------------------------------------
+// Counts what is here plus what is already on the way, so an order is not suggested twice.
+function need(it){
+  const here = it.main + it.upstairs + it.on_order;
+  if (it.speed === "heavy") return here <= 2 ? 3 - here : 0;
+  if (it.speed === "slow") return (it.upstairs + it.on_order === 0 && (it.main === 0 || it.level === "half" || it.level === "empty")) ? 1 : 0;
+  return here <= 1 ? 2 - here : 0;
+}
+function why(it){
+  const total = it.main + it.upstairs;
+  if (total === 0) return "Out. None on hand.";
+  if (it.speed === "slow") return it.level === "empty" ? "Active spool is empty, none upstairs." : "Active spool is half or less, none upstairs.";
+  if (it.upstairs === 0) return "Nothing upstairs.";
+  if (it.speed === "heavy" && it.main > 0) return "Only one left upstairs.";
+  return `Only ${total} on hand.`;
+}
+const total = (it) => it.main + it.upstairs;
+const live = () => items.filter((i) => !i.retired);
+const counting = () => cnt && !cnt.finished_at;
+const isChecked = (it) => counting() && it.checked_at && new Date(it.checked_at) >= new Date(cnt.started_at);
+
+const MAT_RANK = { PLA: 0, PETG: 1, ABS: 2, ASA: 3, TPU: 4 };
+function groupKey(it){ return [it.material, it.subtype].filter(Boolean).join(" "); }
+function grouped(list){
+  const g = new Map();
+  [...list].sort((a, b) => (MAT_RANK[a.material] ?? 9) - (MAT_RANK[b.material] ?? 9) || String(a.material).localeCompare(b.material)
+    || (a.subtype === "Basic" ? 0 : 1) - (b.subtype === "Basic" ? 0 : 1) || String(a.subtype || "").localeCompare(b.subtype || "")
+    || (a.sort ?? 999) - (b.sort ?? 999) || a.color.localeCompare(b.color))
+    .forEach((it) => { const k = groupKey(it); if (!g.has(k)) g.set(k, []); g.get(k).push(it); });
+  return g;
+}
+const slug = (s) => "g-" + s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+// ---- render -------------------------------------------------------------------------------------------
+function render(){
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  const n = live().reduce((s, it) => s + (need(it) > 0 ? 1 : 0), 0);
+  $("#badge").hidden = !n; $("#badge").textContent = n;
+  if (!session){ $("#tabs").hidden = true; $("#main").innerHTML = signedOut(); return; }
+  $("#tabs").hidden = false;
+  if (!loaded){ $("#main").innerHTML = `<div class="loading">Loading your filament…</div>`; return; }
+  if (!items.length){ $("#main").innerHTML = noneYet(); return; }
+  $("#main").innerHTML = tab === "order" ? orderView() : tab === "list" ? listView() : countView();
+}
+
+function signedOut(){
+  return `<div class="h1" style="margin-top:28px">Your spools, counted.</div>
+  <p class="sub">Run through your filament in a minute and see exactly what to reorder. Sign in to see yours.</p>
+  <button class="btn primary block" data-act="signIn">Sign in</button>`;
+}
+function noneYet(){
+  return `<div class="empty"><b>No filament here yet</b>Signed in as ${esc(session.user.email)}. If your filament is on a different account, sign out and use that one.</div>
+  <div class="acts"><button class="btn" data-act="acct">Switch account</button><button class="btn primary" data-act="add">Add filament</button></div>`;
+}
+function swatch(it){ return `<span class="sw" style="background:${esc(it.hex || "#888")}"></span>`; }
+function tagsFor(it){
+  const t = [];
+  if (it.code) t.push(`<span class="code">${esc(it.code)}</span>`);
+  const q = need(it);
+  if (q) t.push(`<span class="tag ${total(it) === 0 ? "out" : "order"}">${total(it) === 0 ? "OUT · " : ""}ORDER ${q}</span>`);
+  if (it.on_order) t.push(`<span class="tag way">${it.on_order} ON THE WAY</span>`);
+  if (it.speed !== "normal") t.push(`<span class="tag sp">${SPEEDS[it.speed].name.toUpperCase()}</span>`);
+  return t.join("");
+}
+
+function countView(){
+  const L = live(), done = L.filter(isChecked).length;
+  let h;
+  if (counting()){
+    const pct = L.length ? Math.round(done / L.length * 100) : 0;
+    h = `<div class="prog"><div class="top"><div class="t"><div class="big">${done} of ${L.length} checked</div><div class="small">COUNT STARTED ${fmtDay(cnt.started_at).toUpperCase()}</div></div>
+      <button class="btn small ${done === L.length ? "primary" : ""}" data-act="finish">Finish</button></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  } else {
+    h = `<div class="prog"><div class="top"><div class="t"><div class="big">Ready to count?</div><div class="small">${cnt ? "LAST COUNT " + fmtDay(cnt.finished_at).toUpperCase() : "NO COUNTS YET"}</div></div>
+      <button class="btn small primary" data-act="start">Start a count</button></div></div>`;
+  }
+  const g = grouped(L);
+  h += `<div class="jump">${[...g.keys()].map((k) => `<a href="#${slug(k)}">${esc(k)} ${g.get(k).length}</a>`).join("")}</div>`;
+  for (const [k, list] of g){
+    h += `<div class="grp" id="${slug(k)}"><span class="kicker">${esc(k)}</span><span class="n">${list.filter(isChecked).length}/${list.length}</span></div>`;
+    for (const it of list) h += countRow(it);
+  }
+  if (counting()) h += `<div style="margin:22px 0"><button class="btn primary block" data-act="finish">Finish count</button></div>`;
+  return h;
+}
+function countRow(it){
+  const ck = isChecked(it);
+  let h = `<div class="row ${ck ? "done" : ""}" data-id="${it.id}"><div class="a">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags">${tagsFor(it)}</div></div>`;
+  if (counting()) h += `<button class="chk ${ck ? "on" : ""}" data-act="check" data-id="${it.id}" aria-label="${ck ? "Checked" : "Looks right"}">${ICON_CHECK}</button>`;
+  h += `</div><div class="b">${stepper(it, "main", "Main")}${stepper(it, "upstairs", "Upstairs")}`;
+  if (it.upstairs > 0) h += `<button class="swap" data-act="swap" data-id="${it.id}" title="Finished the main floor spool and brought one down">${ICON_SWAP}SWAP</button>`;
+  h += `</div>`;
+  if (it.speed === "slow" && it.main > 0){
+    h += `<div class="lvl ${it.level ? "" : "ask"}"><span class="l">Active</span>${LEVELS.map(([v, n]) => `<button class="${it.level === v ? "on" : ""}" data-act="level" data-id="${it.id}" data-v="${v}">${n}</button>`).join("")}</div>`;
+  }
+  return h + `</div>`;
+}
+function stepper(it, field, label){
+  return `<div class="st"><span class="l">${label}</span><div class="ctl"><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="-1" aria-label="One less ${label.toLowerCase()}">−</button><span>${it[field]}</span><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="1" aria-label="One more ${label.toLowerCase()}">+</button></div></div>`;
+}
+
+function orderView(){
+  const L = live(), want = L.filter((i) => need(i) > 0), way = L.filter((i) => i.on_order > 0);
+  const spools = want.reduce((s, i) => s + need(i), 0);
+  let h = `<div class="h1">Order</div><p class="sub">Tap Ordered once it's in your cart. When the box shows up, tap Got it and the spools go upstairs.</p>
+  <div class="sum"><div><b>${spools}</b><span>SPOOLS TO ORDER</span></div><div><b>${want.length}</b><span>COLORS</span></div></div>`;
+  if (!want.length) h += `<div class="empty"><b>Nothing to order</b>Every filament has its backups.</div>`;
+  else {
+    h += `<div class="acts"><button class="btn" data-act="copy">Copy list</button><button class="btn primary" data-act="orderAll">All ordered</button></div>`;
+    for (const [k, list] of grouped(want)){
+      h += `<div class="grp"><span class="kicker">${esc(k)}</span><span class="n">${list.reduce((s, i) => s + need(i), 0)} SPOOLS</span></div>`;
+      for (const it of list) h += `<div class="orow">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="why">${esc(why(it))}${it.code ? ` <span class="code">${esc(it.code)}</span>` : ""}</div></div><div class="qty">${need(it)}<small>×</small></div><button class="btn small" data-act="ordered" data-id="${it.id}">Ordered</button></div>`;
+    }
+  }
+  if (way.length){
+    h += `<div class="grp" style="margin-top:30px"><span class="kicker" style="color:var(--green)">On the way</span><span class="n">${way.reduce((s, i) => s + i.on_order, 0)} SPOOLS</span></div>`;
+    for (const it of way) h += `<div class="orow">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="why">${esc(groupKey(it))}</div></div><div class="qty">${it.on_order}<small>×</small></div><button class="btn small" data-act="unorder" data-id="${it.id}" aria-label="Not ordered after all">✕</button><button class="btn small primary" data-act="got" data-id="${it.id}">Got it</button></div>`;
+    if (way.length > 1) h += `<div class="acts"><button class="btn block" data-act="gotAll">Got everything</button></div>`;
+  }
+  return h;
+}
+
+function listView(){
+  const L = live(), R = items.filter((i) => i.retired);
+  let h = `<div class="h1">Filaments</div><p class="sub">${L.length} colors, ${L.reduce((s, i) => s + total(i), 0)} spools on hand. Tap one to edit it or change how fast you go through it.</p>
+  <div class="acts"><button class="btn primary block" data-act="add">Add filament</button></div>`;
+  for (const [k, list] of grouped(L)){
+    h += `<div class="grp"><span class="kicker">${esc(k)}</span><span class="n">${list.length}</span></div>`;
+    for (const it of list) h += `<button class="frow" data-act="edit" data-id="${it.id}">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags"><span class="code">${[it.code && esc(it.code), it.main + " MAIN", it.upstairs + " UP"].filter(Boolean).join(" · ")}</span>${it.speed !== "normal" ? `<span class="tag sp">${SPEEDS[it.speed].name.toUpperCase()}</span>` : ""}</div></div><span class="chev">›</span></button>`;
+  }
+  if (R.length){
+    h += `<div class="grp" style="margin-top:30px"><span class="kicker" style="color:var(--dim)">Retired</span><span class="n">${R.length}</span></div>`;
+    for (const it of R) h += `<div class="frow ret">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags"><span class="code">${esc(groupKey(it))}</span></div></div><button class="btn small" data-act="unretire" data-id="${it.id}">Bring back</button></div>`;
+  }
+  return h + `<p class="note" style="margin:26px 0">Retired filaments drop off the count and the order list, but keep their history.</p>`;
+}
+
+// ---- data ---------------------------------------------------------------------------------------------
+async function load(quiet){
+  if (!quiet){ loaded = false; items = []; cnt = null; render(); }
+  if (!session) return;
+  const [a, b] = await Promise.all([
+    sb.from("filament_items").select("*"),
+    sb.from("filament_counts").select("*").order("started_at", { ascending: false }).limit(1),
+  ]);
+  if (a.error || b.error){ toast("Couldn't load your filament. Check your connection and reload."); return; }
+  items = a.data; cnt = b.data[0] || null; loaded = true; render();
+}
+const byId = (id) => items.find((i) => i.id === id);
+async function save(it, patch, log){
+  const before = { ...it };
+  Object.assign(it, patch); render();
+  const { error } = await sb.from("filament_items").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", it.id);
+  if (error){ Object.assign(it, before); render(); toast("That didn't save. Check your connection and try again."); return false; }
+  if (log) sb.from("filament_log").insert({ item_id: it.id, kind: log.kind, main: it.main, upstairs: it.upstairs, qty: log.qty ?? null }).then(() => {});
+  return true;
+}
+const stamp = () => (counting() ? { checked_at: new Date().toISOString() } : {});
+
+let tt;
+function toast(msg){
+  document.querySelector(".toast")?.remove(); clearTimeout(tt);
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t);
+  tt = setTimeout(() => t.remove(), 2600);
+}
+
+// ---- actions ------------------------------------------------------------------------------------------
+const ACTS = {
+  signIn: () => openAuth("in"),
+  acct: () => openAcct(),
+  async start(){
+    const { data, error } = await sb.from("filament_counts").insert({}).select().single();
+    if (error){ toast("Couldn't start a count. Try again."); return; }
+    cnt = data; render(); window.scrollTo({ top: 0 });
+  },
+  async finish(){
+    const left = live().filter((i) => !isChecked(i)).length;
+    if (left && !confirm(`${left} ${left === 1 ? "filament isn't" : "filaments aren't"} checked yet. Finish the count anyway?`)) return;
+    const { data, error } = await sb.from("filament_counts").update({ finished_at: new Date().toISOString() }).eq("id", cnt.id).select().single();
+    if (error){ toast("Couldn't finish the count. Try again."); return; }
+    cnt = data; setTab("order"); toast("Count saved.");
+  },
+  check({ id }){
+    const it = byId(id);
+    if (isChecked(it)) save(it, { checked_at: null });
+    else save(it, { checked_at: new Date().toISOString() }, { kind: "count" });
+  },
+  step({ id, f, d }){
+    const it = byId(id), v = Math.max(0, it[f] + Number(d));
+    if (v === it[f]) return;
+    const patch = { [f]: v, ...stamp() };
+    if (f === "main" && v === 0) patch.level = null;
+    if (f === "main" && Number(d) > 0 && it.speed === "slow") patch.level = "over_half";
+    save(it, patch, { kind: "count" });
+  },
+  swap({ id }){
+    const it = byId(id);
+    if (it.upstairs < 1) return;
+    const patch = { upstairs: it.upstairs - 1, main: Math.max(it.main, 1), level: it.speed === "slow" ? "over_half" : it.level, ...stamp() };
+    save(it, patch, { kind: "swap" }).then((ok) => ok && toast(`New ${it.color} on the main floor.`));
+  },
+  level({ id, v }){ const it = byId(id); save(it, { level: v, ...stamp() }, { kind: "count" }); },
+  ordered({ id }){ const it = byId(id), q = need(it); save(it, { on_order: it.on_order + q }, { kind: "ordered", qty: q }); },
+  async orderAll(){
+    for (const it of live().filter((i) => need(i) > 0)){ const q = need(it); await save(it, { on_order: it.on_order + q }, { kind: "ordered", qty: q }); }
+    toast("Marked as ordered.");
+  },
+  unorder({ id }){ const it = byId(id); save(it, { on_order: 0 }, { kind: "unordered" }); },
+  got({ id }){
+    const it = byId(id), q = it.on_order;
+    save(it, { upstairs: it.upstairs + q, on_order: 0 }, { kind: "received", qty: q }).then((ok) => ok && toast(`${q} ${it.color} upstairs.`));
+  },
+  async gotAll(){
+    for (const it of live().filter((i) => i.on_order > 0)){ const q = it.on_order; await save(it, { upstairs: it.upstairs + q, on_order: 0 }, { kind: "received", qty: q }); }
+    toast("All put away upstairs.");
+  },
+  async copy(){
+    const lines = [];
+    for (const [k, list] of grouped(live().filter((i) => need(i) > 0))){
+      lines.push(k);
+      list.forEach((it) => lines.push(`  ${need(it)} x ${it.color}${it.code ? " (" + it.code + ")" : ""}`));
+    }
+    try { await navigator.clipboard.writeText(lines.join("\n")); toast("Order list copied."); }
+    catch { toast("Couldn't copy on this device."); }
+  },
+  edit({ id }){ openEdit(byId(id)); },
+  add(){ openEdit(null); },
+  unretire({ id }){ save(byId(id), { retired: false }, { kind: "edit" }); },
+};
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-tab]");
+  if (t){ setTab(t.dataset.tab); return; }
+  const b = e.target.closest("[data-act]");
+  if (b && ACTS[b.dataset.act]){ e.preventDefault(); ACTS[b.dataset.act](b.dataset, b); }
+});
+function setTab(t){
+  tab = t; try { localStorage.setItem("fil.tab", t); } catch {}
+  render(); window.scrollTo({ top: 0 });
+}
+
+// ---- edit dialog --------------------------------------------------------------------------------------
+let editing = null, eSpeed = "normal";
+function setSpeed(v){
+  eSpeed = v;
+  document.querySelectorAll("#eSpeed button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+  $("#eSpeedHint").textContent = SPEEDS[v].hint;
+}
+$("#eSpeed").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setSpeed(b.dataset.v); });
+function openEdit(it){
+  editing = it;
+  const mats = [...new Set(items.map((i) => i.material))], subs = [...new Set(items.map((i) => i.subtype).filter(Boolean))];
+  $("#matList").innerHTML = mats.map((m) => `<option value="${esc(m)}">`).join("");
+  $("#subList").innerHTML = subs.map((m) => `<option value="${esc(m)}">`).join("");
+  $("#editTitle").textContent = it ? "Edit filament" : "Add filament";
+  $("#eColor").value = it?.color || "";
+  $("#eMat").value = it?.material || "PLA";
+  $("#eSub").value = it ? it.subtype || "" : "Basic";
+  $("#eCode").value = it?.code || "";
+  $("#eSort").value = it?.sort ?? "";
+  $("#eHex").value = /^#[0-9a-f]{6}$/i.test(it?.hex || "") ? it.hex : "#888888";
+  $("#eStock").hidden = !!it; $("#eMain").value = 1; $("#eUp").value = 0;
+  $("#eRetire").hidden = !it;
+  $("#eErr").hidden = true;
+  setSpeed(it?.speed || "normal");
+  $("#editDlg").showModal();
+}
+$("#eCancel").addEventListener("click", () => $("#editDlg").close());
+$("#eRetire").addEventListener("click", async () => {
+  if (!editing || !confirm(`Retire ${editing.color}? It leaves the count and order list. You can bring it back from the bottom of Filaments.`)) return;
+  $("#editDlg").close(); await save(editing, { retired: true }, { kind: "edit" }); toast(`${editing.color} retired.`);
+});
+$("#editForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const row = {
+    color: $("#eColor").value.trim(), material: $("#eMat").value.trim(), subtype: $("#eSub").value.trim() || null,
+    code: $("#eCode").value.trim() || null, sort: $("#eSort").value === "" ? null : Number($("#eSort").value),
+    hex: $("#eHex").value, speed: eSpeed,
+  };
+  if (!row.color || !row.material){ $("#eErr").textContent = "Add a color name and material."; $("#eErr").hidden = false; return; }
+  if (row.speed !== "slow") row.level = null;
+  $("#eSave").disabled = true;
+  if (editing){
+    const ok = await save(editing, row, { kind: "edit" });
+    if (ok) $("#editDlg").close();
+  } else {
+    row.main = Math.max(0, Number($("#eMain").value) || 0); row.upstairs = Math.max(0, Number($("#eUp").value) || 0);
+    if (row.sort == null){ const same = items.filter((i) => i.material === row.material && (i.subtype || null) === row.subtype); row.sort = same.reduce((m, i) => Math.max(m, i.sort ?? 0), 0) + 1; }
+    const { data, error } = await sb.from("filament_items").insert(row).select().single();
+    if (error){ $("#eErr").textContent = "Couldn't add it. Check your connection and try again."; $("#eErr").hidden = false; }
+    else { items.push(data); $("#editDlg").close(); render(); toast(`${data.color} added.`); }
+  }
+  $("#eSave").disabled = false;
+});
+
+// ---- auth (same flow as Dough and Your Turn) ----------------------------------------------------------
+let mode = "in";
+function openAuth(m){
+  mode = m;
+  $("#authTitle").textContent = m === "in" ? "Sign in" : m === "up" ? "Create an account" : "Reset your password";
+  $("#authSub").textContent = m === "reset" ? "Enter your email and I'll send a link to set a new password. Open it on this phone." : "Use the same account as Dough and Your Turn.";
+  $("#authBtn").textContent = m === "in" ? "Sign in" : m === "up" ? "Create account" : "Send the link";
+  $("#pwWrap").hidden = m === "reset"; $("#password").required = m !== "reset";
+  $("#password").autocomplete = m === "up" ? "new-password" : "current-password";
+  $("#googleWrap").hidden = !GOOGLE_ENABLED || m === "reset";
+  $("#authLinks").innerHTML = m === "in"
+    ? `<button type="button" class="link" data-mode="up">Create an account</button> · <button type="button" class="link" data-mode="reset">Forgot your password?</button>`
+    : `<button type="button" class="link" data-mode="in">Back to sign in</button>`;
+  $("#authErr").hidden = $("#authOk").hidden = true;
+  if (!$("#authDlg").open) $("#authDlg").showModal();
+}
+$("#authLinks").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
+$("#authCancel").addEventListener("click", () => $("#authDlg").close());
+$("#showPw").addEventListener("change", (e) => { $("#password").type = e.target.checked ? "text" : "password"; });
+$("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE, queryParams: { prompt: "select_account" } } }));
+$("#authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#email").value.trim(), password = $("#password").value, b = $("#authBtn");
+  const bad = (m) => { $("#authErr").textContent = m; $("#authErr").hidden = false; };
+  const good = (m) => { $("#authOk").textContent = m; $("#authOk").hidden = false; };
+  $("#authErr").hidden = $("#authOk").hidden = true; b.disabled = true;
+  if (mode === "in"){
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) bad(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message sent when you signed up." : "That email and password didn't match."); else $("#authDlg").close();
+  } else if (mode === "up"){
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: HERE } });
+    if (error) bad("Couldn't create the account: " + error.message);
+    else if (data.session) $("#authDlg").close();
+    else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) bad("That email already has an account (maybe from Dough or Your Turn). Sign in instead, or reset the password.");
+    else good("Almost there. Check your email (and spam) for a confirmation link, then sign in here.");
+  } else {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: HERE });
+    if (error) bad("Couldn't send that: " + error.message); else good("Sent. Check your email (and spam) for a link back here.");
+  }
+  b.disabled = false;
+});
+$("#pwLater").addEventListener("click", () => $("#pwDlg").close());
+$("#pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#pwErr").hidden = true; $("#pwBtn").disabled = true;
+  const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
+  $("#pwBtn").disabled = false;
+  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else $("#pwDlg").close();
+});
+function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; $("#acctDlg").showModal(); }
+$("#acct").addEventListener("click", openAcct);
+$("#signOut").addEventListener("click", () => { $("#acctDlg").close(); sb.auth.signOut(); });
+
+function setSession(sess){
+  const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
+  session = sess;
+  $("#acct").hidden = !sess; $("#acct").textContent = sess ? (sess.user.email || "").split("@")[0].slice(0, 14) : "";
+  if (changed || !sess) load(); else render();
+}
+sb.auth.onAuthStateChange((event, sess) => {
+  if (event === "PASSWORD_RECOVERY") $("#pwDlg").showModal();
+  setTimeout(() => setSession(sess), 0);
+});
+// Coming back to the app (it stays open on a phone): pick up changes made elsewhere.
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !document.querySelector("dialog[open]")) load(true); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ shawnzapps.com, the home for Shawn Anderson's apps. Plain HTML on GitHub Pages (
 - `privacy/index.html` the privacy policy (copied from the old site Oct 13, 2026, same text, old site's look), linked from the home page footer. Needed for Google's brand verification, so the Google sign-in screen can say ShawnZapps instead of the Supabase address.
 - `dough/` Dough, the dough calculator. See "dough/ app" below.
 - `yourturn/` Your Turn, the restaurant picker. See "yourturn/ app" below.
+- `filamentinventory/` Filament, Shawn's 3D printer filament counts and reorder list. See "filamentinventory/ app" below.
 - `listingassistant/` forwards to ahgtools.com/listing-assistant/ (moved Oct 25, 2026).
 - `supabase/<app>/` each app's database scripts and Edge Function source. Published by Pages too, which is fine, nothing secret is in them.
 
@@ -178,6 +179,39 @@ shawnzapps.com/yourturn/. Shawn and Leah's way to settle where to eat, also for 
 
 ### Not built yet
 - Joining a round from your own phone, a rating prompt for other people at the table, real drive times, reservations links, price as a question, "who's eating" presets for regular groups.
+
+## filamentinventory/ app (started Nov 19, 2026)
+
+### What it is
+shawnzapps.com/filamentinventory/, named "Filament". Shawn's Bambu Lab filament inventory, replacing his spreadsheet ("Bambu Lab Filament Inventory Tracker.xlsx"). Just Shawn uses it. Phone-first and an installable PWA (manifest, icons, `sw.js`), so from Safari's Share, Add to Home Screen it opens full screen. On iPhone a home screen app keeps its own sign-in, separate from Safari, so it needs one sign-in inside the app.
+
+### Look (Shawn picked option A, Nov 19, 2026)
+He asked for a style unlike anything else on the site. "Shop floor": dark charcoal (`#1B1D1F`) with safety orange (`#FF6B1A`), Space Grotesk plus JetBrains Mono for numbers and labels, dashed row dividers, square-ish corners. Dark only on purpose. Options shown and not chosen: a paper "swatch book" look (Instrument Serif) and a peach and purple "studio pop" look (Unbounded).
+
+### Files
+- `filamentinventory/index.html` the whole app, CSS and JS inline, supabase-js v2. Same sign-in code as Your Turn (Google with the account chooser, email and password).
+- `filamentinventory/manifest.webmanifest`, `sw.js` (network first for the app's own files, cached copy when offline; saving needs a connection), `icon.svg`, `icon-180/192/512.png` (an orange spool ring, drawn by a small Python script).
+- `supabase/filamentinventory/001_schema.sql` tables and RLS; `002_seed_shawn.sql` his 34 filaments from the spreadsheet (loaded Nov 19, 2026 for his gmail account).
+
+### Data (ShawnZapps project, RLS by `user_id = auth.uid()`)
+- `filament_items` one row per filament: `code` (Bambu code), `material`, `subtype`, `color`, `hex` (swatch; approximations Claude picked, Shawn can change them), `sort`, `speed`, `main` (spools on the main floor, the active one), `upstairs` (backups), `level` (active spool, slow ones only), `on_order`, `checked_at`, `retired`.
+- `filament_counts` a count's `started_at` and `finished_at`. A filament is checked in the open count when `checked_at >= started_at`.
+- `filament_log` what happened (count, swap, ordered, unordered, received, edit) with the counts after, for usage history later.
+
+### Reorder rule (Shawn, Nov 19, 2026)
+One setting per filament, "How fast do you go through it?" (`need()` in the page). "Here" = main + upstairs + on order.
+- Normal: on the list when here is 1 or less; orders up to 2 (one main, one upstairs). Same result as his spreadsheet.
+- Heavy: on the list when here is 2 or less; orders up to 3 (one main, two upstairs). Shawn chose two upstairs, not the spreadsheet's three. Heavy: PLA Black, Matte Charcoal, PETG Black, PETG White.
+- Slow: no backup until the active spool is half used. On the list when nothing is upstairs or on order and the main spool is "½ or less", "Empty", or missing; orders 1. Only slow rows ask the level during a count. Slow: Purple, Teal.
+- He orders monthly, so there is no "might run out before the next order" list.
+- His spreadsheet's totals stopped at row 41 and missed Ash Gray and Charcoal; Teal's backup count of 0 meant it never reordered.
+- Idea not built: use `filament_log` swaps to suggest moving a color to Slow or Heavy.
+
+### Screens
+- Count: Start a count, then each row has Main and Upstairs steppers and a check ("looks right"). Changing a number also checks it. Swap = finished the main floor spool and brought one down (upstairs minus one, slow level resets). Jump chips per group. Finish goes to Order.
+- Order: what to buy with the reason, Copy list (plain text), Ordered per row or All ordered (sets `on_order`), then On the way with Got it (adds to upstairs) or ✕.
+- Filaments: add, edit (name, material, type, code, order, swatch, speed), retire and bring back.
+- The spreadsheet's "Cart Spool" and "Cart Refill" columns are ignored on purpose (Shawn has spare empty spools). No Bambu store links.
 
 ## listingassistant/ (moved Oct 25, 2026)
 Listing Assistant moved into AHG Tools: ahgtools.com/listing-assistant/ (repo `shawn3401/ahgtools`, cloned at `~/Code/AHGTools`, whose CLAUDE.md now has all of its notes). Its data and files moved to the AHG Tools Supabase project the same day, and its Edge Function source lives there now. `listingassistant/index.html` here only forwards, keeping the query string and hash. `supabase/listingassistant/*.sql` stays as the history of how the tables were built. The originals in this project (the `listing_` tables, the `listing-files` bucket, and the `listing-*` functions) are left in place until Shawn agrees to delete them; nothing reads them anymore.
