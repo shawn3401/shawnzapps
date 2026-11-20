@@ -134,10 +134,12 @@ nav.tabs button.on{color:var(--orange)}
 .frow.ret{opacity:.55}
 
 /* dialogs */
-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:0;width:min(440px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
-dialog::backdrop{background:rgba(0,0,0,.6)}
-dialog form{padding:18px}
-dialog h2{margin:0 0 4px;font-size:21px;letter-spacing:-.4px}
+/* overlays: plain divs, not <dialog>, which misbehaves in iPhone home screen apps */
+.sheet{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.65);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(18px + var(--safe-t)) 12px calc(40px + var(--safe-b))}
+.sheet .panel{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;width:100%;max-width:440px;margin:0 auto}
+.sheet form{padding:18px}
+body.locked{overflow:hidden}
+.sheet h2{margin:0 0 4px;font-size:21px;letter-spacing:-.4px}
 label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin:14px 0 5px}
 .in{width:100%;height:44px;background:var(--cell);border:1px solid var(--dash);border-radius:4px;padding:0 11px;font-size:16px}
 .in:focus{outline:none;border-color:var(--orange)}
@@ -178,7 +180,7 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
 </div></nav>
 
 <!-- edit / add a filament -->
-<dialog id="editDlg"><form id="editForm" method="dialog">
+<div class="sheet" id="editDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="editForm">
   <h2 id="editTitle">Edit filament</h2>
   <label class="f" for="eColor">Color name</label>
   <input class="in" id="eColor" required maxlength="60" autocomplete="off">
@@ -209,10 +211,10 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
     <button type="button" class="btn" id="eCancel">Cancel</button>
     <button type="submit" class="btn primary" id="eSave" value="save">Save</button>
   </div>
-</form></dialog>
+</form></div></div>
 
 <!-- sign in -->
-<dialog id="authDlg"><form id="authForm">
+<div class="sheet" id="authDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="authForm">
   <h2 id="authTitle">Sign in</h2>
   <p class="sub" id="authSub" style="margin-top:6px"></p>
   <div id="googleWrap" hidden>
@@ -230,32 +232,36 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
   <div class="ok" id="authOk" hidden></div>
   <div class="dlgrow"><div class="sp"></div><button type="button" class="btn" id="authCancel">Cancel</button><button class="btn primary" id="authBtn">Sign in</button></div>
   <p class="note" id="authLinks"></p>
-</form></dialog>
+</form></div></div>
 
-<dialog id="pwDlg"><form id="pwForm">
+<div class="sheet" id="pwDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="pwForm">
   <h2>New password</h2>
   <p class="sub" style="margin-top:6px">You're in from the reset link. Pick a new password.</p>
   <label class="f" for="pw1">New password</label>
   <input class="in" type="text" id="pw1" autocomplete="new-password" minlength="8" required>
   <div class="err" id="pwErr" hidden></div>
   <div class="dlgrow"><div class="sp"></div><button type="button" class="btn" id="pwLater">Not now</button><button class="btn primary" id="pwBtn">Save password</button></div>
-</form></dialog>
+</form></div></div>
 
-<dialog id="acctDlg"><form method="dialog">
+<div class="sheet" id="acctDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="acctForm">
   <h2>Account</h2>
   <p class="sub" style="margin-top:6px">Signed in as <b id="acctEmail"></b>. One account works across all of Shawn's apps.</p>
   <div class="dlgrow"><button type="button" class="btn" id="signOut">Sign out</button><div class="sp"></div><button class="btn primary">Done</button></div>
-</form></dialog>
+</form></div></div>
 
 <script>
 const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
 const HERE = location.origin + location.pathname;
 let GOOGLE_ENABLED = false;
-fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((d) => { GOOGLE_ENABLED = !!d?.external?.google; if ($("#authDlg").open && mode !== "reset") $("#googleWrap").hidden = !GOOGLE_ENABLED; }).catch(() => {});
+fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((d) => { GOOGLE_ENABLED = !!d?.external?.google; if (isOpen("#authDlg") && mode !== "reset") $("#googleWrap").hidden = !GOOGLE_ENABLED; }).catch(() => {});
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = (q) => document.querySelector(q);
+const isOpen = (id) => !$(id).hidden;
+function openDlg(id){ $(id).hidden = false; $(id).scrollTop = 0; document.body.classList.add("locked"); }
+function closeDlg(id){ $(id).hidden = true; if (!document.querySelector(".sheet:not([hidden])")) document.body.classList.remove("locked"); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape"){ const o = [...document.querySelectorAll(".sheet:not([hidden])")].pop(); if (o) closeDlg("#" + o.id); } });
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const ICON_SWAP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13"/><path d="M6 11l6 6 6-6"/><path d="M5 21h14"/></svg>`;
@@ -536,12 +542,12 @@ function openEdit(it){
   $("#eRetire").hidden = !it;
   $("#eErr").hidden = true;
   setSpeed(it?.speed || "normal");
-  $("#editDlg").showModal();
+  openDlg("#editDlg");
 }
-$("#eCancel").addEventListener("click", () => $("#editDlg").close());
+$("#eCancel").addEventListener("click", () => closeDlg("#editDlg"));
 $("#eRetire").addEventListener("click", async () => {
   if (!editing || !confirm(`Retire ${editing.color}? It leaves the count and order list. You can bring it back from the bottom of Filaments.`)) return;
-  $("#editDlg").close(); await save(editing, { retired: true }, { kind: "edit" }); toast(`${editing.color} retired.`);
+  closeDlg("#editDlg"); await save(editing, { retired: true }, { kind: "edit" }); toast(`${editing.color} retired.`);
 });
 $("#editForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -555,13 +561,13 @@ $("#editForm").addEventListener("submit", async (e) => {
   $("#eSave").disabled = true;
   if (editing){
     const ok = await save(editing, row, { kind: "edit" });
-    if (ok) $("#editDlg").close();
+    if (ok) closeDlg("#editDlg");
   } else {
     row.main = Math.max(0, Number($("#eMain").value) || 0); row.upstairs = Math.max(0, Number($("#eUp").value) || 0);
     if (row.sort == null){ const same = items.filter((i) => i.material === row.material && (i.subtype || null) === row.subtype); row.sort = same.reduce((m, i) => Math.max(m, i.sort ?? 0), 0) + 1; }
     const { data, error } = await sb.from("filament_items").insert(row).select().single();
     if (error){ $("#eErr").textContent = "Couldn't add it. Check your connection and try again."; $("#eErr").hidden = false; }
-    else { items.push(data); $("#editDlg").close(); render(); toast(`${data.color} added.`); }
+    else { items.push(data); closeDlg("#editDlg"); render(); toast(`${data.color} added.`); }
   }
   $("#eSave").disabled = false;
 });
@@ -580,10 +586,10 @@ function openAuth(m){
     ? `<button type="button" class="link" data-mode="up">Create an account</button> · <button type="button" class="link" data-mode="reset">Forgot your password?</button>`
     : `<button type="button" class="link" data-mode="in">Back to sign in</button>`;
   $("#authErr").hidden = $("#authOk").hidden = true;
-  if (!$("#authDlg").open) $("#authDlg").showModal();
+  if (!isOpen("#authDlg")) openDlg("#authDlg");
 }
 $("#authLinks").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) openAuth(b.dataset.mode); });
-$("#authCancel").addEventListener("click", () => $("#authDlg").close());
+$("#authCancel").addEventListener("click", () => closeDlg("#authDlg"));
 $("#showPw").addEventListener("change", (e) => { $("#password").type = e.target.checked ? "text" : "password"; });
 $("#google").addEventListener("click", () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: HERE, queryParams: { prompt: "select_account" } } }));
 $("#authForm").addEventListener("submit", async (e) => {
@@ -594,11 +600,11 @@ $("#authForm").addEventListener("submit", async (e) => {
   $("#authErr").hidden = $("#authOk").hidden = true; b.disabled = true;
   if (mode === "in"){
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) bad(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message sent when you signed up." : "That email and password didn't match."); else $("#authDlg").close();
+    if (error) bad(/confirm/i.test(error.message) ? "Confirm your email first. The link is in the message sent when you signed up." : "That email and password didn't match."); else closeDlg("#authDlg");
   } else if (mode === "up"){
     const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: HERE } });
     if (error) bad("Couldn't create the account: " + error.message);
-    else if (data.session) $("#authDlg").close();
+    else if (data.session) closeDlg("#authDlg");
     else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) bad("That email already has an account (maybe from Dough or Your Turn). Sign in instead, or reset the password.");
     else good("Almost there. Check your email (and spam) for a confirmation link, then sign in here.");
   } else {
@@ -607,17 +613,18 @@ $("#authForm").addEventListener("submit", async (e) => {
   }
   b.disabled = false;
 });
-$("#pwLater").addEventListener("click", () => $("#pwDlg").close());
+$("#pwLater").addEventListener("click", () => closeDlg("#pwDlg"));
 $("#pwForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#pwErr").hidden = true; $("#pwBtn").disabled = true;
   const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
   $("#pwBtn").disabled = false;
-  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else $("#pwDlg").close();
+  if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else closeDlg("#pwDlg");
 });
-function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; $("#acctDlg").showModal(); }
+function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; openDlg("#acctDlg"); }
 $("#acct").addEventListener("click", openAcct);
-$("#signOut").addEventListener("click", () => { $("#acctDlg").close(); sb.auth.signOut(); });
+$("#acctForm").addEventListener("submit", (e) => { e.preventDefault(); closeDlg("#acctDlg"); });
+$("#signOut").addEventListener("click", () => { closeDlg("#acctDlg"); sb.auth.signOut(); });
 
 function setSession(sess){
   const changed = (sess?.user?.id || null) !== (session?.user?.id || null);
@@ -626,11 +633,11 @@ function setSession(sess){
   if (changed || !sess) load(); else render();
 }
 sb.auth.onAuthStateChange((event, sess) => {
-  if (event === "PASSWORD_RECOVERY") $("#pwDlg").showModal();
+  if (event === "PASSWORD_RECOVERY") openDlg("#pwDlg");
   setTimeout(() => setSession(sess), 0);
 });
 // Coming back to the app (it stays open on a phone): pick up changes made elsewhere.
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !document.querySelector("dialog[open]")) load(true); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !document.querySelector(".sheet:not([hidden])")) load(true); });
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
