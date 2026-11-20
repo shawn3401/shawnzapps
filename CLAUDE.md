@@ -196,8 +196,9 @@ He asked for a style unlike anything else on the site. "Shop floor": dark charco
 - `supabase/filamentinventory/001_schema.sql` tables and RLS; `002_seed_shawn.sql` his 34 filaments from the spreadsheet (loaded Nov 19, 2026 for his gmail account).
 
 ### Data (ShawnZapps project, RLS by `user_id = auth.uid()`)
-- `filament_items` one row per filament: `code` (Bambu code), `material`, `subtype`, `color`, `hex` (swatch; approximations Claude picked, Shawn can change them), `sort`, `speed`, `main` (spools on the main floor, the active one), `upstairs` (backups), `level` (active spool, slow ones only), `on_order`, `checked_at`, `retired`.
-- `filament_counts` a count's `started_at` and `finished_at`. A filament is checked in the open count when `checked_at >= started_at`.
+- `filament_items` one row per filament: `code` (Bambu code), `material`, `subtype`, `color`, `hex` (swatch; approximations Claude picked, Shawn can change them), `sort`, `speed`, `main` (spools on the main floor, the active one), `upstairs` (backups), `level` (active spool, slow ones only), `on_order`, `retired`, `main_pos` and `up_pos` (shelf order on each floor), `checked_main_at` and `checked_up_at` (`checked_at` is no longer used).
+- `filament_counts` a count's `started_at` and `finished_at`. A filament is checked on a floor in the open count when that floor's checked time is at or after `started_at`.
+- `filament_set_order(ids, floor)` (security invoker, `003_floors.sql`) saves one floor's whole shelf order in one call.
 - `filament_log` what happened (count, swap, ordered, unordered, received, edit) with the counts after, for usage history later.
 
 ### Reorder rule (Shawn, Nov 19, 2026)
@@ -210,7 +211,8 @@ One setting per filament, "How fast do you go through it?" (`need()` in the page
 - Idea not built: use `filament_log` swaps to suggest moving a color to Slow or Heavy.
 
 ### Screens
-- Count: Start a count, then each row has Main and Upstairs steppers and a check ("looks right"). Changing a number also checks it. Swap = finished the main floor spool and brought one down (upstairs minus one, slow level resets). Jump chips per group. Finish goes to Order.
+- Count works one floor at a time (Shawn, Nov 20, 2026: he counts where he's standing and doesn't want the other floor's details). A Main floor / Upstairs switch at the top (remembered); each row shows only that floor's stepper and check, in that floor's shelf order, not grouped by material. Changing a number also checks it on that floor. Main floor rows also have Swap (finished the spool, brought one down; upstairs minus one, slow level resets) and the slow level chips. At the bottom, "Upstairs next" and Finish; Finish warns about unchecked rows on either floor, then goes to Order.
+- Arrange (Shawn, Nov 20, 2026: match how the spools sit on the shelf and change it easily): a button on each floor's shelf header turns rows into a drag list (SortableJS 1.15.6 from jsDelivr, loaded only when needed, `forceFallback` so touch drags work on iPhone). Done saves the order. Each floor has its own order; both started as the old material order. New filaments go to the end of both.
 - Order: what to buy with the reason, Copy list (plain text), Ordered per row or All ordered (sets `on_order`), then On the way with Got it (adds to upstairs) or ✕.
 - Filaments: add, edit (name, material, type, code, order, swatch, speed), retire and bring back.
 - The spreadsheet's "Cart Spool" and "Cart Refill" columns are ignored on purpose (Shawn has spare empty spools). No Bambu store links.

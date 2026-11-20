@@ -75,10 +75,6 @@ nav.tabs button.on{color:var(--orange)}
 .bar{height:6px;background:var(--cell);border-radius:3px;margin-top:12px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--orange);border-radius:3px;transition:width .25s}
 
-/* jump chips */
-.jump{display:flex;gap:6px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}
-.jump::-webkit-scrollbar{display:none}
-.jump a{flex:none;font-family:var(--mono);font-size:12px;color:var(--dim);text-decoration:none;border:1px solid var(--dash);border-radius:4px;padding:6px 9px}
 
 /* groups and rows */
 .grp{display:flex;align-items:baseline;gap:8px;margin:22px 0 4px;scroll-margin-top:70px}
@@ -101,20 +97,30 @@ nav.tabs button.on{color:var(--orange)}
 .chk svg{width:20px;height:20px}
 .chk.on{background:var(--orange);border-color:var(--orange);color:var(--orange-ink)}
 .row.done .c{color:var(--dim)}
-.b{display:flex;align-items:flex-end;gap:10px;margin:10px 0 0 41px}
-.st{display:flex;flex-direction:column;gap:3px}
-.st .l{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--faint);text-transform:uppercase}
-.st .ctl{display:flex;align-items:center;background:var(--cell);border-radius:4px;height:38px}
-.st .ctl button{width:36px;height:38px;font-size:20px;color:var(--dim);display:flex;align-items:center;justify-content:center}
-.st .ctl button:active{color:var(--orange)}
-.st .ctl span{font-family:var(--mono);font-weight:600;font-size:17px;min-width:22px;text-align:center}
-.swap{margin-left:auto;height:38px;font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--dash);border-radius:4px;padding:0 9px;display:flex;align-items:center;gap:5px}
-.swap svg{width:15px;height:15px}
 .lvl{display:flex;gap:5px;margin:9px 0 0 41px;align-items:center;flex-wrap:wrap}
 .lvl .l{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--faint);text-transform:uppercase;margin-right:2px}
 .lvl button{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--dash);border-radius:3px;padding:6px 8px}
 .lvl button.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
 .lvl.ask button{border-color:var(--orange)}
+
+/* floors and shelf */
+.floors{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:16px 0 0;background:var(--cell);padding:4px;border-radius:6px}
+.floors button{height:46px;border-radius:4px;font-weight:700;font-size:15px;color:var(--dim)}
+.floors button.on{background:var(--orange);color:var(--orange-ink)}
+.floors small{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:6px}
+.shelfhd{display:flex;align-items:center;gap:8px;margin:20px 0 2px}
+.shelfhd .kicker{flex:1}
+.row .ctl{display:flex;align-items:center;background:var(--cell);border-radius:4px;height:40px;flex:none}
+.row .ctl button{width:36px;height:40px;font-size:20px;color:var(--dim);display:flex;align-items:center;justify-content:center}
+.row .ctl button:active{color:var(--orange)}
+.row .ctl span{font-family:var(--mono);font-weight:600;font-size:17px;min-width:20px;text-align:center}
+.swapchip{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--dash);border-radius:2px;padding:0 6px;line-height:16px}
+.row.arr{padding:4px 0}
+.pos{font-family:var(--mono);font-size:11px;color:var(--faint);width:20px;text-align:right;flex:none}
+.grip{width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--dim);touch-action:none;cursor:grab;flex:none}
+.grip svg{width:22px;height:22px}
+.row.ghost{opacity:.3}
+.row.chosen{background:var(--panel)}
 
 /* order */
 .sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 6px}
@@ -267,6 +273,8 @@ function closeDlg(id){ $(id).hidden = true; if (!document.querySelector(".sheet:
 document.addEventListener("keydown", (e) => { if (e.key === "Escape"){ const o = [...document.querySelectorAll(".sheet:not([hidden])")].pop(); if (o) closeDlg("#" + o.id); } });
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const ICON_GRIP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h14"/></svg>`;
+const loadScript = (src) => new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = no; document.head.append(t); });
 const ICON_SWAP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13"/><path d="M6 11l6 6 6-6"/><path d="M5 21h14"/></svg>`;
 
 // How fast a filament goes decides when it is reordered (agreed with Shawn Nov 19, 2026).
@@ -277,8 +285,13 @@ const SPEEDS = {
 };
 const LEVELS = [["over_half", "Over ½"], ["half", "½ or less"], ["empty", "Empty"]];
 
-let session = null, items = [], cnt = null, tab = "count", loaded = false;
-try { tab = localStorage.getItem("fil.tab") || "count"; } catch {}
+let session = null, items = [], cnt = null, tab = "count", loaded = false, floor = "main", arranging = false;
+try { tab = localStorage.getItem("fil.tab") || "count"; floor = localStorage.getItem("fil.floor") === "up" ? "up" : "main"; } catch {}
+// Shawn counts one floor at a time (Nov 20, 2026): each floor has its own shelf order and its own check.
+const FLOORS = {
+  main: { name: "Main floor", f: "main",     pos: "main_pos", ck: "checked_main_at" },
+  up:   { name: "Upstairs",   f: "upstairs", pos: "up_pos",   ck: "checked_up_at" },
+};
 
 // ---- the reorder rule ----------------------------------------------------------------------------------
 // Counts what is here plus what is already on the way, so an order is not suggested twice.
@@ -299,7 +312,8 @@ function why(it){
 const total = (it) => it.main + it.upstairs;
 const live = () => items.filter((i) => !i.retired);
 const counting = () => cnt && !cnt.finished_at;
-const isChecked = (it) => counting() && it.checked_at && new Date(it.checked_at) >= new Date(cnt.started_at);
+const isChecked = (it, fl = floor) => { const c = it[FLOORS[fl].ck]; return !!(counting() && c && new Date(c) >= new Date(cnt.started_at)); };
+const shelf = (fl = floor) => live().sort((a, b) => (a[FLOORS[fl].pos] ?? 9999) - (b[FLOORS[fl].pos] ?? 9999) || a.color.localeCompare(b.color));
 
 const MAT_RANK = { PLA: 0, PETG: 1, ABS: 2, ASA: 3, TPU: 4 };
 function groupKey(it){ return [it.material, it.subtype].filter(Boolean).join(" "); }
@@ -311,7 +325,6 @@ function grouped(list){
     .forEach((it) => { const k = groupKey(it); if (!g.has(k)) g.set(k, []); g.get(k).push(it); });
   return g;
 }
-const slug = (s) => "g-" + s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 // ---- render -------------------------------------------------------------------------------------------
@@ -346,39 +359,47 @@ function tagsFor(it){
 }
 
 function countView(){
-  const L = live(), done = L.filter(isChecked).length;
-  let h;
+  const L = shelf(), F = FLOORS[floor], other = floor === "main" ? "up" : "main";
+  const done = (fl) => L.filter((i) => isChecked(i, fl)).length;
+  let h = `<div class="floors">${["main", "up"].map((fl) => `<button class="${fl === floor ? "on" : ""}" data-act="floor" data-v="${fl}">${FLOORS[fl].name}${counting() ? `<small>${done(fl)}/${L.length}</small>` : ""}</button>`).join("")}</div>`;
   if (counting()){
-    const pct = L.length ? Math.round(done / L.length * 100) : 0;
-    h = `<div class="prog"><div class="top"><div class="t"><div class="big">${done} of ${L.length} checked</div><div class="small">COUNT STARTED ${fmtDay(cnt.started_at).toUpperCase()}</div></div>
-      <button class="btn small ${done === L.length ? "primary" : ""}" data-act="finish">Finish</button></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    const d = done(floor), pct = L.length ? Math.round(d / L.length * 100) : 0;
+    h += `<div class="prog"><div class="top"><div class="t"><div class="big">${d} of ${L.length} checked</div><div class="small">${F.name.toUpperCase()} · STARTED ${fmtDay(cnt.started_at).toUpperCase()}</div></div>
+      <button class="btn small" data-act="finish">Finish</button></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
   } else {
-    h = `<div class="prog"><div class="top"><div class="t"><div class="big">Ready to count?</div><div class="small">${cnt ? "LAST COUNT " + fmtDay(cnt.finished_at).toUpperCase() : "NO COUNTS YET"}</div></div>
+    h += `<div class="prog"><div class="top"><div class="t"><div class="big">Ready to count?</div><div class="small">${cnt ? "LAST COUNT " + fmtDay(cnt.finished_at).toUpperCase() : "NO COUNTS YET"}</div></div>
       <button class="btn small primary" data-act="start">Start a count</button></div></div>`;
   }
-  const g = grouped(L);
-  h += `<div class="jump">${[...g.keys()].map((k) => `<a href="#${slug(k)}">${esc(k)} ${g.get(k).length}</a>`).join("")}</div>`;
-  for (const [k, list] of g){
-    h += `<div class="grp" id="${slug(k)}"><span class="kicker">${esc(k)}</span><span class="n">${list.filter(isChecked).length}/${list.length}</span></div>`;
-    for (const it of list) h += countRow(it);
+  h += `<div class="shelfhd"><span class="kicker">${arranging ? "Drag to match your shelf" : F.name + " shelf"}</span>${arranging
+    ? `<button class="btn small primary" data-act="arrangeDone">Done</button>`
+    : `<button class="btn small" data-act="arrange">Arrange</button>`}</div>`;
+  h += `<div id="shelf">${L.map((it, i) => arranging ? arrangeRow(it, i) : countRow(it)).join("")}</div>`;
+  if (counting() && !arranging){
+    const d = done(floor), od = done(other);
+    h += `<div class="acts" style="margin:22px 0">`;
+    if (od < L.length) h += `<button class="btn ${d === L.length ? "primary" : ""}" data-act="floor" data-v="${other}">${FLOORS[other].name} next</button>`;
+    h += `<button class="btn ${d === L.length && od === L.length ? "primary" : ""}" data-act="finish">Finish count</button></div>`;
   }
-  if (counting()) h += `<div style="margin:22px 0"><button class="btn primary block" data-act="finish">Finish count</button></div>`;
   return h;
 }
 function countRow(it){
-  const ck = isChecked(it);
-  let h = `<div class="row ${ck ? "done" : ""}" data-id="${it.id}"><div class="a">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags">${tagsFor(it)}</div></div>`;
+  const F = FLOORS[floor], ck = isChecked(it);
+  let tags = tagsFor(it);
+  if (floor === "main" && it.upstairs > 0) tags += `<button class="swapchip" data-act="swap" data-id="${it.id}" title="Finished this spool and brought one down from upstairs">↓ SWAP</button>`;
+  let h = `<div class="row ${ck ? "done" : ""}" data-id="${it.id}"><div class="a">${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags">${tags}</div></div>${stepper(it, F.f)}`;
   if (counting()) h += `<button class="chk ${ck ? "on" : ""}" data-act="check" data-id="${it.id}" aria-label="${ck ? "Checked" : "Looks right"}">${ICON_CHECK}</button>`;
-  h += `</div><div class="b">${stepper(it, "main", "Main")}${stepper(it, "upstairs", "Upstairs")}`;
-  if (it.upstairs > 0) h += `<button class="swap" data-act="swap" data-id="${it.id}" title="Finished the main floor spool and brought one down">${ICON_SWAP}SWAP</button>`;
   h += `</div>`;
-  if (it.speed === "slow" && it.main > 0){
+  if (floor === "main" && it.speed === "slow" && it.main > 0){
     h += `<div class="lvl ${it.level ? "" : "ask"}"><span class="l">Active</span>${LEVELS.map(([v, n]) => `<button class="${it.level === v ? "on" : ""}" data-act="level" data-id="${it.id}" data-v="${v}">${n}</button>`).join("")}</div>`;
   }
   return h + `</div>`;
 }
-function stepper(it, field, label){
-  return `<div class="st"><span class="l">${label}</span><div class="ctl"><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="-1" aria-label="One less ${label.toLowerCase()}">−</button><span>${it[field]}</span><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="1" aria-label="One more ${label.toLowerCase()}">+</button></div></div>`;
+function arrangeRow(it, i){
+  return `<div class="row arr" data-id="${it.id}"><div class="a"><span class="pos">${i + 1}</span>${swatch(it)}<div class="nm"><div class="c">${esc(it.color)}</div><div class="tags"><span class="code">${esc(groupKey(it))}</span></div></div><span class="grip" aria-label="Drag to move">${ICON_GRIP}</span></div></div>`;
+}
+function stepper(it, field){
+  const label = field === "main" ? "main floor" : "upstairs";
+  return `<div class="ctl"><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="-1" aria-label="One less ${label}">−</button><span>${it[field]}</span><button data-act="step" data-id="${it.id}" data-f="${field}" data-d="1" aria-label="One more ${label}">+</button></div>`;
 }
 
 function orderView(){
@@ -437,7 +458,7 @@ async function save(it, patch, log){
   if (log) sb.from("filament_log").insert({ item_id: it.id, kind: log.kind, main: it.main, upstairs: it.upstairs, qty: log.qty ?? null }).then(() => {});
   return true;
 }
-const stamp = () => (counting() ? { checked_at: new Date().toISOString() } : {});
+const stamp = () => (counting() ? { [FLOORS[floor].ck]: new Date().toISOString() } : {});
 
 let tt;
 function toast(msg){
@@ -456,16 +477,41 @@ const ACTS = {
     cnt = data; render(); window.scrollTo({ top: 0 });
   },
   async finish(){
-    const left = live().filter((i) => !isChecked(i)).length;
-    if (left && !confirm(`${left} ${left === 1 ? "filament isn't" : "filaments aren't"} checked yet. Finish the count anyway?`)) return;
+    const L = live(), lm = L.filter((i) => !isChecked(i, "main")).length, lu = L.filter((i) => !isChecked(i, "up")).length;
+    const parts = [lm && `${lm} on the main floor`, lu && `${lu} upstairs`].filter(Boolean);
+    if (parts.length && !confirm(`Not checked yet: ${parts.join(" and ")}. Finish the count anyway?`)) return;
     const { data, error } = await sb.from("filament_counts").update({ finished_at: new Date().toISOString() }).eq("id", cnt.id).select().single();
     if (error){ toast("Couldn't finish the count. Try again."); return; }
     cnt = data; setTab("order"); toast("Count saved.");
   },
   check({ id }){
-    const it = byId(id);
-    if (isChecked(it)) save(it, { checked_at: null });
-    else save(it, { checked_at: new Date().toISOString() }, { kind: "count" });
+    const it = byId(id), ck = FLOORS[floor].ck;
+    if (isChecked(it)) save(it, { [ck]: null });
+    else save(it, { [ck]: new Date().toISOString() }, { kind: "count" });
+  },
+  floor({ v }){
+    if (arranging) ACTS.arrangeDone();
+    floor = v; try { localStorage.setItem("fil.floor", v); } catch {}
+    render(); window.scrollTo({ top: 0 });
+  },
+  async arrange(){
+    if (!window.Sortable){
+      try { await loadScript("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"); }
+      catch { toast("Couldn't load the arranging tool. Check your connection."); return; }
+    }
+    arranging = true; render();
+    new Sortable($("#shelf"), { handle: ".grip", animation: 150, forceFallback: true, fallbackTolerance: 3, ghostClass: "ghost", chosenClass: "chosen", scrollSensitivity: 90, scrollSpeed: 14,
+      onEnd: () => document.querySelectorAll("#shelf .pos").forEach((e, i) => { e.textContent = i + 1; }) });
+  },
+  async arrangeDone(){
+    const ids = [...document.querySelectorAll("#shelf .row")].map((r) => r.dataset.id), pos = FLOORS[floor].pos;
+    arranging = false;
+    const before = items.map((i) => [i, i[pos]]);
+    ids.forEach((id, n) => { const it = byId(id); if (it) it[pos] = n + 1; });
+    render();
+    const { error } = await sb.rpc("filament_set_order", { p_ids: ids, p_floor: floor });
+    if (error){ before.forEach(([i, v]) => { i[pos] = v; }); render(); toast("Couldn't save the new order. Try again."); }
+    else toast(`${FLOORS[floor].name} order saved.`);
   },
   step({ id, f, d }){
     const it = byId(id), v = Math.max(0, it[f] + Number(d));
@@ -567,6 +613,8 @@ $("#editForm").addEventListener("submit", async (e) => {
   } else {
     row.main = Math.max(0, Number($("#eMain").value) || 0); row.upstairs = Math.max(0, Number($("#eUp").value) || 0);
     if (row.sort == null){ const same = items.filter((i) => i.material === row.material && (i.subtype || null) === row.subtype); row.sort = same.reduce((m, i) => Math.max(m, i.sort ?? 0), 0) + 1; }
+    row.main_pos = items.reduce((m, i) => Math.max(m, i.main_pos ?? 0), 0) + 1;
+    row.up_pos = items.reduce((m, i) => Math.max(m, i.up_pos ?? 0), 0) + 1;
     const { data, error } = await sb.from("filament_items").insert(row).select().single();
     if (error){ $("#eErr").textContent = "Couldn't add it. Check your connection and try again."; $("#eErr").hidden = false; }
     else { items.push(data); closeDlg("#editDlg"); render(); toast(`${data.color} added.`); }
@@ -639,7 +687,7 @@ sb.auth.onAuthStateChange((event, sess) => {
   setTimeout(() => setSession(sess), 0);
 });
 // Coming back to the app (it stays open on a phone): pick up changes made elsewhere.
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !document.querySelector(".sheet:not([hidden])")) load(true); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !arranging && !document.querySelector(".sheet:not([hidden])")) load(true); });
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
