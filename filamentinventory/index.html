@@ -257,6 +257,7 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
 <div class="sheet" id="acctDlg" role="dialog" aria-modal="true" hidden><div class="panel"><form id="acctForm">
   <h2>Account</h2>
   <p class="sub" style="margin-top:6px">Signed in as <b id="acctEmail"></b>. One account works across all of Shawn's apps.</p>
+  <p class="note mono" style="font-size:11px">VERSION <span id="ver"></span></p>
   <div class="dlgrow"><button type="button" class="btn" id="signOut">Sign out</button><div class="sp"></div><button class="btn primary">Done</button></div>
 </form></div></div>
 
@@ -264,6 +265,7 @@ label.f{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1px;
 const SUPABASE_URL = "https://yjurglvfzlboblestfdz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_oGRMRv_8B4_ngkwpe10y5A_S91dOcfe";
 const HERE = location.origin + location.pathname;
+const VERSION = "2026-11-20 c";   // bump with sw.js CACHE on every release
 let GOOGLE_ENABLED = false;
 fetch(SUPABASE_URL + "/auth/v1/settings", { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((d) => { GOOGLE_ENABLED = !!d?.external?.google; if (isOpen("#authDlg") && mode !== "reset") $("#googleWrap").hidden = !GOOGLE_ENABLED; }).catch(() => {});
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -685,7 +687,7 @@ $("#pwForm").addEventListener("submit", async (e) => {
   $("#pwBtn").disabled = false;
   if (error){ $("#pwErr").textContent = "Couldn't save that: " + error.message; $("#pwErr").hidden = false; } else closeDlg("#pwDlg");
 });
-function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; openDlg("#acctDlg"); }
+function openAcct(){ $("#acctEmail").textContent = session?.user?.email || ""; $("#ver").textContent = VERSION; openDlg("#acctDlg"); }
 $("#acct").addEventListener("click", openAcct);
 $("#acctForm").addEventListener("submit", (e) => { e.preventDefault(); closeDlg("#acctDlg"); });
 $("#signOut").addEventListener("click", () => { closeDlg("#acctDlg"); openAuth("in"); sb.auth.signOut(); });
@@ -705,7 +707,20 @@ sb.auth.onAuthStateChange((event, sess) => {
 // Coming back to the app (it stays open on a phone): pick up changes made elsewhere.
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && session && loaded && !arranging && !document.querySelector(".sheet:not([hidden])")) load(true); });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+// Keep the home screen app current: check for a new version whenever it comes back to the front,
+// and reload once the new version takes over (not in the middle of arranging or a dialog).
+if ("serviceWorker" in navigator){
+  const hadSW = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadSW || reloading) return;
+    const go = () => { if (arranging || document.querySelector(".sheet:not([hidden])")) return setTimeout(go, 2000); reloading = true; location.reload(); };
+    go();
+  });
+}
 </script>
 </body>
 </html>

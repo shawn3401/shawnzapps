@@ -190,6 +190,7 @@ He asked for a style unlike anything else on the site. "Shop floor": dark charco
 
 ### Files
 - `filamentinventory/index.html` the whole app, CSS and JS inline, supabase-js v2. Same sign-in code as Your Turn (Google with the account chooser, email and password).
+- Releases (Nov 20, 2026, after Shawn kept seeing an old version on his phone): bump `VERSION` in `index.html` and `CACHE` in `sw.js` together on every change. The service worker fetches with `cache: "no-store"` (GitHub Pages sends max-age=600), the page checks for a new worker each time the app comes to the front, and reloads once it takes over. The version shows in the Account box.
 - No `<dialog>` in this app (Nov 19, 2026): in the iPhone home screen app Shawn could not type in the sign-in dialog's email field or use Google, though it worked in a desktop browser. Popups are plain `div.sheet` overlays (`openDlg`, `closeDlg`).
 - Sign-in is a form right on the signed-out screen (`#authDlg`, a section, not an overlay) with `name="username"` / `autocomplete="username"` and `current-password`, so LastPass and iCloud Passwords recognize it (Shawn, Nov 19, 2026: neither filled the overlay version). Supabase Auth has no passkey sign-in, so Apple's passkey prompt cannot be offered; Google is the one-tap option.
 - `filamentinventory/manifest.webmanifest`, `sw.js` (network first for the app's own files, cached copy when offline; saving needs a connection), `icon.svg`, `icon-180/192/512.png` (an orange spool ring, drawn by a small Python script).
